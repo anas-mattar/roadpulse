@@ -54,7 +54,7 @@ public class ReportFlag
 }
 
 /// <summary>Kinds of places drivers search for or are warned about (from OpenStreetMap).</summary>
-public enum PlaceCategory { FUEL, PARKING, FOOD, EV_CHARGING, REST_AREA, SPEED_CAMERA }
+public enum PlaceCategory { FUEL, PARKING, FOOD, EV_CHARGING, REST_AREA, SPEED_CAMERA, TOLL_PLAZA }
 
 /// <summary>A place imported from OpenStreetMap (see Modules/Places/PlaceImporter.cs).</summary>
 public class MapPlace

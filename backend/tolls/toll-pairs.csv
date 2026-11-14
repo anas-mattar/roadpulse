@@ -1,0 +1,14 @@
+# RoadPulse closed-system toll prices (PLUS and other highways where the price depends on where you
+# enter and leave). YOU fill this in; the server reloads it on every change.
+#
+# How it works: add each plaza to toll-rates.csv with system CLOSED and the highway name
+# (e.g. "Jalan Duta,,PLUS,CLOSED,,,..."). Then add the price of each trip here: one row per
+# entry/exit pair, in either direction. The highway must match the highway in toll-rates.csv.
+# A route that enters at one plaza and leaves at another is then priced as one trip.
+#
+# Where to find prices: the PLUS website or the PLUS app (toll fare calculator). Start with the
+# trips you actually drive.
+#
+# Example (not a real price, delete it):
+#   PLUS,Jalan Duta,Rawang,1.00,,example,2026-11-15,
+highway,entry,exit,car_rm,motorcycle_rm,source,checked_on,notes

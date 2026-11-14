@@ -90,7 +90,16 @@ class OverlayScreenshotTest {
             route.copy(lengthKm = 10.1, timeSeconds = 1380.0, maneuvers = listOf(Maneuver("x", 8.0, 1300.0, 0, streetNames = listOf("Jalan Tun Razak")))),
             route.copy(lengthKm = 12.4, timeSeconds = 1500.0, hasToll = true, maneuvers = listOf(Maneuver("x", 10.0, 1400.0, 0, streetNames = listOf("Jalan Belfield")))),
         )
-        PreviewOverlay(place, choices[0], choices, selected = 0, onSelectRoute = {}, busy = false, onBack = {}, onGo = {}, onSimulate = {})
+        PreviewOverlay(
+            place, choices[0], choices, selected = 0, onSelectRoute = {}, busy = false, onBack = {}, onGo = {}, onSimulate = {},
+            tolls = listOf(
+                com.roadpulse.app.data.TollEstimate(totalRm = 6.8, complete = true,
+                    plazas = listOf(com.roadpulse.app.data.TollPlaza("Gombak", status = "PRICED", priceRm = 6.8))),
+                null,
+                com.roadpulse.app.data.TollEstimate(totalRm = 2.5, complete = false,
+                    plazas = listOf(com.roadpulse.app.data.TollPlaza("Pantai", status = "PRICED", priceRm = 2.5), com.roadpulse.app.data.TollPlaza(null, status = "NOT_IN_TABLE"))),
+            ),
+        )
     }
 
     @Test
@@ -103,6 +112,20 @@ class OverlayScreenshotTest {
                 turnType = 10, thenType = 16, thenGapMeters = 200.0, speedKmh = 57, speedLimitKph = 60,
             ),
             narrator = EnglishNarrator, muted = false, onToggleMute = {}, onReport = {}, onStop = {},
+        )
+    }
+
+    @Test
+    fun drivingArabic() = shot("3c_driving_arabic", RP.Field) {
+        val n = com.roadpulse.app.nav.ArabicNarrator
+        DrivingOverlay(
+            state = MapUiState(
+                navigating = true, route = route, destination = place,
+                currentInstruction = n.atTurn(Maneuver("Turn right onto Jalan Ampang.", 0.5, 30.0, 0, type = 10, streetNames = listOf("Jalan Ampang"))),
+                distanceToTurnMeters = 350.0, remainingKm = 7.2, remainingSeconds = 720.0,
+                turnType = 10, thenType = 16, thenGapMeters = 200.0, speedKmh = 57, speedLimitKph = 60,
+            ),
+            narrator = n, muted = false, onToggleMute = {}, onReport = {}, onStop = {},
         )
     }
 

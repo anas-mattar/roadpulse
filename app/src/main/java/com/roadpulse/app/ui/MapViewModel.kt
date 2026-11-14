@@ -46,6 +46,8 @@ data class MapUiState(
     /** All route choices for the preview; [route] is routeChoices[selectedRoute]. */
     val routeChoices: List<Route> = emptyList(),
     val selectedRoute: Int = 0,
+    /** Toll estimate per route choice (same order); null while loading or when there is no server. */
+    val tollEstimates: List<com.roadpulse.app.data.TollEstimate?> = emptyList(),
     val busy: Boolean = false,
     val navigating: Boolean = false,
     val currentInstruction: String? = null,
@@ -265,6 +267,20 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    /** Asks the backend what each toll route costs (from the owner's toll table); shown on the route cards. */
+    private fun estimateTolls(routes: List<Route>) {
+        val url = ServerSettings.backendUrl()
+        if (url.isEmpty() || routes.none { it.hasToll }) return
+        val vehicle = com.roadpulse.app.data.RouteSettings.options.value.vehicle
+        viewModelScope.launch {
+            val client = com.roadpulse.app.data.TollClient(url)
+            val estimates = routes.map { r ->
+                if (!r.hasToll) null else runCatching { client.estimate(r.shape, vehicle) }.getOrNull()
+            }
+            _state.update { if (it.routeChoices === routes) it.copy(tollEstimates = estimates) else it }
+        }
+    }
+
     /** Where the current preview was planned from (to re-plan after a stop or option change). */
     private var lastOrigin: GeoPoint? = null
 
@@ -276,7 +292,8 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
             _state.update { it.copy(busy = true) }
             runCatching { router.routes(from, to, stops = stops, options = com.roadpulse.app.data.RouteSettings.options.value) }
                 .onSuccess { routes ->
-                    _state.update { it.copy(route = routes.first(), routeChoices = routes, selectedRoute = 0, busy = false) }
+                    _state.update { it.copy(route = routes.first(), routeChoices = routes, selectedRoute = 0, tollEstimates = emptyList(), busy = false) }
+                    estimateTolls(routes)
                 }
                 .onFailure { e -> _state.update { it.copy(busy = false, message = "Routing failed: ${e.message}") } }
         }

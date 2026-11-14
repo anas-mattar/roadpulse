@@ -65,6 +65,13 @@ kept as `valhalla_data/previous.osm.pbf`), stops if the data is not newer, rebui
 `-SkipDownload`, `-SkipMaps`. Monthly is enough for development; weekly before a public release.
 Community reports are live data and are not affected.
 
+### Monthly, automatically
+
+`register-map-update-task.ps1` creates a Windows scheduled task that runs the update on the 1st of
+every month at 03:00, or as soon as possible after that if the laptop was off. It starts Docker
+Desktop if needed and writes logs to `backend\logs`. Options: `-Day 15 -Time 02:30`, and `-Remove`
+to delete the task. To test it: `schtasks /Run /TN "RoadPulse monthly map update"`.
+
 ## Places: fuel, parking, food, EV charging, R&R, speed cameras
 
 ```
@@ -82,6 +89,36 @@ into the `places` table with `docker compose run --rm api import-places /maps/pl
 The app uses them for the category buttons under the search box, car parks near the destination,
 and speed camera warnings. Coverage is whatever OpenStreetMap has: speed cameras in particular
 are mapped only in part in Malaysia.
+
+## Toll prices (estimates you keep up to date)
+
+Route cards show the estimated toll, e.g. **Toll ~RM 6.80**. How it works:
+
+1. Toll plaza locations come from the map file (`barrier=toll_booth`), loaded by `setup-places.ps1`
+   together with the other places. Re-run it once after this update.
+2. Prices come from **`tolls/toll-rates.csv`**, a table you maintain. Open it in Excel or a text
+   editor, change a price, save as CSV. The server notices the change; no restart needed.
+3. `POST /v1/tolls/estimate` with `{ "points": [[lat, lon], ...], "vehicle": "CAR" | "MOTORCYCLE" }`
+   returns the plazas on the route in driving order, each `PRICED`, `NO_PRICE`, `CLOSED_SYSTEM` or
+   `NOT_IN_TABLE`, plus `totalRm` (priced plazas only) and `complete`.
+
+The app shows `Toll ~RM x` when every plaza is priced, `Toll RM x + ?` when some are not,
+and `Toll: price unknown` when none are. Taxis use the car (Class 1) price.
+
+Limits:
+
+- **Closed systems (PLUS etc.)** charge by entry and exit. Add their plazas to `toll-rates.csv`
+  with system `CLOSED`, and the price of each trip to **`tolls/toll-pairs.csv`** (highway, entry,
+  exit, price; either direction). A route through a known pair shows as one trip, "Rawang - Jalan
+  Duta". Unknown pairs show as "not priced". The file starts empty: add the trips you drive, using
+  the PLUS toll fare calculator.
+- Matching uses the plaza **name** on the map. "Plaza Tol", "Toll Plaza", brackets and
+  "Arah ..." are ignored. If a name on the map differs, add it to `aliases`, e.g.
+  `Sg Long|Sungai Long`. A name used by two highways counts as unknown rather than risk a wrong
+  price.
+- The pre-filled prices (Class 1) are from motorist.my's 2026 list and litrak.com.my, checked
+  2026-11-15. None of these sources gives an effective date. Motorcycle prices are empty.
+  Check each row on the operator's site and fill in `checked_on`.
 
 ## Offline map tiles (optional)
 

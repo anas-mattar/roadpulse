@@ -33,8 +33,10 @@ services:
       Database__MigrateOnStartup: "true"
       Moderation__Moderators__0__Name: ${MODERATOR_NAME:-}
       Moderation__Moderators__0__KeyHash: ${MODERATOR_KEY_HASH:-}
+      Tolls__RatesPath: /tolls/toll-rates.csv
     volumes:
       - ./maps:/maps:ro # places file for "import-places" (setup-places.ps1)
+      - ./tolls:/tolls:ro # toll prices you keep up to date (tolls/toll-rates.csv); read on every change
     ports:
       - "8080:8080"
 

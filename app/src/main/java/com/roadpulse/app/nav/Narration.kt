@@ -7,7 +7,8 @@ import java.util.Locale
 /** Languages for voice prompts and the navigation banner. */
 enum class GuidanceLanguage(val code: String, val label: String, val locale: Locale) {
     EN("en", "English", Locale.US),
-    MS("ms", "Bahasa Melayu", Locale("ms", "MY"));
+    MS("ms", "Bahasa Melayu", Locale("ms", "MY")),
+    AR("ar", "العربية (Arabic)", Locale("ar"));
 
     companion object {
         fun fromCode(code: String?): GuidanceLanguage? = entries.firstOrNull { it.code == code }
@@ -59,6 +60,7 @@ interface Narrator {
 fun narratorFor(language: GuidanceLanguage): Narrator = when (language) {
     GuidanceLanguage.EN -> EnglishNarrator
     GuidanceLanguage.MS -> MalayNarrator
+    GuidanceLanguage.AR -> ArabicNarrator
 }
 
 private fun String.lowercaseFirst() = replaceFirstChar { it.lowercase() }
@@ -228,6 +230,136 @@ object MalayNarrator : Narrator {
 
     fun compass(bearing: Int): String {
         val names = listOf("utara", "timur laut", "timur", "tenggara", "selatan", "barat daya", "barat", "barat laut")
+        return names[(((bearing % 360) + 360) % 360 + 22) / 45 % 8]
+    }
+}
+
+/**
+ * Modern Standard Arabic, generated from the maneuver data like [MalayNarrator] (the routing server
+ * has no Arabic). All Arabic wording lives here for review. Street names stay as on the map
+ * (usually Malay in Latin letters). Unknown maneuver types fall back to the English text.
+ */
+object ArabicNarrator : Narrator {
+
+    fun core(m: Maneuver): String? {
+        val name = m.streetNames.firstOrNull()
+        val onto = name?.let { " إلى $it" }.orEmpty()
+        val target = (m.exitBranch.firstOrNull() ?: name)
+        val toward = m.exitToward.take(2).joinToString("، ").let { if (it.isBlank()) "" else " باتجاه $it" }
+        return when (m.type) {
+            1, 2, 3 -> {
+                val dir = m.bearingAfter?.let { " باتجاه ${compass(it)}" }.orEmpty()
+                "انطلق$dir" + (name?.let { " على $it" }.orEmpty())
+            }
+            4 -> "لقد وصلت إلى وجهتك"
+            com.roadpulse.app.data.RoutingClient.STOP_REACHED -> "لقد وصلت إلى محطة التوقف"
+            5 -> "وجهتك على اليمين"
+            6 -> "وجهتك على اليسار"
+            7 -> "تابع$onto"
+            8 -> "تابع" + (name?.let { " على $it" }.orEmpty())
+            9 -> "انعطف قليلًا إلى اليمين$onto"
+            10 -> "انعطف يمينًا$onto"
+            11 -> "انعطف بحدة إلى اليمين$onto"
+            12, 13 -> "استدر للخلف$onto"
+            14 -> "انعطف بحدة إلى اليسار$onto"
+            15 -> "انعطف يسارًا$onto"
+            16 -> "انعطف قليلًا إلى اليسار$onto"
+            17 -> "تابع مباشرة إلى المنحدر" + (target?.let { " نحو $it" }.orEmpty()) + toward
+            18 -> "اسلك المنحدر على اليمين" + (target?.let { " نحو $it" }.orEmpty()) + toward
+            19 -> "اسلك المنحدر على اليسار" + (target?.let { " نحو $it" }.orEmpty()) + toward
+            20, 21 -> {
+                val side = if (m.type == 20) "اليمين" else "اليسار"
+                val number = m.exitNumber?.let { " رقم $it" }.orEmpty()
+                "اسلك المخرج$number على $side" + (target?.let { " نحو $it" }.orEmpty()) + toward
+            }
+            22, 23, 24 -> {
+                val keep = when (m.type) {
+                    22 -> "تابع مباشرة"
+                    23 -> "الزم اليمين"
+                    else -> "الزم اليسار"
+                }
+                when {
+                    target != null -> "$keep للدخول إلى $target$toward"
+                    toward.isNotEmpty() -> "$keep$toward"
+                    else -> "$keep عند التفرع"
+                }
+            }
+            25, 37, 38 -> name?.let { "اندمج في $it" } ?: "اندمج مع حركة المرور"
+            26 -> m.roundaboutExitCount?.let { "ادخل الدوار واسلك المخرج ${ordinal(it)}$onto" } ?: "ادخل الدوار"
+            27 -> "اخرج من الدوار$onto"
+            28 -> "استقل العبارة"
+            29 -> "انزل من العبارة$onto"
+            else -> null
+        }
+    }
+
+    private fun String.withStop() = trimEnd().let { if (it.endsWith(".")) it else "$it." }
+
+    /** "450 مترًا", "200 متر", "5 أمتار": the word for metres agrees with the number. */
+    fun meters(n: Int): String {
+        val lastTwo = n % 100
+        val word = when {
+            n == 1 -> return "متر واحد"
+            n == 2 -> return "متران"
+            lastTwo == 0 -> "متر"
+            lastTwo in 3..10 -> "أمتار"
+            lastTwo in 1..2 -> "متر"
+            else -> "مترًا"
+        }
+        return "$n $word"
+    }
+
+    override fun banner(m: Maneuver) = core(m)?.withStop() ?: m.instruction
+    override fun atTurn(m: Maneuver) = core(m)?.withStop() ?: (m.verbalPre ?: m.instruction)
+    override fun alert(m: Maneuver, meters: Int): String {
+        val c = core(m) ?: return EnglishNarrator.alert(m, meters)
+        return "بعد ${meters(meters)}، $c".withStop()
+    }
+
+    override fun atTurnThen(m: Maneuver, next: Maneuver): String {
+        val c = core(m) ?: return EnglishNarrator.atTurnThen(m, next)
+        val n = core(next) ?: return atTurn(m)
+        return "$c، ثم $n".withStop()
+    }
+
+    override fun alertThen(m: Maneuver, meters: Int, next: Maneuver): String {
+        val c = core(m) ?: return EnglishNarrator.alertThen(m, meters, next)
+        val n = core(next) ?: return alert(m, meters)
+        return "بعد ${meters(meters)}، $c، ثم $n".withStop()
+    }
+
+    override val arrived = "لقد وصلت."
+    override val rerouting = "جارٍ البحث عن مسار جديد."
+    override val gpsLost = "فُقدت إشارة GPS. تابع السير على الطريق."
+    override val noInternet = "لا يوجد اتصال بالإنترنت. سيبقى المسار الحالي."
+    override fun resuming(destination: String) = "متابعة الرحلة إلى $destination."
+    override fun inDistance(distance: String) = "بعد $distance"
+    override val followRoute = "اتبع المسار"
+    override val thenLabel = "ثم"
+    override val recenter = "عودة إلى موقعي"
+    override val statusFindingRoute = "جارٍ البحث عن مسار جديد…"
+    override val statusOffline = "غير متصل: سيبقى المسار الحالي"
+    override val statusGpsLost = "فُقدت إشارة GPS: تابع السير على الطريق"
+    override val statusWeakGps = "إشارة GPS ضعيفة"
+
+    override fun reportName(type: ReportType) = when (type) {
+        ReportType.POLICE -> "شرطة"
+        ReportType.CRASH -> "حادث"
+        ReportType.HAZARD -> "خطر"
+        ReportType.TRAFFIC_JAM -> "ازدحام مروري"
+        ReportType.ROAD_CLOSED -> "إغلاق طريق"
+    }
+    override fun reportAhead(type: ReportType, meters: Int) = "${reportName(type)} على بعد ${meters(meters)} أمامك."
+    override fun cameraAhead(meters: Int, limitKph: Int?) =
+        "كاميرا سرعة بعد ${meters(meters)}." + (limitKph?.let { " الحد الأقصى $it." } ?: "")
+    override val speedCamera = "كاميرا سرعة"
+
+    private val ordinals = listOf("الأول", "الثاني", "الثالث", "الرابع", "الخامس", "السادس", "السابع", "الثامن", "التاسع", "العاشر")
+
+    fun ordinal(n: Int): String = ordinals.getOrNull(n - 1) ?: "رقم $n"
+
+    fun compass(bearing: Int): String {
+        val names = listOf("الشمال", "الشمال الشرقي", "الشرق", "الجنوب الشرقي", "الجنوب", "الجنوب الغربي", "الغرب", "الشمال الغربي")
         return names[(((bearing % 360) + 360) % 360 + 22) / 45 % 8]
     }
 }

@@ -494,7 +494,12 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                         voiceSearch.launch(
                             android.content.Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
                                 .putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL, android.speech.RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-                                .putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE, if (effectiveLanguage == GuidanceLanguage.MS) "ms-MY" else "en-US")
+                                .putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE, when (effectiveLanguage) {
+                                    GuidanceLanguage.MS -> "ms-MY"
+                                    // Place names in Malaysia are Malay/English; Arabic speech would not match them.
+                                    GuidanceLanguage.AR -> "en-US"
+                                    GuidanceLanguage.EN -> "en-US"
+                                })
                                 .putExtra(android.speech.RecognizerIntent.EXTRA_PROMPT, "Where to?")
                         )
                     }) else null,
@@ -504,6 +509,7 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                     destination = state.destination,
                     route = state.route,
                     choices = state.routeChoices,
+                    tolls = state.tollEstimates,
                     selected = state.selectedRoute,
                     onSelectRoute = viewModel::selectRoute,
                     busy = state.busy,
@@ -1006,6 +1012,19 @@ private fun VoiceSettingsDialog(onDismiss: () -> Unit, onClearPlaces: () -> Unit
                         style = MaterialTheme.typography.bodySmall,
                         color = RP.TextSecondary,
                     )
+                    if (useLocal) {
+                        val link by ServerSettings.link.collectAsStateWithLifecycle()
+                        Text("Laptop reached from", fontSize = 13.sp, color = RP.TextSecondary, modifier = Modifier.padding(top = 8.dp))
+                        ServerSettings.LaptopLink.entries.forEach { option ->
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.fillMaxWidth().clickable { ServerSettings.setLink(option) },
+                            ) {
+                                RadioButton(selected = link == option, onClick = null)
+                                Text(option.label, modifier = Modifier.padding(start = 8.dp))
+                            }
+                        }
+                    }
                     if (ServerSettings.localMapsAvailable) {
                         val useLocalMaps by ServerSettings.useLocalMaps.collectAsStateWithLifecycle()
                         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {

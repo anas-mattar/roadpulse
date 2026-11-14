@@ -36,7 +36,11 @@ object VoiceSettings {
         prefs = p
         _muted.value = p.getBoolean(KEY_MUTED, false)
         _language.value = GuidanceLanguage.fromCode(p.getString(KEY_LANGUAGE, null))
-            ?: if (Locale.getDefault().language == "ms") GuidanceLanguage.MS else GuidanceLanguage.EN
+            ?: when (Locale.getDefault().language) {
+                "ms" -> GuidanceLanguage.MS
+                "ar" -> GuidanceLanguage.AR
+                else -> GuidanceLanguage.EN
+            }
         recompute()
     }
 

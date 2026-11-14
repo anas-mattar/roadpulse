@@ -162,6 +162,10 @@ fun TurnIsland(turnType: Int?, distanceLabel: String?, instruction: String, modi
                     fontSize = 15.sp,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
+                    // Arabic instructions read right to left, even with Latin street names inside.
+                    style = androidx.compose.material3.LocalTextStyle.current.copy(
+                        textDirection = androidx.compose.ui.text.style.TextDirection.Content,
+                    ),
                 )
             }
         }

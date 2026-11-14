@@ -1,0 +1,65 @@
+package com.roadpulse.app.data
+
+import kotlinx.serialization.Serializable
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
+import java.util.Locale
+
+/** One toll plaza on a route, as priced by the backend from the owner's toll table. */
+@Serializable
+data class TollPlaza(
+    val name: String? = null,
+    val highway: String? = null,
+    /** PRICED, NO_PRICE, CLOSED_SYSTEM or NOT_IN_TABLE (see the backend's TollPlazaStatus). */
+    val status: String,
+    val priceRm: Double? = null,
+    val lat: Double = 0.0,
+    val lon: Double = 0.0,
+)
+
+/** Estimated toll for one route. [totalRm] counts priced plazas only; [complete] when all are priced. */
+@Serializable
+data class TollEstimate(
+    val currency: String = "MYR",
+    val totalRm: Double = 0.0,
+    val complete: Boolean = true,
+    val plazas: List<TollPlaza> = emptyList(),
+    val ratesCheckedOn: String? = null,
+)
+
+@Serializable
+private data class TollEstimateBody(val points: List<List<Double>>, val vehicle: String, val corridorM: Double)
+
+/** Toll estimates from the RoadPulse backend (POST /v1/tolls/estimate). */
+class TollClient(private val baseUrl: String) {
+
+    suspend fun estimate(shape: List<GeoPoint>, vehicle: Vehicle): TollEstimate {
+        val points = PlacesClient.thin(shape, PlacesClient.MAX_POINTS).map { listOf(it.lat, it.lon) }
+        val body = Http.json.encodeToString(TollEstimateBody.serializer(), TollEstimateBody(points, tollClass(vehicle), 40.0))
+        val request = Request.Builder().url("$baseUrl/v1/tolls/estimate")
+            .post(body.toRequestBody("application/json".toMediaType())).build()
+        return Http.json.decodeFromString(TollEstimate.serializer(), Http.execute(request))
+    }
+
+    companion object {
+        /** Taxis and ride-hailing cars pay the car (Class 1) price. */
+        fun tollClass(vehicle: Vehicle) = if (vehicle == Vehicle.MOTORCYCLE) "MOTORCYCLE" else "CAR"
+
+        /**
+         * What a route card says about tolls, or null for a toll-free route:
+         * "Toll ~RM 6.80", "Toll RM 5.00 + ?" (some plazas not priced), "Toll: price unknown",
+         * or "Toll road" while the estimate is loading or unavailable.
+         */
+        fun label(hasToll: Boolean, estimate: TollEstimate?): String? {
+            if (estimate == null) return if (hasToll) "Toll road" else null
+            if (estimate.plazas.isEmpty()) return if (hasToll) "Toll: price unknown" else null
+            val rm = String.format(Locale.ROOT, "RM %.2f", estimate.totalRm)
+            return when {
+                estimate.complete -> "Toll ~$rm"
+                estimate.totalRm > 0 -> "Toll $rm + ?"
+                else -> "Toll: price unknown"
+            }
+        }
+    }
+}

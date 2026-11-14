@@ -53,10 +53,16 @@ class MalayPromptSheetTest {
     )
 
     @Test
-    fun writeReviewSheet() {
+    fun writeReviewSheet() = writeSheet(MalayNarrator, "Bahasa Melayu (current)", MalayNarrator::ordinal, MalayNarrator::compass, "build/malay_prompts.tsv")
+
+    /** The same sheet in Arabic, for review by an Arabic speaker (docs/ARABIC_PROMPTS.md). */
+    @Test
+    fun writeArabicReviewSheet() = writeSheet(com.roadpulse.app.nav.ArabicNarrator, "العربية (current)",
+        com.roadpulse.app.nav.ArabicNarrator::ordinal, com.roadpulse.app.nav.ArabicNarrator::compass, "build/arabic_prompts.tsv")
+
+    private fun writeSheet(ms: com.roadpulse.app.nav.Narrator, column: String, ordinal: (Int) -> String, compass: (Int) -> String, path: String) {
         val en = EnglishNarrator
-        val ms = MalayNarrator
-        val rows = mutableListOf(listOf("Group", "When it is used", "English", "Bahasa Melayu (current)"))
+        val rows = mutableListOf(listOf("Group", "When it is used", "English", column))
         examples.forEach { (group, man) -> rows += listOf(group, "Spoken at the turn and shown in the banner", man.instruction, ms.atTurn(man)) }
         val right = m(10, "Turn right onto Jalan Ampang.", "Jalan Ampang")
         val left = m(15, "Turn left onto Jalan Pinang.", "Jalan Pinang")
@@ -83,10 +89,10 @@ class MalayPromptSheetTest {
         }
         rows += listOf("Cameras", "Warning for a fixed speed camera ahead", en.cameraAhead(500, 90), ms.cameraAhead(500, 90))
         rows += listOf("Cameras", "Label of the speed camera hint", en.speedCamera, ms.speedCamera)
-        (1..4).forEach { rows += listOf("Words", "Roundabout exit number", "exit $it", ms.ordinal(it)) }
-        listOf(0, 45, 90, 135, 180, 225, 270, 315).forEach { rows += listOf("Words", "Compass direction at the start", "$it°", ms.compass(it)) }
+        (1..4).forEach { rows += listOf("Words", "Roundabout exit number", "exit $it", ordinal(it)) }
+        listOf(0, 45, 90, 135, 180, 225, 270, 315).forEach { rows += listOf("Words", "Compass direction at the start", "$it°", compass(it)) }
 
-        rows.drop(1).forEach { assertEquals("Malay missing for ${it[2]}", false, it[3].isBlank() || it[3] == it[2]) }
-        File("build/malay_prompts.tsv").writeText(rows.joinToString("\n") { it.joinToString("\t") })
+        rows.drop(1).forEach { assertEquals("Translation missing for ${it[2]}", false, it[3].isBlank() || it[3] == it[2]) }
+        File(path).writeText(rows.joinToString("\n") { it.joinToString("\t") })
     }
 }

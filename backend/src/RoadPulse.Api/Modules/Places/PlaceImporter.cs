@@ -18,6 +18,7 @@ public static class PlaceImporter
 
     /// <summary>Maps OpenStreetMap tags to a category, or null for places RoadPulse does not use.</summary>
     public static PlaceCategory? CategoryOf(IReadOnlyDictionary<string, string> tags) =>
+        tags.GetValueOrDefault("barrier") == "toll_booth" ? PlaceCategory.TOLL_PLAZA :
         (tags.GetValueOrDefault("amenity"), tags.GetValueOrDefault("highway")) switch
         {
             ("fuel", _) => PlaceCategory.FUEL,

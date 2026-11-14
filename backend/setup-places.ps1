@@ -1,5 +1,5 @@
 # Loads places that drivers search for or are warned about (fuel, parking, food, EV charging,
-# R&R rest areas, speed cameras) from the Malaysia map file into the RoadPulse database.
+# R&R rest areas, speed cameras, toll plazas) from the Malaysia map file into the RoadPulse database.
 #
 #   cd D:\solutions\waze\backend
 #   powershell -ExecutionPolicy Bypass -File setup-places.ps1
@@ -32,6 +32,7 @@ docker run --rm -v "${PSScriptRoot}\valhalla_data:/osm:ro" -v "${maps}:/work" ro
   n/highway=speed_camera `
   nw/amenity=fuel,parking,charging_station,restaurant,fast_food,cafe,food_court `
   nw/highway=rest_area,services `
+  nw/barrier=toll_booth `
   -o /work/places-filtered.osm.pbf --overwrite
 if ($LASTEXITCODE -ne 0) { throw "Extracting places failed." }
 docker run --rm -v "${maps}:/work" roadpulse-osmium `

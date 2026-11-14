@@ -307,6 +307,8 @@ fun PreviewOverlay(
     destination: Place?,
     route: Route?,
     choices: List<Route> = listOfNotNull(route),
+    /** Toll estimate per choice (same order); missing entries show "Toll road" for toll routes. */
+    tolls: List<com.roadpulse.app.data.TollEstimate?> = emptyList(),
     selected: Int = 0,
     onSelectRoute: (Int) -> Unit = {},
     busy: Boolean,
@@ -382,6 +384,7 @@ fun PreviewOverlay(
                                 selected = i == selected,
                                 single = cards.size == 1,
                                 arrival = formatArrival(context, r.timeSeconds),
+                                toll = com.roadpulse.app.data.TollClient.label(r.hasToll, tolls.getOrNull(i)),
                                 onClick = { onSelectRoute(i) },
                             )
                         }
@@ -558,6 +561,7 @@ private fun RouteCard(
     selected: Boolean,
     single: Boolean,
     arrival: String,
+    toll: String? = null,
     onClick: () -> Unit,
 ) {
     Surface(
@@ -590,6 +594,9 @@ private fun RouteCard(
             )
             choice?.via?.let {
                 Text("via $it", fontSize = 12.sp, color = RP.TextSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+            toll?.let {
+                Text(it, fontSize = 12.sp, fontWeight = FontWeight.Medium, color = RP.AmberDark, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
     }

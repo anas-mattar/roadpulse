@@ -118,3 +118,7 @@ The plan asks for thresholds based on pilot baselines. These are starting propos
 Gate 1 is passed when R1–R10 have each been run at least twice, the targets are met (or the team
 has agreed adjusted targets with reasons), and every flagged issue is fixed or documented as a
 known limitation.
+
+## Using the laptop's servers from the phone
+
+See [REAL_PHONE.md](REAL_PHONE.md): `connect-phone.bat` plus "Phone on USB cable" in Settings.

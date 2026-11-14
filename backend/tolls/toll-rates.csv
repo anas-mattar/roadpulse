@@ -1,0 +1,65 @@
+# RoadPulse toll prices. YOU keep this table up to date; the app shows these as estimates.
+# Edit in Excel or any text editor and save as CSV. The server reloads it on every change (no restart).
+#
+# plaza         : name as on the toll plaza / in the map, without 'Plaza Tol' or 'Toll Plaza'
+# aliases       : other spellings, separated by |  (e.g. Sg Long|Sungai Long)
+# system        : OPEN = fixed price at the plaza. CLOSED = price depends on entry and exit (PLUS etc.);
+#                 CLOSED plazas are shown as 'not priced' for now
+# car_rm        : Class 1 (cars, also used for taxi/ride-hailing cars). Empty = not known
+# motorcycle_rm : Class 0. Empty = not known (the app then says the price is unknown)
+# checked_on    : the date YOU last checked the price against the operator's website
+#
+# Pre-filled on 2026-11-15 from the sources named in each row. Every row still needs checking:
+# the sources give no effective dates. Not added (plaza names not clear in the source):
+#   SEPADU 'MOC B' (Class 1 RM 1.40).
+plaza,aliases,highway,system,car_rm,motorcycle_rm,source,checked_on,notes
+Bukit Kiara,,SPRINT,OPEN,3.00,,litrak.com.my SPRINT toll fares,2026-11-15,matches litrak.com.my fare page
+Damansara,,SPRINT,OPEN,2.00,,litrak.com.my SPRINT toll fares,2026-11-15,matches litrak.com.my fare page
+Pantai,,SPRINT,OPEN,2.50,,litrak.com.my SPRINT toll fares,2026-11-15,matches litrak.com.my fare page
+Keramat,,AKLEH,OPEN,2.13,,motorist.my 2026 list (updated 2026-05-22),,to verify; fits Prolintas 8-15% cut of 20 Oct 2022 (malaymail)
+Pantai Dalam,,NPE,OPEN,2.30,,motorist.my 2026 list (updated 2026-05-22),,to verify
+PJS2,PJS 2,NPE,OPEN,1.00,,motorist.my 2026 list (updated 2026-05-22),,to verify
+PJS5,PJS 5,NPE,OPEN,2.30,,motorist.my 2026 list (updated 2026-05-22),,to verify
+Sungai Ramal,Sg Ramal,SILK,OPEN,1.66,,motorist.my 2026 list (updated 2026-05-22),,to verify; fits Prolintas 8-15% cut of 20 Oct 2022 (malaymail)
+Sungai Long,Sg Long,SILK,OPEN,1.66,,motorist.my 2026 list (updated 2026-05-22),,to verify; fits Prolintas 8-15% cut of 20 Oct 2022 (malaymail)
+Sungai Balak,Sg Balak,SILK,OPEN,1.66,,motorist.my 2026 list (updated 2026-05-22),,to verify; fits Prolintas 8-15% cut of 20 Oct 2022 (malaymail)
+Bukit Kajang,,SILK,OPEN,1.66,,motorist.my 2026 list (updated 2026-05-22),,to verify; fits Prolintas 8-15% cut of 20 Oct 2022 (malaymail)
+Awan Besar,Awan Besar Timur|Awan Besar Barat|Awan Besar East|Awan Besar West,KESAS,OPEN,2.00,,motorist.my 2026 list (updated 2026-05-22),,to verify
+Kemuning,,KESAS,OPEN,2.00,,motorist.my 2026 list (updated 2026-05-22),,to verify
+Sunway,,KESAS,OPEN,2.00,,motorist.my 2026 list (updated 2026-05-22),,to verify
+Lagong,,GCE,OPEN,1.75,,motorist.my 2026 list (updated 2026-05-22),,to verify; fits Prolintas 8-15% cut of 20 Oct 2022 (malaymail)
+Bukit Jelutong,,GCE,OPEN,1.75,,motorist.my 2026 list (updated 2026-05-22),,to verify; fits Prolintas 8-15% cut of 20 Oct 2022 (malaymail)
+Elmina,,GCE,OPEN,1.75,,motorist.my 2026 list (updated 2026-05-22),,to verify; fits Prolintas 8-15% cut of 20 Oct 2022 (malaymail)
+Terowong SMART,SMART|SMART Tunnel,SMART,OPEN,3.00,,motorist.my 2026 list (updated 2026-05-22),,to verify
+Putrajaya,,MEX,OPEN,3.50,,motorist.my 2026 list (updated 2026-05-22),,to verify; no rise in 2026 per Cabinet decision Oct 2026 (carz.com.my)
+Salak Selatan,,MEX,OPEN,2.00,,motorist.my 2026 list (updated 2026-05-22),,to verify; no rise in 2026 per Cabinet decision Oct 2026 (carz.com.my)
+Seri Kembangan,Sri Kembangan,MEX,OPEN,2.20,,motorist.my 2026 list (updated 2026-05-22),,to verify; no rise in 2026 per Cabinet decision Oct 2026 (carz.com.my)
+Ayer Panas,Air Panas,DUKE,OPEN,2.50,,motorist.my 2026 list (updated 2026-05-22),,to verify; no rise in 2026 per Cabinet decision Oct 2026 (carz.com.my)
+Batu,,DUKE,OPEN,2.50,,motorist.my 2026 list (updated 2026-05-22),,to verify; no rise in 2026 per Cabinet decision Oct 2026 (carz.com.my)
+Segambut,,DUKE,OPEN,2.50,,motorist.my 2026 list (updated 2026-05-22),,to verify; no rise in 2026 per Cabinet decision Oct 2026 (carz.com.my)
+Sentul Pasar,,DUKE,OPEN,2.50,,motorist.my 2026 list (updated 2026-05-22),,to verify; no rise in 2026 per Cabinet decision Oct 2026 (carz.com.my)
+Alam Impian,,LKSA,OPEN,0.83,,motorist.my 2026 list (updated 2026-05-22),,to verify; fits Prolintas 8-15% cut of 20 Oct 2022 (malaymail)
+Seri Muda,Sri Muda,LKSA,OPEN,1.56,,motorist.my 2026 list (updated 2026-05-22),,to verify; fits Prolintas 8-15% cut of 20 Oct 2022 (malaymail)
+Ijok,,LATAR,OPEN,2.50,,motorist.my 2026 list (updated 2026-05-22),,to verify; no rise in 2026 per Cabinet decision Oct 2026 (carz.com.my)
+Kuang Barat,,LATAR,OPEN,2.50,,motorist.my 2026 list (updated 2026-05-22),,to verify; no rise in 2026 per Cabinet decision Oct 2026 (carz.com.my)
+Kuang Timur,,LATAR,OPEN,2.50,,motorist.my 2026 list (updated 2026-05-22),,to verify; no rise in 2026 per Cabinet decision Oct 2026 (carz.com.my)
+Taman Rimba Templer,Taman Rimba Templar|Templer,LATAR,OPEN,2.50,,motorist.my 2026 list (updated 2026-05-22),,to verify; no rise in 2026 per Cabinet decision Oct 2026 (carz.com.my)
+Kundang Barat,,LATAR,OPEN,1.30,,motorist.my 2026 list (updated 2026-05-22),,to verify; no rise in 2026 per Cabinet decision Oct 2026 (carz.com.my)
+Kundang Timur,,LATAR,OPEN,1.30,,motorist.my 2026 list (updated 2026-05-22),,to verify; no rise in 2026 per Cabinet decision Oct 2026 (carz.com.my)
+Penchala,,LDP,OPEN,2.10,,motorist.my 2026 list (updated 2026-05-22),,to verify
+PJ,Petaling Jaya,LDP,OPEN,2.10,,motorist.my 2026 list (updated 2026-05-22),,to verify
+Puchong Jaya,,LDP,OPEN,2.10,,motorist.my 2026 list (updated 2026-05-22),,to verify
+Puchong Selatan,,LDP,OPEN,2.10,,motorist.my 2026 list (updated 2026-05-22),,to verify
+Gombak,,KL-Karak (KLK),OPEN,6.00,,motorist.my 2026 list (updated 2026-05-22),,to verify
+Bentong,,KL-Karak (KLK),OPEN,3.50,,motorist.my 2026 list (updated 2026-05-22),,to verify
+Batu 9,Batu Sembilan,Cheras-Kajang,OPEN,1.30,,motorist.my 2026 list (updated 2026-05-22),,to verify; no rise in 2026 per Cabinet decision Oct 2026 (carz.com.my)
+Batu 11,Batu Sebelas,Cheras-Kajang,OPEN,1.30,,motorist.my 2026 list (updated 2026-05-22),,to verify; no rise in 2026 per Cabinet decision Oct 2026 (carz.com.my)
+Mines,,BESRAYA,OPEN,1.85,,motorist.my 2026 list (updated 2026-05-22),,to verify
+Loke Yew,,BESRAYA,OPEN,1.85,,motorist.my 2026 list (updated 2026-05-22),,to verify
+Ampang,,SUKE,OPEN,2.30,,motorist.my 2026 list (updated 2026-05-22),,to verify
+Bukit Teratai,,SUKE,OPEN,2.30,,motorist.my 2026 list (updated 2026-05-22),,to verify
+Bukit Raja,,SEPADU,OPEN,0.60,,motorist.my 2026 list (updated 2026-05-22),,to verify
+Kapar,,SEPADU,OPEN,2.70,,motorist.my 2026 list (updated 2026-05-22),,to verify
+Denai Alam,,DASH,OPEN,2.30,,paultan.org DASH rates (from 2022-12-01),,to verify
+RRIM,Kwasa Damansara|RRIM Kwasa Damansara,DASH,OPEN,2.30,,paultan.org DASH rates (from 2022-12-01),,to verify
+Kota Damansara,,DASH,OPEN,2.30,,paultan.org DASH rates (from 2022-12-01),,to verify

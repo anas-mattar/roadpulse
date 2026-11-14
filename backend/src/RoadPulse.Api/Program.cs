@@ -7,6 +7,7 @@ using RoadPulse.Api.Modules.Live;
 using RoadPulse.Api.Modules.Moderation;
 using RoadPulse.Api.Modules.Places;
 using RoadPulse.Api.Modules.Reports;
+using RoadPulse.Api.Modules.Tolls;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -26,6 +27,8 @@ builder.Services.AddProblemDetails(o => o.CustomizeProblemDetails = ctx =>
         ctx.ProblemDetails.Title = "Invalid request";
         ctx.ProblemDetails.Detail = ctx.HttpContext.Request.Path.StartsWithSegments("/v1/places")
             ? "Check the parameters (category must be one of: " + string.Join(", ", Enum.GetNames<PlaceCategory>()) + ")."
+            : ctx.HttpContext.Request.Path.StartsWithSegments("/v1/tolls")
+            ? "Check the body: points as [lat, lon] pairs, vehicle one of: " + string.Join(", ", Enum.GetNames<TollVehicle>()) + "."
             : "The request body could not be read. Check the JSON, field names and values " +
               "(type must be one of: " + string.Join(", ", Enum.GetNames<ReportType>()) + ").";
     }
@@ -41,6 +44,7 @@ builder.Services.Configure<ModerationOptions>(builder.Configuration.GetSection("
 builder.Services.AddAuthorizationBuilder()
     .AddPolicy(ModeratorAuthHandler.Policy, p => p.AddAuthenticationSchemes(ModeratorAuthHandler.SchemeName).RequireRole("moderator"));
 builder.Services.AddRoadPulseRateLimits(builder.Configuration);
+builder.Services.AddSingleton<TollRateStore>();
 
 var app = builder.Build();
 
@@ -98,6 +102,7 @@ v1.MapDeviceEndpoints();
 v1.MapReportEndpoints();
 v1.MapModerationEndpoints();
 v1.MapPlaceEndpoints();
+v1.MapTollEndpoints();
 app.MapHub<ReportsHub>(ReportsHub.Path).RequireRateLimiting(RateLimits.Reads);
 
 app.Run();

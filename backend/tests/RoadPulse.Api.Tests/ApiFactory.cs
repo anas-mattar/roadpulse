@@ -27,8 +27,12 @@ public class ApiFactory : WebApplicationFactory<Program>
     /// <summary>Moderator key accepted by this test host (configuration holds only its hash).</summary>
     public const string ModeratorKey = "test-moderator-key-0123456789abcdef";
 
+    /// <summary>Toll price table for this host (a temp file in toll tests).</summary>
+    public string TollRatesPath { get; init; } = "/nonexistent/toll-rates.csv";
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
+        builder.UseSetting("Tolls:RatesPath", TollRatesPath);
         builder.UseSetting("ConnectionStrings:Default", ConnectionString);
         builder.UseSetting("Database:MigrateOnStartup", "false");
         builder.UseSetting("RateLimits:ReadsPerMinute", "100000");
