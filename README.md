@@ -1,0 +1,86 @@
+# RoadPulse
+
+An original, community-driven navigation app for Android, built on open data and open-source
+components. "RoadPulse" is a placeholder name; check trademark availability before launch.
+
+## What works today (v0.1 scaffold)
+
+- Vector map (MapLibre + OpenStreetMap tiles) with the user's live location
+- Destination search (Photon geocoder)
+- Route calculation and drawing (Valhalla), with distance and ETA
+- Navigation mode: camera follows the driver, banner with the next instruction and distance
+  to the turn, live remaining time and arrival time, automatic rerouting, arrival detection
+- Voice guidance (device text-to-speech): a heads-up about 500 m before each turn and the
+  full instruction at the turn
+- Navigation keeps running in the background and with the screen off (foreground service
+  with an ongoing notification and a Stop action)
+- Survives interruptions: the active drive is saved and resumes if Android stops the app;
+  "GPS signal lost" and "Offline: keeping your current route" states instead of silence.
+  See `docs/OFFLINE.md` for exactly what works without network or GPS
+- Report button (police, crash, hazard, traffic jam, road closed); reports appear on the map.
+  They are stored in memory on the device only until the backend exists (Phase 2).
+
+## Run it
+
+Quickest on Windows: double-click `setup-windows.bat`. It installs Android Studio, the Android
+SDK and an emulator, builds the app, and launches it with the virtual phone placed in Kuala
+Lumpur. To run on a real phone instead, copy `apk/RoadPulse-debug.apk` to it and open it
+(allow installs from unknown sources).
+
+Manual route:
+
+1. Install the latest Android Studio (the project uses Gradle 9.9 and Android Gradle plugin 9.5, which need a recent version) and open this folder.
+2. Let Gradle sync, then run the `app` configuration on an emulator or phone (Android 8.0+).
+3. Grant the location permission. On an emulator, set a location in Extended Controls > Location.
+
+Command line: `gradlew.bat :app:assembleDebug` (APK lands in `app/build/outputs/apk/debug/`).
+
+## Simulated drives and drive logs (debug builds only)
+
+After calculating a route, the route card has a **Simulate** button. It runs navigation with a
+simulated car instead of real GPS, so voice prompts, rerouting and arrival can be tested on the
+emulator or at a desk:
+
+- Drive the route at 50 km/h or at 90 km/h
+- Take a wrong turn: leaves the route sideways at 30% of the trip, to test rerouting
+- Bad GPS: 25 m position noise
+
+Every debug navigation session, simulated or real, writes a CSV log with one row per GPS fix
+(raw and route-matched position, offset, off-route state, distance to the next turn) and one row
+per event (`drive_start`, `prompt`, `reroute_start`, `reroute_done`, `reroute_failed`,
+`gps_lost`, `gps_restored`, `arrived`), ending with a `summary` row (fixes, reroutes, prompts, poor-signal fixes, largest
+matched offset). Run `pull-drive-logs.bat` to copy the logs into `navlogs\`.
+
+The logs contain precise locations: keep them local, delete them when done, and do not
+commit them (`navlogs/` is in `.gitignore`). Release builds have neither the button nor the log.
+
+## Automatic checks (GitHub Actions)
+
+`.github/workflows/android-ci.yml` runs on every push and pull request: unit tests, debug and
+release builds, and a check that the release build is HTTPS-only. Test reports and the debug APK
+are attached to each run. Plain HTTP is allowed only in debug builds, and only to a server on the
+developer's machine (`app/src/debug/res/xml/network_security_config_debug.xml`).
+
+## Configuration
+
+Service URLs live in `gradle.properties` (`roadpulse.mapStyleUrl`, `roadpulse.routingUrl`,
+`roadpulse.geocodingUrl`). The defaults point at free public servers that are fine for
+development but not for production traffic. `backend/docker-compose.yml` starts your own
+Valhalla routing server and a PostGIS database.
+
+## Layout
+
+    app/src/main/java/com/roadpulse/app/
+      data/   models, Valhalla + Photon clients, polyline decoder, report repository
+      nav/    RouteMatcher + RouteTracker (matching, off-route, prompts), NavigationSession,
+              NavigationService, DeviceLocation, VoiceGuide, DriveStore (resume), SignalMonitor,
+              PromptText, DriveSimulator + DriveReplay + NavLog (debug)
+      ui/     MapScreen (Compose + MapLibre), MapViewModel
+    backend/  docker-compose (Valhalla, PostGIS) and database schema
+    docs/     PLAN.md - architecture and roadmap; OFFLINE.md - behaviour without network/GPS
+
+## Licensing notes
+
+OpenStreetMap data is ODbL: the app must show "© OpenStreetMap contributors" attribution
+(the map style includes it; keep it visible). No code, assets, or data from any other
+navigation product are used, and none should be added.
