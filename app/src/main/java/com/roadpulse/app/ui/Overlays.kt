@@ -489,6 +489,8 @@ fun DrivingOverlay(
     /** A live link is active: shows "Sharing live" with a stop action. */
     sharing: Boolean = false,
     onStopSharing: () -> Unit = {},
+    onTakeFasterRoute: () -> Unit = {},
+    onKeepRoute: () -> Unit = {},
     /** Debug builds: passenger issue report for field tests. */
     onFlag: (() -> Unit)? = null,
     showSpeedometer: Boolean = true,
@@ -631,10 +633,13 @@ fun DrivingOverlay(
             val total = state.route?.lengthKm ?: 0.0
             val left = state.remainingKm ?: total
             val seconds = state.remainingSeconds ?: state.route?.timeSeconds ?: 0.0
+            state.fasterRoute?.let { FasterRouteCard(it, onTakeFasterRoute, onKeepRoute, Modifier.padding(bottom = 8.dp)) }
             track?.let { MediaBar(it, onPlayPause, onNextTrack, onPreviousTrack, Modifier.padding(bottom = 8.dp)) }
             TripIsland(
-                arrival = formatArrival(context, seconds),
-                remaining = "${formatDuration(seconds)} · ${formatKm(left)}",
+                // Arrival includes the delay from live traffic on the route ahead.
+                arrival = formatArrival(context, seconds + state.trafficDelaySeconds),
+                remaining = "${formatDuration(seconds)} · ${formatKm(left)}" +
+                    (state.trafficDelaySeconds.takeIf { it >= 60 }?.let { " · " + strings.trafficDelay(Math.round(it / 60).toInt()) } ?: ""),
                 progress = if (total > 0) (1 - left / total).toFloat() else 0f,
                 onStop = onStop,
                 attribution = MAP_CREDITS,
@@ -651,6 +656,30 @@ private fun plannedLabel(drive: com.roadpulse.app.data.PlannedDrive, nowMillis: 
     val day = java.time.Instant.ofEpochMilli(drive.arriveByMillis).atZone(zone).toLocalDate()
     val today = java.time.Instant.ofEpochMilli(nowMillis).atZone(zone).toLocalDate()
     return strings.plannedFor(time, tomorrow = day.isAfter(today))
+}
+
+/** "Faster route found · saves 6 min" with Take it / No thanks; closes by itself (keeps the route) after 20 s. */
+@Composable
+private fun FasterRouteCard(faster: com.roadpulse.app.nav.FasterRoute, onTake: () -> Unit, onKeep: () -> Unit, modifier: Modifier = Modifier) {
+    androidx.compose.runtime.LaunchedEffect(faster) {
+        kotlinx.coroutines.delay(20_000)
+        onKeep()
+    }
+    Surface(shape = RoundedCornerShape(20.dp), color = RP.TealDark, contentColor = Color.White, shadowElevation = 6.dp, modifier = modifier.fillMaxWidth()) {
+        Column(Modifier.padding(14.dp)) {
+            Text(strings.fasterRoute(Math.round(faster.savedSeconds / 60).toInt()), fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+            Row(Modifier.fillMaxWidth().padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Button(onClick = onTake, modifier = Modifier.weight(1f).height(48.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = RP.TealDark)) {
+                    Text(strings.takeRoute, fontWeight = FontWeight.SemiBold)
+                }
+                androidx.compose.material3.OutlinedButton(onClick = onKeep, modifier = Modifier.weight(1f).height(48.dp),
+                    border = BorderStroke(1.dp, Color.White), colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)) {
+                    Text(strings.keepRoute)
+                }
+            }
+        }
+    }
 }
 
 /** Compact music controls above the trip card: title, previous, play/pause, next (large touch targets). */

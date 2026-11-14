@@ -62,6 +62,13 @@ public sealed class ShareStore(TimeProvider clock)
 
     public void Remove(string id) => _shares.TryRemove(id, out _);
 
+    /// <summary>Ends every share of a device (used when the driver deletes their data).</summary>
+    public void RemoveForDevice(Guid deviceId)
+    {
+        foreach (var (id, s) in _shares)
+            if (s.DeviceId == deviceId) _shares.TryRemove(id, out _);
+    }
+
     private void Cleanup()
     {
         foreach (var (id, s) in _shares)

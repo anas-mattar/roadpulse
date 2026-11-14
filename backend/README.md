@@ -138,6 +138,18 @@ Limits:
   `GET /v1/traffic?minLat&minLon&maxLat&maxLon`. Needs the local routing server for map matching.
   The app draws slow (orange) and jammed (red) roads.
 
+## Privacy controls and automatic jam reports
+
+- `GET /v1/me/export`: everything linked to the device (reports, votes, flags, nickname).
+- `DELETE /v1/me`: deletes the device and its reports, votes, flags and share links; vote counts on
+  other reports are corrected. The app also clears its saved places, planned drives and token.
+- Retention (hourly job): reports deleted 90 days after they expire, idempotency keys after 2 days,
+  moderation log after 12 months, traffic averages after 12 months.
+- Privacy policy page: `/privacy` (draft for testing; needs legal review and contact details).
+- Automatic jam reports (every 2 minutes, `Traffic:AutoJamReports`): stretches of jammed roads of
+  150 m or more get a "Traffic jam" report from the RoadPulse system account, kept alive while the
+  jam lasts (20 minutes after it was last seen). No duplicate when a driver already reported it.
+
 ## Offline map tiles (optional)
 
 The app's map normally loads from OpenFreeMap over the internet. To serve map tiles from this

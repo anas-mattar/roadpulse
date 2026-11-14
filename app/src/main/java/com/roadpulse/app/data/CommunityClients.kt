@@ -99,6 +99,18 @@ class ProfileClient(private val api: DeviceApi) {
     @Serializable private data class NicknameBody(val nickname: String?)
 }
 
+// ---------------------------------------------------------------- Privacy
+
+/** The driver's data rights: a copy of their server data, and deleting it (backend: Modules/Privacy). */
+class PrivacyClient(private val api: DeviceApi) {
+    /** Everything the server holds about this device, as JSON text. */
+    suspend fun export(): String = api.call("GET", "/v1/me/export")
+
+    suspend fun deleteAll() {
+        api.call("DELETE", "/v1/me")
+    }
+}
+
 // ---------------------------------------------------------------- Share my drive
 
 @Serializable

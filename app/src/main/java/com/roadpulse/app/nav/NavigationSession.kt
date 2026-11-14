@@ -66,7 +66,14 @@ data class NavState(
     val lanes: List<com.roadpulse.app.data.Lane> = emptyList(),
     /** Nearest school on the route ahead (within 600 m). */
     val schoolAhead: SchoolAhead? = null,
+    /** Extra time on the route ahead from live traffic (seconds; 0 when unknown or none). */
+    val trafficDelaySeconds: Double = 0.0,
+    /** A quicker way around jammed roads, offered to the driver. */
+    val fasterRoute: FasterRoute? = null,
 )
+
+/** A route that avoids jammed roads and saves [savedSeconds] compared with staying on the current one. */
+data class FasterRoute(val route: Route, val savedSeconds: Double)
 
 /**
  * The single active drive. Shared by [NavigationService] (feeds GPS fixes, speaks prompts,
@@ -130,6 +137,69 @@ object NavigationSession {
         persist = persistDrive
         applyRoute(route, destination, resumed = false)
         startWatchdog()
+        startTrafficChecks()
+    }
+
+    private var trafficJob: Job? = null
+    private var fasterRouteSuppressedUntil = 0L
+
+    /** Every few minutes: how much traffic slows the route ahead, and whether a detour is worth it. */
+    private fun startTrafficChecks() {
+        trafficJob?.cancel()
+        fasterRouteSuppressedUntil = 0L
+        trafficJob = scope.launch {
+            delay(TRAFFIC_FIRST_CHECK_MS)
+            while (_state.value != null) {
+                runCatching { checkTraffic() }.onFailure { e ->
+                    if (e is CancellationException) throw e
+                    log?.event(now(), "traffic_check", "failed: ${e.javaClass.simpleName}")
+                }
+                delay(TRAFFIC_CHECK_MS)
+            }
+        }
+    }
+
+    private suspend fun checkTraffic() {
+        val url = com.roadpulse.app.data.ServerSettings.backendUrl()
+        val current = _state.value ?: return
+        if (url.isEmpty() || current.rerouting) return
+        var ahead = TrafficDelay.ahead(current.route.shape, current.displayPosition)
+        if (ahead.size < 2) return
+        fun span(p: List<GeoPoint>) = maxOf(p.maxOf { it.lat } - p.minOf { it.lat }, p.maxOf { it.lon } - p.minOf { it.lon })
+        if (span(ahead) > 0.85) ahead = TrafficDelay.ahead(current.route.shape, current.displayPosition, maxM = 12_000.0)
+        val lines = com.roadpulse.app.data.TrafficClient(url).lines(
+            ahead.minOf { it.lat } - 0.01, ahead.minOf { it.lon } - 0.01, ahead.maxOf { it.lat } + 0.01, ahead.maxOf { it.lon } + 0.01,
+        )
+        val (delaySeconds, hit) = TrafficDelay.estimate(ahead, lines)
+        _state.update { it?.copy(trafficDelaySeconds = delaySeconds) }
+        log?.event(now(), "traffic_check", "delay_s=${delaySeconds.toInt()};lines=${hit.size}")
+        val position = current.displayPosition ?: return
+        if (delaySeconds < FASTER_ROUTE_MIN_SAVING_S || current.fasterRoute != null || now() < fasterRouteSuppressedUntil) return
+        val avoid = TrafficDelay.avoidAreas(hit)
+        if (avoid.isEmpty()) return
+        val alt = router.route(position, current.destination.location, remainingStops(), com.roadpulse.app.data.RouteSettings.options.value, avoid)
+        val altDelay = TrafficDelay.estimate(TrafficDelay.ahead(alt.shape, null), lines).first
+        val stay = (_state.value?.remainingSeconds ?: return) + delaySeconds
+        val saved = stay - (alt.timeSeconds + altDelay)
+        log?.event(now(), "faster_route", "saved_s=${saved.toInt()}")
+        if (saved < FASTER_ROUTE_MIN_SAVING_S || _state.value?.route !== current.route) return
+        _state.update { it?.copy(fasterRoute = FasterRoute(alt, saved)) }
+        speak(VoiceSettings.narrator().fasterRouteFound(Math.round(saved / 60).toInt()))
+    }
+
+    /** The driver took the faster route. */
+    fun acceptFasterRoute() {
+        val current = _state.value ?: return
+        val faster = current.fasterRoute ?: return
+        log?.event(now(), "faster_route_taken", "saved_s=${faster.savedSeconds.toInt()}")
+        applyRoute(faster.route, current.destination, resumed = false)
+        speak(faster.route.maneuvers.firstOrNull()?.let(VoiceSettings.narrator()::atTurn))
+    }
+
+    /** The driver kept the current route: no new offer for a while. */
+    fun declineFasterRoute() {
+        _state.update { it?.copy(fasterRoute = null) }
+        fasterRouteSuppressedUntil = now() + FASTER_ROUTE_QUIET_MS
     }
 
     /** Restores a saved drive if one exists and none is active. Returns true if a drive is now active. */
@@ -139,6 +209,7 @@ object NavigationSession {
         persist = true
         applyRoute(saved.route, saved.destination, resumed = true)
         startWatchdog()
+        startTrafficChecks()
         return true
     }
 
@@ -188,6 +259,7 @@ object NavigationSession {
         cameras = emptyList()
         announcedCameras.clear()
         TrafficUploader.driveEnded()
+        trafficJob?.cancel()
         schoolsJob?.cancel()
         schools = emptyList()
         schoolRoute = null
@@ -494,6 +566,10 @@ object NavigationSession {
     private const val STOP_PASSED_M = 30.0
     private const val CAMERA_WARN_M = 500.0
     private const val SCHOOL_CORRIDOR_M = 120.0
+    private const val TRAFFIC_FIRST_CHECK_MS = 30_000L
+    private const val TRAFFIC_CHECK_MS = 180_000L
+    private const val FASTER_ROUTE_MIN_SAVING_S = 180.0
+    private const val FASTER_ROUTE_QUIET_MS = 10 * 60_000L
     private const val SCHOOL_HINT_M = 600.0
     private const val PASS_NEAR_M = 80.0
     private const val SPEEDING_ALERT_GAP_MS = 20_000L

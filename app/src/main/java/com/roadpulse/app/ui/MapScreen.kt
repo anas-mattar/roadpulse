@@ -565,6 +565,8 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                     }) else null,
                     sharing = shareLink != null,
                     onStopSharing = com.roadpulse.app.nav.ShareSession::stop,
+                    onTakeFasterRoute = com.roadpulse.app.nav.NavigationSession::acceptFasterRoute,
+                    onKeepRoute = com.roadpulse.app.nav.NavigationSession::declineFasterRoute,
                     onOverview = {
                         following = false
                         val m = map
@@ -710,6 +712,18 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
             onClearPlaces = {
                 showVoiceSettings = false
                 viewModel.clearSavedPlaces()
+            },
+            onExportData = {
+                viewModel.exportMyData { json ->
+                    val send = android.content.Intent(android.content.Intent.ACTION_SEND).setType("application/json")
+                        .putExtra(android.content.Intent.EXTRA_SUBJECT, "RoadPulse data")
+                        .putExtra(android.content.Intent.EXTRA_TEXT, json)
+                    context.startActivity(android.content.Intent.createChooser(send, s.exportData))
+                }
+            },
+            onDeleteData = {
+                showVoiceSettings = false
+                viewModel.deleteMyData()
             },
         )
     }
@@ -1042,7 +1056,19 @@ private fun LocationFix.toAndroidLocation(): android.location.Location =
     }
 
 @Composable
-private fun VoiceSettingsDialog(onDismiss: () -> Unit, onClearPlaces: () -> Unit) {
+private fun VoiceSettingsDialog(onDismiss: () -> Unit, onClearPlaces: () -> Unit, onExportData: () -> Unit = {}, onDeleteData: () -> Unit = {}) {
+    var showPolicy by remember { mutableStateOf(false) }
+    var confirmDelete by remember { mutableStateOf(false) }
+    if (showPolicy) PrivacyPolicyDialog(onDismiss = { showPolicy = false })
+    if (confirmDelete) {
+        AlertDialog(
+            onDismissRequest = { confirmDelete = false },
+            title = { Text(strings.deleteData) },
+            text = { Text(strings.deleteDataConfirm) },
+            confirmButton = { TextButton(onClick = { confirmDelete = false; onDeleteData() }) { Text(strings.delete, color = RP.Danger) } },
+            dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text(strings.cancel) } },
+        )
+    }
     val context = LocalContext.current
     val language by VoiceSettings.language.collectAsStateWithLifecycle()
     val missing by VoiceSettings.missingVoices.collectAsStateWithLifecycle()
@@ -1157,9 +1183,13 @@ private fun VoiceSettingsDialog(onDismiss: () -> Unit, onClearPlaces: () -> Unit
                     style = MaterialTheme.typography.bodySmall,
                     color = RP.TextSecondary,
                 )
-                TextButton(onClick = onClearPlaces, contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)) {
+                val noPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)
+                TextButton(onClick = { showPolicy = true }, contentPadding = noPadding) { Text(strings.privacyPolicy) }
+                TextButton(onClick = onExportData, contentPadding = noPadding) { Text(strings.exportData) }
+                TextButton(onClick = onClearPlaces, contentPadding = noPadding) {
                     Text(strings.clearSavedPlaces, color = RP.Danger)
                 }
+                TextButton(onClick = { confirmDelete = true }, contentPadding = noPadding) { Text(strings.deleteData, color = RP.Danger) }
             }
         },
         confirmButton = { TextButton(onClick = onDismiss) { Text(strings.done) } },
@@ -1170,9 +1200,34 @@ private fun VoiceSettingsDialog(onDismiss: () -> Unit, onClearPlaces: () -> Unit
 @Composable
 private fun TrafficSettings() {
     val on by com.roadpulse.app.nav.TrafficUploader.enabled.collectAsStateWithLifecycle()
+    var asking by remember { mutableStateOf(false) }
     SettingsHeader(strings.helpTraffic)
-    SettingSwitch(strings.helpTraffic, on) { com.roadpulse.app.nav.TrafficUploader.setEnabled(it) }
+    // Turning it on asks for consent first, with the full explanation; turning it off is immediate.
+    SettingSwitch(strings.helpTraffic, on) { want -> if (want) asking = true else com.roadpulse.app.nav.TrafficUploader.setEnabled(false) }
     Text(strings.helpTrafficText, style = MaterialTheme.typography.bodySmall, color = RP.TextSecondary)
+    if (asking) {
+        AlertDialog(
+            onDismissRequest = { asking = false },
+            title = { Text(strings.trafficConsentTitle) },
+            text = { Text(strings.helpTrafficText) },
+            confirmButton = { TextButton(onClick = { asking = false; com.roadpulse.app.nav.TrafficUploader.setEnabled(true) }) { Text(strings.allow) } },
+            dismissButton = { TextButton(onClick = { asking = false }) { Text(strings.notNow) } },
+        )
+    }
+}
+
+@Composable
+private fun PrivacyPolicyDialog(onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(strings.privacyPolicy) },
+        text = {
+            Column(Modifier.verticalScroll(androidx.compose.foundation.rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                strings.privacyPolicyText.forEach { Text(it, fontSize = 14.sp) }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text(strings.done) } },
+    )
 }
 
 /** Music controls while driving: needs notification access, granted in Android settings. */

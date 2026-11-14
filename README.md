@@ -34,6 +34,10 @@ components. "RoadPulse" is a placeholder name; check trademark availability befo
 - Share my drive: a live link with arrival time and position (works on the laptop now; for
   everyone once the server is online)
 - Live traffic (opt-in, anonymous, ADR 0004): slow and jammed roads on the map
+- Privacy: policy, export and delete my data (server and phone), consent before live traffic,
+  retention limits
+- Traffic: automatic jam reports from live traffic; arrival time includes traffic delay; a faster
+  route around jams is offered during the drive (Take it / No thanks)
 - Toll estimates on route cards from a price table you maintain (`backend/tolls/`)
 - Real phone over USB with everything on the laptop: `connect-phone.bat`, `docs/REAL_PHONE.md`
 - Navigation keeps running in the background and with the screen off (foreground service

@@ -98,6 +98,9 @@ data class MapUiState(
     /** This device's points and level; null until loaded (or without a server). */
     val profile: com.roadpulse.app.data.Profile? = null,
     val profileError: Boolean = false,
+    /** Extra minutes from live traffic on the route ahead, and a faster route on offer. */
+    val trafficDelaySeconds: Double = 0.0,
+    val fasterRoute: com.roadpulse.app.nav.FasterRoute? = null,
     /** Route options in effect (shown in the preview). */
     val routeOptions: com.roadpulse.app.data.RouteOptions = com.roadpulse.app.data.RouteOptions(),
 )
@@ -151,6 +154,8 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
                             reportAhead = nav.reportAhead,
                             cameraAhead = nav.cameraAhead,
                             lanes = nav.lanes,
+                            trafficDelaySeconds = nav.trafficDelaySeconds,
+                            fasterRoute = nav.fasterRoute,
                             schoolAhead = nav.schoolAhead,
                             navStatus = VoiceSettings.narrator().let { n ->
                                 when {
@@ -488,6 +493,54 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
                 .onFailure { e -> _state.update { it.copy(message = e.message) } }
         }
     }
+
+    /** A copy of this device's server data (JSON), for the share sheet. */
+    fun exportMyData(onReady: (String) -> Unit) {
+        val url = ServerSettings.backendUrl()
+        val s = com.roadpulse.app.i18n.currentStrings()
+        if (url.isEmpty()) {
+            _state.update { it.copy(message = s.profileNeedsServer) }
+            return
+        }
+        viewModelScope.launch {
+            runCatching { privacyClient(url).export() }
+                .onSuccess(onReady)
+                .onFailure { _state.update { it.copy(message = s.exportFailed) } }
+        }
+    }
+
+    /**
+     * Deletes this device's data on the server (reports, votes, flags, nickname, share links) and
+     * the personal data on the phone (places, planned drives, parking, device token, drive logs).
+     * Settings such as language stay. Live traffic is switched off.
+     */
+    fun deleteMyData() {
+        val app = getApplication<Application>()
+        val url = ServerSettings.backendUrl()
+        val s = com.roadpulse.app.i18n.currentStrings()
+        viewModelScope.launch {
+            if (url.isNotEmpty()) {
+                val ok = runCatching { privacyClient(url).deleteAll() }
+                    .recoverCatching { e -> if (e is com.roadpulse.app.data.ApiException && e.code == 401) Unit else throw e }
+                    .isSuccess
+                if (!ok) {
+                    _state.update { it.copy(message = s.deleteFailed) }
+                    return@launch
+                }
+            }
+            com.roadpulse.app.nav.ShareSession.stop()
+            com.roadpulse.app.nav.TrafficUploader.setEnabled(false)
+            placesStore.load().planned.forEach { com.roadpulse.app.nav.LeaveReminders.cancel(app, it.id) }
+            val cleared = placesStore.clear()
+            app.getSharedPreferences("roadpulse_device", android.content.Context.MODE_PRIVATE).edit().clear().apply()
+            runCatching { File(app.getExternalFilesDir(null), "navlogs").deleteRecursively() }
+            useReportsSource() // a fresh anonymous device next time it is needed
+            _state.update { it.copy(saved = cleared, profile = null, message = s.dataDeleted) }
+        }
+    }
+
+    private fun privacyClient(url: String) =
+        com.roadpulse.app.data.PrivacyClient(com.roadpulse.app.data.DeviceApi(url, ServerSettings.tokenStore(getApplication(), url)))
 
     private fun profileClient(url: String) =
         com.roadpulse.app.data.ProfileClient(com.roadpulse.app.data.DeviceApi(url, ServerSettings.tokenStore(getApplication(), url)))

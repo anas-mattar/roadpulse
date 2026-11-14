@@ -36,6 +36,8 @@ public class ApiFactory : WebApplicationFactory<Program>
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseSetting("Tolls:RatesPath", TollRatesPath);
+        builder.UseSetting("Traffic:AutoJamReports", "false"); // tests run detection passes directly
+        builder.UseSetting("BackgroundJobs", "false");         // retention and cleanup are tested directly
         builder.UseSetting("ConnectionStrings:Default", ConnectionString);
         builder.UseSetting("Database:MigrateOnStartup", "false");
         builder.UseSetting("RateLimits:ReadsPerMinute", "100000");

@@ -11,6 +11,7 @@ using RoadPulse.Api.Modules.Tolls;
 using RoadPulse.Api.Modules.Profile;
 using RoadPulse.Api.Modules.Shares;
 using RoadPulse.Api.Modules.Traffic;
+using RoadPulse.Api.Modules.Privacy;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -50,7 +51,12 @@ builder.Services.AddRoadPulseRateLimits(builder.Configuration);
 builder.Services.AddSingleton<TollRateStore>();
 builder.Services.AddSingleton<ShareStore>();
 builder.Services.AddHttpClient<IMapMatcher, ValhallaMatcher>(c => c.Timeout = TimeSpan.FromSeconds(10));
-builder.Services.AddHostedService<TrafficCleanup>();
+if (builder.Configuration.GetValue("BackgroundJobs", true))
+{
+    builder.Services.AddHostedService<TrafficCleanup>();
+    builder.Services.AddHostedService<PrivacyRetention>();
+}
+if (builder.Configuration.GetValue("Traffic:AutoJamReports", true)) builder.Services.AddHostedService<JamDetector>();
 
 var app = builder.Build();
 
@@ -113,6 +119,8 @@ v1.MapProfileEndpoints();
 v1.MapShareEndpoints();
 v1.MapTrafficEndpoints();
 app.MapSharePage();
+v1.MapPrivacyEndpoints();
+app.MapPrivacyPage();
 app.MapHub<ReportsHub>(ReportsHub.Path).RequireRateLimiting(RateLimits.Reads);
 
 app.Run();

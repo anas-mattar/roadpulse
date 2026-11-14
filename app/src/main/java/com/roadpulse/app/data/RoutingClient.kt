@@ -19,6 +19,7 @@ class RoutingClient(private val baseUrl: String) {
         stops: List<GeoPoint> = emptyList(),
         options: RouteOptions = RouteOptions(),
         alternates: Int? = null,
+        avoid: List<List<GeoPoint>> = emptyList(),
     ): String = Http.json.encodeToString(
         RouteRequest(
             locations = (listOf(from) + stops + to).map { Location(it.lat, it.lon) },
@@ -26,6 +27,7 @@ class RoutingClient(private val baseUrl: String) {
             costingOptions = options.costingOptions(),
             // The server offers alternatives only for trips without stops.
             alternates = if (stops.isEmpty()) alternates else null,
+            excludePolygons = avoid.takeIf { it.isNotEmpty() }?.map { ring -> ring.map { listOf(it.lon, it.lat) } },
         )
     )
 
@@ -86,8 +88,9 @@ class RoutingClient(private val baseUrl: String) {
         to: GeoPoint,
         stops: List<GeoPoint> = emptyList(),
         options: RouteOptions = RouteOptions(),
+        avoid: List<List<GeoPoint>> = emptyList(),
     ): Route {
-        val payload = requestBody(from, to, stops, options)
+        val payload = requestBody(from, to, stops, options, avoid = avoid)
         val request = Request.Builder()
             .url("$baseUrl/route")
             .header("User-Agent", "RoadPulse/0.1")
@@ -222,6 +225,8 @@ class RoutingClient(private val baseUrl: String) {
         val alternates: Int? = null,
         /** Ask for lane arrows on each maneuver ("turn_lanes"). Servers that do not know it ignore it. */
         @SerialName("turn_lanes") val turnLanes: Boolean = true,
+        /** Areas to avoid, each a closed ring of [lon, lat] pairs (jammed roads). Omitted when null. */
+        @SerialName("exclude_polygons") val excludePolygons: List<List<List<Double>>>? = null,
     )
 
     @Serializable

@@ -266,6 +266,20 @@ class OverlayScreenshotTest {
             onToggleMute = {}, onReport = {}, onStop = {}, onShare = {})
     }
 
+    private val fasterState = laneState.copy(lanes = emptyList(), schoolAhead = null, trafficDelaySeconds = 540.0,
+        fasterRoute = com.roadpulse.app.nav.FasterRoute(route, 360.0))
+
+    @Test
+    fun drivingFasterRoute() = shot("3i_driving_faster_route", RP.Field) {
+        DrivingOverlay(state = fasterState, narrator = EnglishNarrator, muted = false, onToggleMute = {}, onReport = {}, onStop = {})
+    }
+
+    @Test
+    fun drivingFasterRouteArabic() = shot("ar_3i_driving_faster_route", RP.Field, arabic = true) {
+        DrivingOverlay(state = fasterState.copy(currentInstruction = "الزم اليسار للبقاء على E10."), narrator = com.roadpulse.app.nav.ArabicNarrator,
+            muted = false, onToggleMute = {}, onReport = {}, onStop = {})
+    }
+
     @Test
     fun drivingMalayWithStatus() = shot("3b_driving_malay_gps_lost", RP.NightSurface) {
         DrivingOverlay(

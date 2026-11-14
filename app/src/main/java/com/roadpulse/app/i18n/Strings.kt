@@ -224,6 +224,25 @@ interface AppStrings {
     // Live traffic
     val helpTraffic: String
     val helpTrafficText: String
+    val trafficConsentTitle: String
+    val allow: String
+    val notNow: String
+    fun fasterRoute(savedMinutes: Int): String
+    val takeRoute: String
+    val keepRoute: String
+    fun trafficDelay(minutes: Int): String
+
+    // Privacy
+    val privacyPolicy: String
+    /** Short policy for the app, one paragraph per item (the full page is /privacy on the server). */
+    val privacyPolicyText: List<String>
+    val exportData: String
+    val deleteData: String
+    val deleteDataConfirm: String
+    val delete: String
+    val dataDeleted: String
+    val deleteFailed: String
+    val exportFailed: String
 
     // Navigation notification
     fun navigatingTo(name: String): String
@@ -448,6 +467,32 @@ object EnglishStrings : AppStrings {
 
     override val helpTraffic = "Help with live traffic"
     override val helpTrafficText = "When on, RoadPulse sends your speed and position in short anonymous pieces while you navigate: no account or device ID, nothing from the first and last 500 m of a trip, and the server keeps only average road speeds. Turn off at any time."
+
+    override val trafficConsentTitle = "Help with live traffic?"
+    override val allow = "Allow"
+    override val notNow = "Not now"
+    override fun fasterRoute(savedMinutes: Int) = "Faster route found · saves $savedMinutes min"
+    override val takeRoute = "Take it"
+    override val keepRoute = "No thanks"
+    override fun trafficDelay(minutes: Int) = "+$minutes min traffic"
+
+    override val privacyPolicy = "Privacy policy"
+    override val privacyPolicyText = listOf(
+        "Draft for testing: to be reviewed for Malaysia's Personal Data Protection Act before public release.",
+        "On your phone only: Home, Work, recent and saved places, planned drives, where you parked, and your settings.",
+        "Sent to the RoadPulse server: an anonymous device id (no name, email or phone number), the reports, votes and flags you make, and your nickname if you set one. Reports are public on the map without a name.",
+        "Share my drive, only when you tap Share: destination, arrival time and position, for anyone with the link, until you stop, 30 minutes after arrival, or 12 hours.",
+        "Live traffic, only if you turn it on: speed and position in 2-minute pieces with no device id, nothing from the first and last 500 m of a trip. Only average road speeds are kept.",
+        "Kept for: reports 90 days after they expire; road speed averages 12 months (no driver information).",
+        "Your choices: export or delete your data below, and turn live traffic off at any time.",
+    )
+    override val exportData = "Export my data"
+    override val deleteData = "Delete my data"
+    override val deleteDataConfirm = "This deletes your reports, votes, flags, nickname and share links from the server, and your saved places, planned drives and parking spot from this phone. It cannot be undone."
+    override val delete = "Delete"
+    override val dataDeleted = "Your data was deleted"
+    override val deleteFailed = "Could not delete your data on the server. Check the connection and try again."
+    override val exportFailed = "Could not get your data from the server."
 
     override fun navigatingTo(name: String) = "Navigating to $name"
     override val navigation = "Navigation"
@@ -717,6 +762,32 @@ object ArabicStrings : AppStrings {
 
     override val helpTraffic = "ساعد في معرفة حركة المرور"
     override val helpTrafficText = "عند التفعيل، يرسل RoadPulse سرعتك وموقعك على شكل أجزاء قصيرة مجهولة الهوية أثناء الملاحة: بلا حساب أو معرّف جهاز، ولا شيء من أول وآخر 500 م من الرحلة، ويحتفظ الخادم بمتوسط سرعات الطرق فقط. يمكنك إيقافه في أي وقت."
+
+    override val trafficConsentTitle = "هل تساعد في معرفة حركة المرور؟"
+    override val allow = "سماح"
+    override val notNow = "ليس الآن"
+    override fun fasterRoute(savedMinutes: Int) = "وُجد مسار أسرع · يوفّر $savedMinutes د"
+    override val takeRoute = "اسلكه"
+    override val keepRoute = "لا، شكرًا"
+    override fun trafficDelay(minutes: Int) = "+$minutes د بسبب الازدحام"
+
+    override val privacyPolicy = "سياسة الخصوصية"
+    override val privacyPolicyText = listOf(
+        "مسودة للاختبار: تحتاج إلى مراجعة وفق قانون حماية البيانات الشخصية الماليزي قبل الإطلاق العام.",
+        "على هاتفك فقط: المنزل والعمل والأماكن الأخيرة والمحفوظة، والرحلات المخطط لها، ومكان ركن سيارتك، وإعداداتك.",
+        "يُرسل إلى خادم RoadPulse: معرّف جهاز مجهول (بلا اسم أو بريد أو رقم هاتف)، والبلاغات والتصويتات والإبلاغات التي تقوم بها، واسمك المستعار إن عيّنته. تظهر البلاغات على الخريطة بلا اسم.",
+        "مشاركة الرحلة، فقط عند الضغط على مشاركة: الوجهة ووقت الوصول والموقع لمن لديه الرابط، حتى تتوقف أو بعد 30 دقيقة من الوصول أو 12 ساعة.",
+        "حركة المرور، فقط إذا فعّلتها: السرعة والموقع على شكل أجزاء مدتها دقيقتان بلا معرّف جهاز، ولا شيء من أول وآخر 500 م من الرحلة. يُحتفظ بمتوسط سرعات الطرق فقط.",
+        "مدة الحفظ: البلاغات 90 يومًا بعد انتهائها، ومتوسط سرعات الطرق 12 شهرًا (بلا معلومات عن السائقين).",
+        "خياراتك: صدّر بياناتك أو احذفها أدناه، وأوقف مشاركة حركة المرور في أي وقت.",
+    )
+    override val exportData = "تصدير بياناتي"
+    override val deleteData = "حذف بياناتي"
+    override val deleteDataConfirm = "سيحذف هذا بلاغاتك وتصويتاتك وإبلاغاتك واسمك المستعار وروابط المشاركة من الخادم، وأماكنك المحفوظة ورحلاتك المخطط لها ومكان ركن سيارتك من هذا الهاتف. لا يمكن التراجع عن ذلك."
+    override val delete = "حذف"
+    override val dataDeleted = "تم حذف بياناتك"
+    override val deleteFailed = "تعذّر حذف بياناتك من الخادم. تحقق من الاتصال وحاول مجددًا."
+    override val exportFailed = "تعذّر الحصول على بياناتك من الخادم."
 
     override fun navigatingTo(name: String) = "الملاحة إلى $name"
     override val navigation = "الملاحة"

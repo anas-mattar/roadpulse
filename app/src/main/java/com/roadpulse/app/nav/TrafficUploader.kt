@@ -95,7 +95,10 @@ object TrafficUploader {
 
     fun setEnabled(on: Boolean) {
         _enabled.value = on
-        prefs?.edit()?.putBoolean(KEY, on)?.apply()
+        // Record what was agreed to and when (kept on the phone; shown again if the wording changes).
+        prefs?.edit()?.putBoolean(KEY, on)?.apply {
+            if (on) putLong("traffic_consent_at", System.currentTimeMillis()).putString("traffic_consent_version", CONSENT_VERSION)
+        }?.apply()
         if (!on) segmenter.reset()
     }
 
@@ -112,4 +115,5 @@ object TrafficUploader {
     fun driveEnded() = segmenter.reset()
 
     private const val KEY = "traffic_opt_in"
+    const val CONSENT_VERSION = "2026-11-15"
 }
