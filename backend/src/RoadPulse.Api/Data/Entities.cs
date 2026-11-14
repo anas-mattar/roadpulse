@@ -10,6 +10,31 @@ public class Device
     public DateTimeOffset CreatedAt { get; set; }
     public bool Blocked { get; set; }
     public DateTimeOffset? BlockedAt { get; set; }
+    /// <summary>Optional public nickname shown on the driver's profile (no real name required).</summary>
+    public string? Nickname { get; set; }
+}
+
+/// <summary>
+/// A road edge seen in traffic samples (ADR 0004): its routing-graph id, line for the map, and
+/// the speed the routing data expects. Holds no information about drivers.
+/// </summary>
+public class TrafficEdge
+{
+    public long Id { get; set; }
+    public long WayId { get; set; }
+    public int ExpectedKph { get; set; }
+    public required LineString Geometry { get; set; }
+}
+
+/// <summary>Aggregated speed on one edge in one 5-minute window. Raw points are never stored.</summary>
+public class TrafficObservation
+{
+    public long EdgeId { get; set; }
+    public DateTimeOffset WindowStart { get; set; }
+    /// <summary>Sum of each contributing segment's average speed on the edge (km/h).</summary>
+    public double SpeedSumKph { get; set; }
+    /// <summary>Number of separate segments (2-minute pieces with a fresh random id) that contributed.</summary>
+    public int Segments { get; set; }
 }
 
 /// <summary>Report categories; names match the Android app's ReportType enum.</summary>

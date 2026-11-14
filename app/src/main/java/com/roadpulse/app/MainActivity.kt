@@ -44,6 +44,7 @@ class MainActivity : ComponentActivity() {
         com.roadpulse.app.data.RouteSettings.init(this)
         com.roadpulse.app.data.ServerSettings.init(this)
         com.roadpulse.app.nav.NowPlaying.init(this)
+        com.roadpulse.app.nav.TrafficUploader.init(this)
         com.roadpulse.app.nav.LeaveReminders.rescheduleAll(this)
         handleReminder(intent)
         VoiceProbe.check(this, VoiceSettings.language.value)

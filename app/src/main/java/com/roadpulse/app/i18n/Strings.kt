@@ -198,6 +198,33 @@ interface AppStrings {
     val nextTrack: String
     val previousTrack: String
 
+    // Profile
+    val profile: String
+    val nickname: String
+    val nicknameHint: String
+    fun levelName(code: String): String
+    fun points(n: Int): String
+    fun pointsToNext(points: Int, nextLevel: String): String
+    val topLevel: String
+    val statReports: String
+    val statConfirmed: String
+    val statVotes: String
+    val badges: String
+    fun badge(code: String): String
+    val howPointsWork: String
+    val profileNeedsServer: String
+
+    // Share my drive
+    val shareDrive: String
+    fun shareText(destination: String, eta: String, url: String): String
+    val sharingLive: String
+    val stopSharing: String
+    val shareFailed: String
+
+    // Live traffic
+    val helpTraffic: String
+    val helpTrafficText: String
+
     // Navigation notification
     fun navigatingTo(name: String): String
     val navigation: String
@@ -384,6 +411,43 @@ object EnglishStrings : AppStrings {
     override val pause = "Pause"
     override val nextTrack = "Next track"
     override val previousTrack = "Previous track"
+
+    override val profile = "Profile"
+    override val nickname = "Nickname"
+    override val nicknameHint = "Optional. Shown on your profile; no real name needed."
+    override fun levelName(code: String) = when (code) {
+        "ROAD_SCOUT" -> "Road Scout"
+        "NAVIGATOR" -> "Navigator"
+        "ROAD_GUARDIAN" -> "Road Guardian"
+        "ROAD_LEGEND" -> "Road Legend"
+        else -> "Learner"
+    }
+    override fun points(n: Int) = "$n points"
+    override fun pointsToNext(points: Int, nextLevel: String) = "$points points to $nextLevel"
+    override val topLevel = "Top level reached"
+    override val statReports = "Reports"
+    override val statConfirmed = "Confirmed by others"
+    override val statVotes = "Reports checked"
+    override val badges = "Badges"
+    override fun badge(code: String) = when (code) {
+        "FIRST_REPORT" -> "First report"
+        "REPORTER_10" -> "10 reports"
+        "REPORTER_50" -> "50 reports"
+        "HELPFUL_10" -> "10 confirmations"
+        "CHECKER_25" -> "25 checks"
+        else -> code
+    }
+    override val howPointsWork = "10 points per report, 5 when another driver confirms it, 2 for checking someone's report. A report removed by moderators costs 20."
+    override val profileNeedsServer = "Your profile needs the RoadPulse server. Turn on \"Use my laptop's server\" in Settings."
+
+    override val shareDrive = "Share drive"
+    override fun shareText(destination: String, eta: String, url: String) = "I'm driving to $destination, arriving around $eta. Follow live: $url"
+    override val sharingLive = "Sharing live"
+    override val stopSharing = "Stop sharing"
+    override val shareFailed = "Could not share the drive. Check the connection to the server."
+
+    override val helpTraffic = "Help with live traffic"
+    override val helpTrafficText = "When on, RoadPulse sends your speed and position in short anonymous pieces while you navigate: no account or device ID, nothing from the first and last 500 m of a trip, and the server keeps only average road speeds. Turn off at any time."
 
     override fun navigatingTo(name: String) = "Navigating to $name"
     override val navigation = "Navigation"
@@ -616,6 +680,43 @@ object ArabicStrings : AppStrings {
     override val pause = "إيقاف مؤقت"
     override val nextTrack = "المقطع التالي"
     override val previousTrack = "المقطع السابق"
+
+    override val profile = "الملف الشخصي"
+    override val nickname = "الاسم المستعار"
+    override val nicknameHint = "اختياري. يظهر في ملفك الشخصي، ولا حاجة لاسمك الحقيقي."
+    override fun levelName(code: String) = when (code) {
+        "ROAD_SCOUT" -> "مستكشف الطريق"
+        "NAVIGATOR" -> "الملّاح"
+        "ROAD_GUARDIAN" -> "حارس الطريق"
+        "ROAD_LEGEND" -> "أسطورة الطريق"
+        else -> "متعلّم"
+    }
+    override fun points(n: Int) = "$n نقطة"
+    override fun pointsToNext(points: Int, nextLevel: String) = "$points نقطة للوصول إلى $nextLevel"
+    override val topLevel = "وصلت إلى أعلى مستوى"
+    override val statReports = "البلاغات"
+    override val statConfirmed = "أكّدها آخرون"
+    override val statVotes = "بلاغات تحققت منها"
+    override val badges = "الأوسمة"
+    override fun badge(code: String) = when (code) {
+        "FIRST_REPORT" -> "أول بلاغ"
+        "REPORTER_10" -> "10 بلاغات"
+        "REPORTER_50" -> "50 بلاغًا"
+        "HELPFUL_10" -> "10 تأكيدات"
+        "CHECKER_25" -> "25 تحققًا"
+        else -> code
+    }
+    override val howPointsWork = "10 نقاط لكل بلاغ، و5 عندما يؤكده سائق آخر، و2 عند التحقق من بلاغ غيرك. البلاغ الذي يحذفه المشرفون يخصم 20."
+    override val profileNeedsServer = "يحتاج ملفك الشخصي إلى خادم RoadPulse. فعّل \"Use my laptop's server\" في الإعدادات."
+
+    override val shareDrive = "شارك الرحلة"
+    override fun shareText(destination: String, eta: String, url: String) = "أنا في طريقي إلى $destination، وأصل نحو الساعة $eta. تابعني مباشرة: $url"
+    override val sharingLive = "المشاركة مباشرة"
+    override val stopSharing = "إيقاف المشاركة"
+    override val shareFailed = "تعذّرت مشاركة الرحلة. تحقق من الاتصال بالخادم."
+
+    override val helpTraffic = "ساعد في معرفة حركة المرور"
+    override val helpTrafficText = "عند التفعيل، يرسل RoadPulse سرعتك وموقعك على شكل أجزاء قصيرة مجهولة الهوية أثناء الملاحة: بلا حساب أو معرّف جهاز، ولا شيء من أول وآخر 500 م من الرحلة، ويحتفظ الخادم بمتوسط سرعات الطرق فقط. يمكنك إيقافه في أي وقت."
 
     override fun navigatingTo(name: String) = "الملاحة إلى $name"
     override val navigation = "الملاحة"

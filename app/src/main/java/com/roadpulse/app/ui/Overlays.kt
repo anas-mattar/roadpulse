@@ -33,6 +33,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.getValue
 import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.SkipNext
@@ -126,15 +128,21 @@ fun ExploreOverlay(
     onCloseCategory: () -> Unit = {},
     onPlanned: (com.roadpulse.app.data.PlannedDrive) -> Unit = {},
     onRemovePlanned: (com.roadpulse.app.data.PlannedDrive) -> Unit = {},
+    /** Points, level and badges; null hides the button (no server). */
+    onOpenProfile: (() -> Unit)? = null,
 ) {
     Box(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(12.dp)) {
-        CircleButton(
-            icon = Icons.Filled.Settings,
-            description = strings.settingsButton,
-            onClick = onOpenSettings,
-            modifier = Modifier.align(Alignment.TopEnd),
-            content = RP.TextSecondary,
-        )
+        Column(Modifier.align(Alignment.TopEnd), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            CircleButton(
+                icon = Icons.Filled.Settings,
+                description = strings.settingsButton,
+                onClick = onOpenSettings,
+                content = RP.TextSecondary,
+            )
+            if (onOpenProfile != null) {
+                CircleButton(icon = Icons.Filled.Person, description = strings.profile, onClick = onOpenProfile)
+            }
+        }
 
         Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth()) {
             Column(Modifier.align(Alignment.End), horizontalAlignment = Alignment.End) {
@@ -476,6 +484,11 @@ fun DrivingOverlay(
     onPlayPause: () -> Unit = {},
     onNextTrack: () -> Unit = {},
     onPreviousTrack: () -> Unit = {},
+    /** Share this drive as a live link; null hides the button (no server). */
+    onShare: (() -> Unit)? = null,
+    /** A live link is active: shows "Sharing live" with a stop action. */
+    sharing: Boolean = false,
+    onStopSharing: () -> Unit = {},
     /** Debug builds: passenger issue report for field tests. */
     onFlag: (() -> Unit)? = null,
     showSpeedometer: Boolean = true,
@@ -533,6 +546,15 @@ fun DrivingOverlay(
                         )
                     }
                     state.navStatus?.let { Pill(text = it, color = RP.Amber, contentColor = RP.AmberDark) }
+                    if (sharing) {
+                        Surface(onClick = onStopSharing, shape = RoundedCornerShape(14.dp), color = RP.TealDark, contentColor = Color.White, shadowElevation = 4.dp) {
+                            Row(Modifier.padding(horizontal = 12.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Filled.Share, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(Modifier.width(6.dp))
+                                Text(strings.sharingLive + " · " + strings.stopSharing, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                            }
+                        }
+                    }
                     if (onFlag != null) {
                         Surface(onClick = onFlag, shape = RoundedCornerShape(14.dp), color = Color.White, contentColor = RP.Danger, shadowElevation = 4.dp) {
                             Row(Modifier.padding(horizontal = 12.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -543,13 +565,18 @@ fun DrivingOverlay(
                         }
                     }
                 }
-                CircleButton(
-                    icon = if (muted) Icons.AutoMirrored.Filled.VolumeOff else Icons.AutoMirrored.Filled.VolumeUp,
-                    description = if (muted) strings.unmuteVoice else strings.muteVoice,
-                    onClick = onToggleMute,
-                    container = RP.NightPanel,
-                    content = Color.White,
-                )
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    CircleButton(
+                        icon = if (muted) Icons.AutoMirrored.Filled.VolumeOff else Icons.AutoMirrored.Filled.VolumeUp,
+                        description = if (muted) strings.unmuteVoice else strings.muteVoice,
+                        onClick = onToggleMute,
+                        container = RP.NightPanel,
+                        content = Color.White,
+                    )
+                    if (onShare != null && !sharing) {
+                        CircleButton(icon = Icons.Filled.Share, description = strings.shareDrive, onClick = onShare, container = Color.White, content = RP.Indigo)
+                    }
+                }
             }
         }
 

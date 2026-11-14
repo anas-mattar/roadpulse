@@ -8,6 +8,9 @@ using RoadPulse.Api.Modules.Moderation;
 using RoadPulse.Api.Modules.Places;
 using RoadPulse.Api.Modules.Reports;
 using RoadPulse.Api.Modules.Tolls;
+using RoadPulse.Api.Modules.Profile;
+using RoadPulse.Api.Modules.Shares;
+using RoadPulse.Api.Modules.Traffic;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -45,6 +48,9 @@ builder.Services.AddAuthorizationBuilder()
     .AddPolicy(ModeratorAuthHandler.Policy, p => p.AddAuthenticationSchemes(ModeratorAuthHandler.SchemeName).RequireRole("moderator"));
 builder.Services.AddRoadPulseRateLimits(builder.Configuration);
 builder.Services.AddSingleton<TollRateStore>();
+builder.Services.AddSingleton<ShareStore>();
+builder.Services.AddHttpClient<IMapMatcher, ValhallaMatcher>(c => c.Timeout = TimeSpan.FromSeconds(10));
+builder.Services.AddHostedService<TrafficCleanup>();
 
 var app = builder.Build();
 
@@ -103,6 +109,10 @@ v1.MapReportEndpoints();
 v1.MapModerationEndpoints();
 v1.MapPlaceEndpoints();
 v1.MapTollEndpoints();
+v1.MapProfileEndpoints();
+v1.MapShareEndpoints();
+v1.MapTrafficEndpoints();
+app.MapSharePage();
 app.MapHub<ReportsHub>(ReportsHub.Path).RequireRateLimiting(RateLimits.Reads);
 
 app.Run();

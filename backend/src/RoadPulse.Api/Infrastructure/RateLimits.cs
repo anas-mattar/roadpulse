@@ -12,6 +12,7 @@ public static class RateLimits
     public const string Votes = "votes";
     public const string Registration = "registration";
     public const string Moderation = "moderation";
+    public const string Traffic = "traffic";
 
     public static IServiceCollection AddRoadPulseRateLimits(this IServiceCollection services, IConfiguration config)
     {
@@ -24,6 +25,8 @@ public static class RateLimits
             o.AddPolicy(Registration, http => Fixed(ClientIp(http), Limit("RegistrationsPerHour", 10), TimeSpan.FromHours(1)));
             o.AddPolicy(Reports, http => Fixed(DeviceOrIp(http), Limit("ReportsPer10Minutes", 10), TimeSpan.FromMinutes(10)));
             o.AddPolicy(Moderation, http => Fixed(ClientIp(http), Limit("ModerationPerMinute", 120), TimeSpan.FromMinutes(1)));
+            // Anonymous traffic segments (one every ~2 minutes per driver; several drivers can share an IP).
+            o.AddPolicy(Traffic, http => Fixed(ClientIp(http), Limit("TrafficSegmentsPer10Minutes", 120), TimeSpan.FromMinutes(10)));
             o.AddPolicy(Votes, http => Fixed(DeviceOrIp(http), Limit("VotesPer10Minutes", 60), TimeSpan.FromMinutes(10)));
         });
         return services;

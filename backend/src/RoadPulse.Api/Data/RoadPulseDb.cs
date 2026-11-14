@@ -11,6 +11,8 @@ public class RoadPulseDb(DbContextOptions<RoadPulseDb> options) : DbContext(opti
     public DbSet<ReportFlag> ReportFlags => Set<ReportFlag>();
     public DbSet<AuditEntry> AuditLog => Set<AuditEntry>();
     public DbSet<MapPlace> Places => Set<MapPlace>();
+    public DbSet<TrafficEdge> TrafficEdges => Set<TrafficEdge>();
+    public DbSet<TrafficObservation> TrafficObservations => Set<TrafficObservation>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -21,6 +23,7 @@ public class RoadPulseDb(DbContextOptions<RoadPulseDb> options) : DbContext(opti
             e.ToTable("devices");
             e.HasIndex(d => d.TokenHash).IsUnique();
             e.Property(d => d.TokenHash).HasMaxLength(64);
+            e.Property(d => d.Nickname).HasMaxLength(24);
         });
 
         b.Entity<Report>(e =>
@@ -75,6 +78,21 @@ public class RoadPulseDb(DbContextOptions<RoadPulseDb> options) : DbContext(opti
             e.Property(p => p.Location).HasColumnType("geography (point, 4326)");
             e.HasIndex(p => p.Location).HasMethod("gist");
             e.HasIndex(p => p.Category);
+        });
+
+        b.Entity<TrafficEdge>(e =>
+        {
+            e.ToTable("traffic_edges");
+            e.Property(t => t.Id).ValueGeneratedNever();
+            e.Property(t => t.Geometry).HasColumnType("geography (linestring, 4326)");
+            e.HasIndex(t => t.Geometry).HasMethod("gist");
+        });
+
+        b.Entity<TrafficObservation>(e =>
+        {
+            e.ToTable("traffic_observations");
+            e.HasKey(o => new { o.EdgeId, o.WindowStart });
+            e.HasIndex(o => o.WindowStart);
         });
 
         b.Entity<IdempotencyRecord>(e =>

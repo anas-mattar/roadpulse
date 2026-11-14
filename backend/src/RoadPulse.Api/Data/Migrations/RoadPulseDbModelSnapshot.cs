@@ -96,6 +96,11 @@ namespace RoadPulse.Api.Data.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
+                    b.Property<string>("Nickname")
+                        .HasMaxLength(24)
+                        .HasColumnType("character varying(24)")
+                        .HasColumnName("nickname");
+
                     b.Property<string>("TokenHash")
                         .IsRequired()
                         .HasMaxLength(64)
@@ -327,6 +332,63 @@ namespace RoadPulse.Api.Data.Migrations
                         .HasDatabaseName("ix_report_votes_device_id");
 
                     b.ToTable("report_votes", (string)null);
+                });
+
+            modelBuilder.Entity("RoadPulse.Api.Data.TrafficEdge", b =>
+                {
+                    b.Property<long>("Id")
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    b.Property<int>("ExpectedKph")
+                        .HasColumnType("integer")
+                        .HasColumnName("expected_kph");
+
+                    b.Property<LineString>("Geometry")
+                        .IsRequired()
+                        .HasColumnType("geography (linestring, 4326)")
+                        .HasColumnName("geometry");
+
+                    b.Property<long>("WayId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("way_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_traffic_edges");
+
+                    b.HasIndex("Geometry")
+                        .HasDatabaseName("ix_traffic_edges_geometry");
+
+                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("Geometry"), "gist");
+
+                    b.ToTable("traffic_edges", (string)null);
+                });
+
+            modelBuilder.Entity("RoadPulse.Api.Data.TrafficObservation", b =>
+                {
+                    b.Property<long>("EdgeId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("edge_id");
+
+                    b.Property<DateTimeOffset>("WindowStart")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("window_start");
+
+                    b.Property<int>("Segments")
+                        .HasColumnType("integer")
+                        .HasColumnName("segments");
+
+                    b.Property<double>("SpeedSumKph")
+                        .HasColumnType("double precision")
+                        .HasColumnName("speed_sum_kph");
+
+                    b.HasKey("EdgeId", "WindowStart")
+                        .HasName("pk_traffic_observations");
+
+                    b.HasIndex("WindowStart")
+                        .HasDatabaseName("ix_traffic_observations_window_start");
+
+                    b.ToTable("traffic_observations", (string)null);
                 });
 
             modelBuilder.Entity("RoadPulse.Api.Data.Report", b =>

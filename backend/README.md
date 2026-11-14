@@ -124,6 +124,20 @@ Limits:
   2026-11-15. None of these sources gives an effective date. Motorcycle prices are empty.
   Check each row on the operator's site and fill in `checked_on`.
 
+## Profiles, share links and live traffic
+
+- **Profile** (`GET/PUT /v1/me`, device token): points (10 per report, 5 per confirmation from
+  another driver, 2 per vote, -20 per report removed by a moderator), levels (Learner, Road Scout,
+  Navigator, Road Guardian, Road Legend), badges, optional nickname. No sign-in (ADR 0006).
+- **Share my drive** (`POST/PUT/DELETE /v1/shares`, public `GET /v1/shares/{id}` and page `/s/{id}`):
+  a live link with destination, arrival time and position. Kept in memory only; ends when the driver
+  stops, 30 minutes after arrival, or after 12 hours. Links use `Share__PublicBaseUrl`
+  (`http://localhost:8080` in docker-compose; set `SHARE_PUBLIC_BASE_URL` in `.env` to your public
+  address once the server is online).
+- **Live traffic** (ADR 0004, opt-in in the app): `POST /v1/traffic/samples` (anonymous),
+  `GET /v1/traffic?minLat&minLon&maxLat&maxLon`. Needs the local routing server for map matching.
+  The app draws slow (orange) and jammed (red) roads.
+
 ## Offline map tiles (optional)
 
 The app's map normally loads from OpenFreeMap over the internet. To serve map tiles from this

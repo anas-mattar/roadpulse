@@ -93,6 +93,11 @@ data class MapUiState(
     val lanes: List<com.roadpulse.app.data.Lane> = emptyList(),
     /** Nearest school on the route ahead while driving. */
     val schoolAhead: com.roadpulse.app.nav.SchoolAhead? = null,
+    /** Slow and jammed roads in view (live traffic, privacy threshold applied by the server). */
+    val trafficLines: List<com.roadpulse.app.data.TrafficLine> = emptyList(),
+    /** This device's points and level; null until loaded (or without a server). */
+    val profile: com.roadpulse.app.data.Profile? = null,
+    val profileError: Boolean = false,
     /** Route options in effect (shown in the preview). */
     val routeOptions: com.roadpulse.app.data.RouteOptions = com.roadpulse.app.data.RouteOptions(),
 )
@@ -111,6 +116,13 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
     private var searchJob: Job? = null
 
     init {
+        // Live traffic in view, refreshed every minute.
+        viewModelScope.launch {
+            while (true) {
+                kotlinx.coroutines.delay(60_000)
+                refreshTraffic()
+            }
+        }
         _state.update { it.copy(saved = placesStore.load()) }
         // Reports come from the server when one is configured, otherwise they stay on this phone.
         viewModelScope.launch {
@@ -150,7 +162,7 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
                                 }
                             },
                         )
-                        ui.navigating -> MapUiState(reports = ui.reports, message = ui.message, saved = ui.saved, selectedReportId = ui.selectedReportId, selectedReportOwn = ui.selectedReportOwn, routeOptions = ui.routeOptions, placesAvailable = ui.placesAvailable)
+                        ui.navigating -> MapUiState(reports = ui.reports, message = ui.message, saved = ui.saved, selectedReportId = ui.selectedReportId, selectedReportOwn = ui.selectedReportOwn, routeOptions = ui.routeOptions, placesAvailable = ui.placesAvailable, trafficLines = ui.trafficLines, profile = ui.profile)
                         else -> ui
                     }
                 }
@@ -429,7 +441,56 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
     fun onMapAreaChanged(visible: MapArea) {
         lastVisibleArea = visible
         reportRepository.watchArea(visible)
+        if (System.currentTimeMillis() - lastTrafficFetch > 5_000) refreshTraffic()
     }
+
+    private var lastTrafficFetch = 0L
+    private var trafficJob: Job? = null
+
+    /** Loads slow and jammed roads for the visible area (city zoom or closer). */
+    private fun refreshTraffic() {
+        val url = ServerSettings.backendUrl()
+        val area = lastVisibleArea ?: return
+        if (url.isEmpty() || area.width > 0.9 || area.height > 0.9) {
+            if (_state.value.trafficLines.isNotEmpty()) _state.update { it.copy(trafficLines = emptyList()) }
+            return
+        }
+        lastTrafficFetch = System.currentTimeMillis()
+        trafficJob?.cancel()
+        trafficJob = viewModelScope.launch {
+            val lines = runCatching {
+                com.roadpulse.app.data.TrafficClient(url).lines(area.minLat, area.minLon, area.maxLat, area.maxLon)
+            }.getOrNull() ?: return@launch
+            _state.update { it.copy(trafficLines = lines.filter { l -> l.level != "FREE" }) }
+        }
+    }
+
+    /** Loads this device's profile (points, level, badges). */
+    fun loadProfile() {
+        val url = ServerSettings.backendUrl()
+        if (url.isEmpty()) {
+            _state.update { it.copy(profileError = true) }
+            return
+        }
+        viewModelScope.launch {
+            runCatching { profileClient(url).get() }
+                .onSuccess { p -> _state.update { it.copy(profile = p, profileError = false) } }
+                .onFailure { _state.update { it.copy(profileError = true) } }
+        }
+    }
+
+    fun saveNickname(name: String) {
+        val url = ServerSettings.backendUrl()
+        if (url.isEmpty()) return
+        viewModelScope.launch {
+            runCatching { profileClient(url).setNickname(name.trim().ifEmpty { null }) }
+                .onSuccess { p -> _state.update { it.copy(profile = p, message = com.roadpulse.app.i18n.currentStrings().saved(p.nickname ?: "")) } }
+                .onFailure { e -> _state.update { it.copy(message = e.message) } }
+        }
+    }
+
+    private fun profileClient(url: String) =
+        com.roadpulse.app.data.ProfileClient(com.roadpulse.app.data.DeviceApi(url, ServerSettings.tokenStore(getApplication(), url)))
 
     // --- long press, stops, favourites, parking ------------------------------------------------
 

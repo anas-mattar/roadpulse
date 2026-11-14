@@ -187,6 +187,7 @@ object NavigationSession {
         camerasJob?.cancel()
         cameras = emptyList()
         announcedCameras.clear()
+        TrafficUploader.driveEnded()
         schoolsJob?.cancel()
         schools = emptyList()
         schoolRoute = null
@@ -210,8 +211,13 @@ object NavigationSession {
         // no prompts fire because the driver is off route, and no second reroute starts.
         val progress = t.update(fix)
         log?.fix(fix, progress)
+        // Opt-in live traffic (ADR 0004): real drives only, never simulations; ends trimmed.
+        if (usable && !DriveReplay.active.value) {
+            TrafficUploader.onFix(fix.position, fix.speedMps, fix.timeMillis, progress.remainingMeters)
+        }
         if (progress.arrived) {
             log?.event(fix.timeMillis, "arrived")
+            ShareSession.onArrived()
             speak(VoiceSettings.narrator().arrived)
             _events.tryEmit(NavEvent.Arrived)
             stop()

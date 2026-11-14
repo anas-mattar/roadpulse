@@ -30,6 +30,9 @@ public class ApiFactory : WebApplicationFactory<Program>
     /// <summary>Toll price table for this host (a temp file in toll tests).</summary>
     public string TollRatesPath { get; init; } = "/nonexistent/toll-rates.csv";
 
+    /// <summary>Extra service replacements for one test (e.g. a fake map matcher).</summary>
+    public Action<IServiceCollection>? ExtraServices { get; init; }
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseSetting("Tolls:RatesPath", TollRatesPath);
@@ -46,6 +49,7 @@ public class ApiFactory : WebApplicationFactory<Program>
         {
             s.RemoveAll<TimeProvider>();
             s.AddSingleton<TimeProvider>(Clock);
+            ExtraServices?.Invoke(s);
         });
     }
 

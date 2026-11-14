@@ -112,6 +112,7 @@ import org.maplibre.android.style.layers.LineLayer
 import org.maplibre.android.style.layers.Property
 import org.maplibre.android.style.layers.PropertyFactory
 import org.maplibre.android.style.sources.GeoJsonSource
+import kotlinx.coroutines.launch
 import org.maplibre.geojson.Feature
 import org.maplibre.geojson.FeatureCollection
 import org.maplibre.geojson.LineString
@@ -133,6 +134,7 @@ private val FLAG_CATEGORIES = listOf(
     "other" to "Other",
 )
 private const val ALT_ROUTE_SOURCE = "alt-route-source"
+private const val TRAFFIC_SOURCE = "traffic-source"
 private const val ALT_ROUTE_LAYER = "alt-route-line"
 private const val DEST_SOURCE = "destination-source"
 private const val STOP_SOURCE = "stop-source"
@@ -166,6 +168,10 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
     var showSimulateDialog by remember { mutableStateOf(false) }
     var showFlagDialog by remember { mutableStateOf(false) }
     var showPlanDialog by remember { mutableStateOf(false) }
+    var showProfile by remember { mutableStateOf(false) }
+    val shareLink by com.roadpulse.app.nav.ShareSession.link.collectAsStateWithLifecycle()
+    val uiScope = androidx.compose.runtime.rememberCoroutineScope()
+    val s = strings
     val musicOn by com.roadpulse.app.nav.NowPlaying.enabled.collectAsStateWithLifecycle()
     val track by com.roadpulse.app.nav.NowPlaying.track.collectAsStateWithLifecycle()
 
@@ -496,6 +502,7 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                     onCloseCategory = viewModel::clearCategory,
                     onPlanned = { viewModel.openPlanned(it.id, currentLocation()) },
                     onRemovePlanned = viewModel::removePlanned,
+                    onOpenProfile = if (state.placesAvailable) ({ viewModel.loadProfile(); showProfile = true }) else null,
                     onVoiceSearch = if (voiceSearchAvailable) ({
                         voiceSearch.launch(
                             android.content.Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
@@ -543,6 +550,21 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                     onPlayPause = com.roadpulse.app.nav.NowPlaying::playPause,
                     onNextTrack = com.roadpulse.app.nav.NowPlaying::next,
                     onPreviousTrack = com.roadpulse.app.nav.NowPlaying::previous,
+                    onShare = if (state.placesAvailable) ({
+                        uiScope.launch {
+                            runCatching { com.roadpulse.app.nav.ShareSession.start(context, state.profile?.nickname) }
+                                .onSuccess { link ->
+                                    val eta = formatArrivalText(context, state.remainingSeconds ?: 0.0)
+                                    val text = s.shareText(state.destination?.name.orEmpty(), eta, link.url)
+                                    val send = android.content.Intent(android.content.Intent.ACTION_SEND).setType("text/plain")
+                                        .putExtra(android.content.Intent.EXTRA_TEXT, text)
+                                    context.startActivity(android.content.Intent.createChooser(send, s.shareDrive))
+                                }
+                                .onFailure { viewModel.showMessage(s.shareFailed) }
+                        }
+                    }) else null,
+                    sharing = shareLink != null,
+                    onStopSharing = com.roadpulse.app.nav.ShareSession::stop,
                     onOverview = {
                         following = false
                         val m = map
@@ -642,6 +664,20 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
             confirmButton = {},
             dismissButton = { TextButton(onClick = { showAbuseDialog = false }) { Text(strings.cancel) } },
         )
+    }
+
+    if (showProfile) {
+        ProfileDialog(state.profile, state.profileError, onSaveNickname = viewModel::saveNickname, onDismiss = { showProfile = false })
+    }
+
+    // Live traffic lines in view.
+    LaunchedEffect(style, state.trafficLines) {
+        val features = state.trafficLines.map { line ->
+            Feature.fromGeometry(
+                org.maplibre.geojson.LineString.fromLngLats(line.points.map { org.maplibre.geojson.Point.fromLngLat(it[1], it[0]) })
+            ).apply { addStringProperty("level", line.level) }
+        }
+        style?.getSourceAs<GeoJsonSource>(TRAFFIC_SOURCE)?.setGeoJson(FeatureCollection.fromFeatures(features))
     }
 
     if (showPlanDialog) {
@@ -793,6 +829,7 @@ private fun Style.addOverlayLayers() {
     fun add(layer: org.maplibre.android.style.layers.Layer) {
         if (locationLayer != null) addLayerBelow(layer, locationLayer) else addLayer(layer)
     }
+    addSource(GeoJsonSource(TRAFFIC_SOURCE))
     addSource(GeoJsonSource(ALT_ROUTE_SOURCE))
     addSource(GeoJsonSource(ROUTE_SOURCE))
     addSource(GeoJsonSource(DEST_SOURCE))
@@ -806,6 +843,23 @@ private fun Style.addOverlayLayers() {
         )
     )
 
+    // Live traffic under the routes: orange = slow, red = jammed (free-flowing roads are not drawn).
+    add(
+        LineLayer("traffic-line", TRAFFIC_SOURCE).withProperties(
+            PropertyFactory.lineColor(
+                org.maplibre.android.style.expressions.Expression.match(
+                    org.maplibre.android.style.expressions.Expression.get("level"),
+                    org.maplibre.android.style.expressions.Expression.literal("JAM"),
+                    org.maplibre.android.style.expressions.Expression.color(android.graphics.Color.parseColor("#D20F39")),
+                    org.maplibre.android.style.expressions.Expression.color(android.graphics.Color.parseColor("#F59F00")),
+                )
+            ),
+            PropertyFactory.lineWidth(5f),
+            PropertyFactory.lineOpacity(0.85f),
+            PropertyFactory.lineCap(Property.LINE_CAP_ROUND),
+            PropertyFactory.lineJoin(Property.LINE_JOIN_ROUND),
+        )
+    )
     add(
         LineLayer(ALT_ROUTE_LAYER, ALT_ROUTE_SOURCE).withProperties(
             PropertyFactory.lineColor("#9E9C94"),
@@ -968,6 +1022,9 @@ internal fun formatKm(km: Double): String = strings.distance(km)
 @androidx.compose.runtime.ReadOnlyComposable
 internal fun formatDuration(seconds: Double): String = strings.duration((seconds / 60).roundToInt())
 
+/** Arrival clock time for messages outside composition. */
+internal fun formatArrivalText(context: Context, secondsFromNow: Double): String = formatArrival(context, secondsFromNow)
+
 /** Arrival clock time in the phone's own 12/24-hour style. */
 internal fun formatArrival(context: Context, secondsFromNow: Double): String =
     android.text.format.DateFormat.getTimeFormat(context)
@@ -1043,6 +1100,7 @@ private fun VoiceSettingsDialog(onDismiss: () -> Unit, onClearPlaces: () -> Unit
                 }
                 RouteAndDisplaySettings()
                 MusicSettings()
+                TrafficSettings()
                 if (ServerSettings.localAvailable) {
                     val useLocal by ServerSettings.useLocal.collectAsStateWithLifecycle()
                     Text(
@@ -1106,6 +1164,15 @@ private fun VoiceSettingsDialog(onDismiss: () -> Unit, onClearPlaces: () -> Unit
         },
         confirmButton = { TextButton(onClick = onDismiss) { Text(strings.done) } },
     )
+}
+
+/** Opt-in to send anonymous speed samples for live traffic (ADR 0004). Off by default. */
+@Composable
+private fun TrafficSettings() {
+    val on by com.roadpulse.app.nav.TrafficUploader.enabled.collectAsStateWithLifecycle()
+    SettingsHeader(strings.helpTraffic)
+    SettingSwitch(strings.helpTraffic, on) { com.roadpulse.app.nav.TrafficUploader.setEnabled(it) }
+    Text(strings.helpTrafficText, style = MaterialTheme.typography.bodySmall, color = RP.TextSecondary)
 }
 
 /** Music controls while driving: needs notification access, granted in Android settings. */

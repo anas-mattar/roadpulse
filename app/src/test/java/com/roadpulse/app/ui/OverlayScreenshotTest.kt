@@ -238,6 +238,34 @@ class OverlayScreenshotTest {
         PreviewOverlay(destination = place, route = route, busy = false, onBack = {}, onGo = {}, onSimulate = null, onLeaveLater = {})
     }
 
+    private val sampleProfile = com.roadpulse.app.data.Profile(
+        nickname = "Ahmad", points = 215, level = "ROAD_SCOUT", levelIndex = 1, nextLevelPoints = 500,
+        stats = com.roadpulse.app.data.ProfileStats(reports = 14, confirmationsReceived = 9, votes = 12),
+        badges = listOf("FIRST_REPORT", "REPORTER_10"),
+    )
+
+    @Test
+    fun profile() = shot("12_profile", Color.White) {
+        androidx.compose.foundation.layout.Column(Modifier.padding(24.dp)) { ProfileContent(sampleProfile, onSaveNickname = {}) }
+    }
+
+    @Test
+    fun profileArabic() = shot("ar_12_profile", Color.White, arabic = true) {
+        androidx.compose.foundation.layout.Column(Modifier.padding(24.dp)) { ProfileContent(sampleProfile, onSaveNickname = {}) }
+    }
+
+    @Test
+    fun drivingSharing() = shot("3g_driving_sharing", RP.Field) {
+        DrivingOverlay(state = laneState.copy(lanes = emptyList(), schoolAhead = null), narrator = EnglishNarrator, muted = false,
+            onToggleMute = {}, onReport = {}, onStop = {}, onShare = {}, sharing = true)
+    }
+
+    @Test
+    fun drivingShareButton() = shot("3h_driving_share_button", RP.Field) {
+        DrivingOverlay(state = laneState.copy(lanes = emptyList(), schoolAhead = null), narrator = EnglishNarrator, muted = false,
+            onToggleMute = {}, onReport = {}, onStop = {}, onShare = {})
+    }
+
     @Test
     fun drivingMalayWithStatus() = shot("3b_driving_malay_gps_lost", RP.NightSurface) {
         DrivingOverlay(

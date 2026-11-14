@@ -1,6 +1,7 @@
 # 0004. Location telemetry for live traffic
 
-Date: 2026-11-14 · Status: Proposed (needs legal review before any collection starts)
+Date: 2026-11-14 · Status: Accepted for local testing on 2026-11-15 (owner's decision). A PDPA legal
+review, privacy policy and consent screen review are still required before any real users opt in.
 
 ## Context
 
@@ -26,6 +27,20 @@ short-lived, and reviewed for Malaysia's PDPA (and GDPR if offered in the EU).
   contributed in the window, so a single driver's speed is not exposed.
 - **Retention**: aggregated speeds kept up to 12 months for historical profiles; no raw traces kept.
 - **Security**: TLS, write-only ingestion endpoint, rate limits, and no precise locations in logs.
+
+## Implementation (2026-11-15)
+
+- App: `nav/TrafficUploader.kt` (`TrafficSegmenter`): off by default (Settings > "Help with live
+  traffic"); 2-minute segments, one point per 2 s, times relative to the segment start, coordinates
+  rounded to 5 decimals; first and last 500 m dropped; simulated drives never uploaded; failed
+  uploads dropped (no queue on the phone). No token or device id is sent.
+- Backend: `Modules/Traffic`: `POST /v1/traffic/samples` (anonymous, rate limited per IP), map
+  matched at once on the local Valhalla (`trace_attributes`), added to `traffic_observations`
+  (edge, 5-minute window, speed sum, segment count); points are not stored or logged.
+  `GET /v1/traffic` returns only edges with at least 3 segments in the last 15 minutes. Aggregates
+  are deleted after 12 months.
+- Known gap: one driver stuck on the same road for several minutes sends several segments, so the
+  3-segment threshold alone does not guarantee 3 different people. Review before real users.
 
 ## Consequences
 

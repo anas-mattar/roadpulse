@@ -30,6 +30,10 @@ components. "RoadPulse" is a placeholder name; check trademark availability befo
   comes 5 minutes before the leave time (travel time + 10 min spare). Stored on the phone only
 - Music controls while driving (play/pause/next for Spotify, YouTube Music...), opt-in in Settings;
   needs Android notification access, used only to see which music is playing
+- Profile with points, levels and badges for reporting (anonymous, optional nickname)
+- Share my drive: a live link with arrival time and position (works on the laptop now; for
+  everyone once the server is online)
+- Live traffic (opt-in, anonymous, ADR 0004): slow and jammed roads on the map
 - Toll estimates on route cards from a price table you maintain (`backend/tolls/`)
 - Real phone over USB with everything on the laptop: `connect-phone.bat`, `docs/REAL_PHONE.md`
 - Navigation keeps running in the background and with the screen off (foreground service
