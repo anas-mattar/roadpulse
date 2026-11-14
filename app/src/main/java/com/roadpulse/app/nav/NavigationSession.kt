@@ -44,6 +44,13 @@ data class NavState(
     val offline: Boolean = false,
     /** This drive was restored after the app was stopped. */
     val resumed: Boolean = false,
+    /** Maneuver type of the next turn (drives the turn arrow). */
+    val upcomingType: Int? = null,
+    /** The turn after that, shown as "Then …" when it comes soon after. */
+    val thenType: Int? = null,
+    val thenGapMeters: Double? = null,
+    /** Current speed from GPS, if the provider reports it. */
+    val speedMps: Double? = null,
 )
 
 /**
@@ -116,9 +123,9 @@ object NavigationSession {
     /** Speaks (and logs) the first instruction of the current route. */
     fun announceStart() {
         val s = _state.value ?: return
-        val opening = s.route.maneuvers.firstOrNull()?.let { it.verbalPre ?: it.instruction }
-        speak(if (s.resumed) "Resuming your drive to ${s.destination.name}." else null)
-        speak(opening)
+        val n = VoiceSettings.narrator()
+        speak(if (s.resumed) n.resuming(s.destination.name) else null)
+        speak(s.route.maneuvers.firstOrNull()?.let(n::atTurn))
     }
 
     fun stop() {
@@ -146,14 +153,16 @@ object NavigationSession {
         log?.fix(fix, progress)
         if (progress.arrived) {
             log?.event(fix.timeMillis, "arrived")
-            speak("You have arrived.")
+            speak(VoiceSettings.narrator().arrived)
             _events.tryEmit(NavEvent.Arrived)
             stop()
             return
         }
         if (progress.offRoute) {
             if (!current.rerouting) reroute(fix.position)
-            _state.update { it?.copy(displayPosition = progress.displayPosition, poorSignal = progress.poorSignal) }
+            _state.update {
+                it?.copy(displayPosition = progress.displayPosition, poorSignal = progress.poorSignal, speedMps = fix.speedMps)
+            }
             return
         }
         progress.prompt?.let { speak(it, fix.timeMillis) }
@@ -163,7 +172,11 @@ object NavigationSession {
         _state.update {
             it?.copy(
                 offline = if (progress.matched) false else it.offline,
-                instruction = progress.upcoming?.instruction?.let(PromptText::tidy),
+                instruction = progress.upcoming?.let { m -> PromptText.tidy(VoiceSettings.narrator().banner(m)) },
+                upcomingType = progress.upcoming?.type,
+                thenType = progress.following?.type,
+                thenGapMeters = progress.followingGapMeters,
+                speedMps = fix.speedMps,
                 distanceToTurnMeters = progress.distanceToTurnMeters,
                 remainingKm = progress.remainingMeters / 1000,
                 remainingSeconds = progress.remainingSeconds,
@@ -174,19 +187,21 @@ object NavigationSession {
     }
 
     private fun applyRoute(route: Route, destination: Place, resumed: Boolean) {
-        tracker = RouteTracker(route, resumed)
+        tracker = RouteTracker(route, resumed, VoiceSettings::narrator)
         signal.reset(now())
         if (persist) store?.save(route, destination)
         val previous = _state.value
         _state.value = NavState(
             route = route,
             destination = destination,
-            instruction = route.maneuvers.firstOrNull()?.instruction?.let(PromptText::tidy),
+            instruction = route.maneuvers.firstOrNull()?.let { m -> PromptText.tidy(VoiceSettings.narrator().banner(m)) },
             distanceToTurnMeters = null,
             remainingKm = route.lengthKm,
             remainingSeconds = route.timeSeconds,
             displayPosition = previous?.displayPosition,
             resumed = resumed,
+            upcomingType = route.maneuvers.firstOrNull()?.type,
+            speedMps = previous?.speedMps,
         )
     }
 
@@ -207,7 +222,7 @@ object NavigationSession {
                 if (signal.check(now())) {
                     log?.event(now(), "gps_lost")
                     _state.update { it?.copy(gpsLost = true) }
-                    speak("GPS signal lost. Keep following the road.")
+                    speak(VoiceSettings.narrator().gpsLost)
                 }
             }
         }
@@ -220,14 +235,14 @@ object NavigationSession {
         lastRerouteAttemptMillis = t
         _state.value = current.copy(rerouting = true)
         log?.event(t, "reroute_start", "from=${from.lat},${from.lon}")
-        if (!current.offline) speak("Rerouting.")
+        if (!current.offline) speak(VoiceSettings.narrator().rerouting)
         rerouteJob = scope.launch {
             try {
                 val route = router.route(from, current.destination.location)
                 if (_state.value == null) return@launch
                 log?.event(now(), "reroute_done", "route_km=${route.lengthKm}")
                 applyRoute(route, current.destination, resumed = false)
-                speak(route.maneuvers.firstOrNull()?.let { it.verbalPre ?: it.instruction })
+                speak(route.maneuvers.firstOrNull()?.let(VoiceSettings.narrator()::atTurn))
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -235,7 +250,7 @@ object NavigationSession {
                 log?.event(now(), "reroute_failed", "${e.javaClass.simpleName}: ${e.message.orEmpty()}")
                 val wasOffline = _state.value?.offline == true
                 _state.update { it?.copy(rerouting = false, offline = noNetwork) }
-                if (noNetwork && !wasOffline) speak("No internet connection. Keeping your current route.")
+                if (noNetwork && !wasOffline) speak(VoiceSettings.narrator().noInternet)
                 // Retried on a later off-route fix, at most every REROUTE_MIN_INTERVAL_MS.
             }
         }

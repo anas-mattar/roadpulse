@@ -58,6 +58,7 @@ class NavigationService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        VoiceSettings.init(this)
         voice = VoiceGuide(this)
         deviceLocation = DeviceLocation(this)
         NavigationSession.init(driveStore(this), SystemClock::elapsedRealtime)
@@ -104,6 +105,12 @@ class NavigationService : Service() {
                 }
             }
             NavigationSession.announceStart()
+            scope.launch {
+                VoiceSettings.muted.collect { muted -> if (muted) voice.stopSpeaking() }
+            }
+            scope.launch {
+                VoiceSettings.effectiveLanguage.collect { voice.applyLanguage(it) }
+            }
             scope.launch {
                 NavigationSession.state.collect { state ->
                     if (state == null) {

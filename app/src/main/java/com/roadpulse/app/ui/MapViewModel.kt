@@ -17,6 +17,7 @@ import com.roadpulse.app.nav.DriveReplay
 import com.roadpulse.app.nav.NavEvent
 import com.roadpulse.app.nav.NavigationService
 import com.roadpulse.app.nav.NavigationSession
+import com.roadpulse.app.nav.VoiceSettings
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -25,6 +26,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
 
 data class MapUiState(
     val query: String = "",
@@ -38,6 +40,10 @@ data class MapUiState(
     val remainingKm: Double? = null,
     val remainingSeconds: Double? = null,
     val matchedPosition: GeoPoint? = null,
+    val turnType: Int? = null,
+    val thenType: Int? = null,
+    val thenGapMeters: Double? = null,
+    val speedKmh: Int? = null,
     /** Short status shown under the instruction while navigating (rerouting, GPS lost, offline). */
     val navStatus: String? = null,
     val reports: List<Report> = emptyList(),
@@ -73,12 +79,18 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
                             remainingKm = nav.remainingKm,
                             remainingSeconds = nav.remainingSeconds,
                             matchedPosition = nav.displayPosition,
-                            navStatus = when {
-                                nav.rerouting -> "Finding a new route…"
-                                nav.offline -> "Offline: keeping your current route"
-                                nav.gpsLost -> "GPS signal lost: keep following the road"
-                                nav.poorSignal -> "Weak GPS signal"
-                                else -> null
+                            turnType = nav.upcomingType,
+                            thenType = nav.thenType,
+                            thenGapMeters = nav.thenGapMeters,
+                            speedKmh = nav.speedMps?.let { (it * 3.6).roundToInt() },
+                            navStatus = VoiceSettings.narrator().let { n ->
+                                when {
+                                    nav.rerouting -> n.statusFindingRoute
+                                    nav.offline -> n.statusOffline
+                                    nav.gpsLost -> n.statusGpsLost
+                                    nav.poorSignal -> n.statusWeakGps
+                                    else -> null
+                                }
                             },
                         )
                         ui.navigating -> MapUiState(reports = ui.reports, message = ui.message)

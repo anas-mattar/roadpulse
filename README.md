@@ -5,13 +5,20 @@ components. "RoadPulse" is a placeholder name; check trademark availability befo
 
 ## What works today (v0.1 scaffold)
 
+- Modern map-first layout: floating search panel (Explore), route card with "Go now" (Preview),
+  and a dark driving view with a big turn card, turn arrows, a "Then …" hint for close turns,
+  a speed ring, a trip panel with arrival time and progress, and quick mute/report buttons
+  (`docs/screenshots/overlays-part-a.png`)
 - Vector map (MapLibre + OpenStreetMap tiles) with the user's live location
 - Destination search (Photon geocoder)
 - Route calculation and drawing (Valhalla), with distance and ETA
 - Navigation mode: camera follows the driver, banner with the next instruction and distance
   to the turn, live remaining time and arrival time, automatic rerouting, arrival detection
 - Voice guidance (device text-to-speech): a heads-up about 500 m before each turn and the
-  full instruction at the turn
+  full instruction at the turn. Music lowers its volume during prompts (audio ducking), and a
+  Mute button in the navigation banner is remembered across restarts. Voice and banner in
+  English or Bahasa Melayu (settings button on the search bar). Malay instructions are generated
+  by the app (the routing server has none); see `docs/MALAY_PROMPTS.md` for the review sheet
 - Navigation keeps running in the background and with the screen off (foreground service
   with an ongoing notification and a Stop action)
 - Survives interruptions: the active drive is saved and resumes if Android stops the app;
@@ -54,6 +61,11 @@ matched offset). Run `pull-drive-logs.bat` to copy the logs into `navlogs\`.
 The logs contain precise locations: keep them local, delete them when done, and do not
 commit them (`navlogs/` is in `.gitignore`). Release builds have neither the button nor the log.
 
+## Screenshot tests
+
+`OverlayScreenshotTest` renders the Explore, Preview and Driving panels on the JVM with
+Robolectric and Roborazzi (no emulator) and writes PNGs to `app/build/outputs/roborazzi/`.
+
 ## Automatic checks (GitHub Actions)
 
 `.github/workflows/android-ci.yml` runs on every push and pull request: unit tests, debug and
@@ -74,7 +86,8 @@ Valhalla routing server and a PostGIS database.
       data/   models, Valhalla + Photon clients, polyline decoder, report repository
       nav/    RouteMatcher + RouteTracker (matching, off-route, prompts), NavigationSession,
               NavigationService, DeviceLocation, VoiceGuide, DriveStore (resume), SignalMonitor,
-              PromptText, DriveSimulator + DriveReplay + NavLog (debug)
+              PromptText, Narration (English/Malay), VoiceSettings,
+              DriveSimulator + DriveReplay + NavLog (debug)
       ui/     MapScreen (Compose + MapLibre), MapViewModel
     backend/  docker-compose (Valhalla, PostGIS) and database schema
     docs/     PLAN.md - architecture and roadmap; OFFLINE.md - behaviour without network/GPS

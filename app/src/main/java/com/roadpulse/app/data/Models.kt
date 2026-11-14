@@ -19,6 +19,19 @@ data class Maneuver(
     val verbalAlert: String? = null,
     /** Full spoken instruction at the maneuver. */
     val verbalPre: String? = null,
+    /** Routing-server maneuver type (Valhalla codes, e.g. 10 = right, 26 = enter roundabout). */
+    val type: Int = 0,
+    /** Road names after the maneuver, first is the main one. */
+    val streetNames: List<String> = emptyList(),
+    /** Compass heading after the maneuver, degrees clockwise from north. */
+    val bearingAfter: Int? = null,
+    val roundaboutExitCount: Int? = null,
+    /** Signposted exit number, e.g. "608". */
+    val exitNumber: String? = null,
+    /** Signposted route numbers of the branch taken, e.g. "E37". */
+    val exitBranch: List<String> = emptyList(),
+    /** Signposted destinations, e.g. "Putrajaya", "Cyberjaya". */
+    val exitToward: List<String> = emptyList(),
 )
 
 @Serializable

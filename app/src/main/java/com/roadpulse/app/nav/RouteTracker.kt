@@ -17,6 +17,9 @@ data class Progress(
     val poorSignal: Boolean,
     val upcoming: Maneuver?,
     val distanceToTurnMeters: Double,
+    /** The maneuver after [upcoming], and the distance between the two (for "Then …" hints). */
+    val following: Maneuver? = null,
+    val followingGapMeters: Double? = null,
     val remainingMeters: Double,
     val remainingSeconds: Double,
     /** Voice prompt that became due with this position fix, if any. */
@@ -32,6 +35,8 @@ class RouteTracker(
     val route: Route,
     /** True when continuing a saved drive: the driver may be anywhere along the route. */
     resumed: Boolean = false,
+    /** Language of prompts; read on every update so a language change applies immediately. */
+    private val narrator: () -> Narrator = { EnglishNarrator },
 ) {
 
     private val matcher = RouteMatcher(route.shape, startAlongM = if (resumed) null else 0.0)
@@ -67,19 +72,20 @@ class RouteTracker(
             .takeIf { it >= 0 } ?: route.maneuvers.lastIndex
         val upcoming = route.maneuvers.getOrNull(upcomingIndex)
         val distanceToTurn = upcoming?.let { (alongAt(it) - along).coerceAtLeast(0.0) } ?: remaining
+        val following = route.maneuvers.getOrNull(upcomingIndex + 1)
+        val followingGap = if (upcoming != null && following != null) alongAt(following) - alongAt(upcoming) else null
 
         var prompt: String? = null
         if (upcoming != null && match.onRoute && !poor) {
             if (distanceToTurn <= FINAL_PROMPT_M) {
                 if (announced.add(upcomingIndex)) {
                     alerted.add(upcomingIndex)
-                    prompt = upcoming.verbalPre ?: upcoming.instruction
+                    prompt = narrator().atTurn(upcoming)
                 }
             } else if (distanceToTurn <= ALERT_PROMPT_M && distanceToTurn > ALERT_MIN_M) {
                 if (alerted.add(upcomingIndex)) {
-                    val text = upcoming.verbalAlert ?: upcoming.instruction
                     val rounded = ((distanceToTurn / 50).roundToInt() * 50).coerceAtLeast(50)
-                    prompt = "In $rounded meters, ${text.replaceFirstChar { it.lowercase() }}"
+                    prompt = narrator().alert(upcoming, rounded)
                 }
             }
         }
@@ -92,6 +98,8 @@ class RouteTracker(
             poorSignal = poor,
             upcoming = upcoming,
             distanceToTurnMeters = distanceToTurn,
+            following = following,
+            followingGapMeters = followingGap,
             remainingMeters = remaining,
             remainingSeconds = remainingSeconds,
             prompt = prompt,

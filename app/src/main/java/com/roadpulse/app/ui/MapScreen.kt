@@ -5,6 +5,7 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
+import android.view.Gravity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
@@ -23,6 +24,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -36,6 +38,8 @@ import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -52,6 +56,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
@@ -67,13 +72,23 @@ import com.roadpulse.app.data.Report
 import com.roadpulse.app.data.ReportType
 import com.roadpulse.app.data.Route
 import com.roadpulse.app.nav.DeviceLocation
+import com.roadpulse.app.nav.DisplaySettings
+import com.roadpulse.app.nav.MapColors
+import com.roadpulse.app.nav.SunTimes
 import com.roadpulse.app.nav.DriveReplay
 import com.roadpulse.app.nav.LocationFix
+import com.roadpulse.app.nav.GuidanceLanguage
+import com.roadpulse.app.nav.Narrator
+import com.roadpulse.app.nav.VoiceProbe
+import com.roadpulse.app.nav.VoiceSettings
+import com.roadpulse.app.nav.narratorFor
+import kotlinx.coroutines.delay
 import org.maplibre.android.camera.CameraPosition
 import org.maplibre.android.camera.CameraUpdateFactory
 import org.maplibre.android.geometry.LatLng
 import org.maplibre.android.geometry.LatLngBounds
 import org.maplibre.android.location.LocationComponentActivationOptions
+import org.maplibre.android.location.OnCameraTrackingChangedListener
 import org.maplibre.android.location.modes.CameraMode
 import org.maplibre.android.location.modes.RenderMode
 import org.maplibre.android.maps.MapLibreMap
@@ -109,6 +124,10 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
     var style by remember { mutableStateOf<Style?>(null) }
     var hasLocationPermission by remember { mutableStateOf(context.hasLocationPermission()) }
     var showReportDialog by remember { mutableStateOf(false) }
+    val voiceMuted by VoiceSettings.muted.collectAsStateWithLifecycle()
+    val effectiveLanguage by VoiceSettings.effectiveLanguage.collectAsStateWithLifecycle()
+    val narrator = narratorFor(effectiveLanguage)
+    var showVoiceSettings by remember { mutableStateOf(false) }
     var showSimulateDialog by remember { mutableStateOf(false) }
 
     val permissionLauncher = rememberLauncherForActivityResult(
@@ -203,19 +222,32 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
         style?.getSourceAs<GeoJsonSource>(REPORT_SOURCE)?.setGeoJson(state.reports.toFeatureCollection())
     }
 
-    // Navigation mode: follow the user with a tilted camera. Progress, rerouting and voice
-    // are handled by NavigationService so they keep working with the screen off.
-    LaunchedEffect(state.navigating, map, hasLocationPermission) {
+    // Navigation mode: follow the car with a tilted camera. Re-applied after every map style load
+    // (a style switch resets it) and whenever the driver taps Re-center after panning the map.
+    var following by remember { mutableStateOf(true) }
+    var trackingListenerAdded by remember { mutableStateOf(false) }
+    LaunchedEffect(state.navigating) { if (state.navigating) following = true }
+    LaunchedEffect(state.navigating, map, style, hasLocationPermission, following) {
         val m = map ?: return@LaunchedEffect
-        if (!hasLocationPermission || !m.locationComponent.isLocationComponentActivated) return@LaunchedEffect
-        if (state.navigating) {
-            m.locationComponent.cameraMode = CameraMode.TRACKING_GPS
-            m.locationComponent.renderMode = RenderMode.GPS
-            m.locationComponent.zoomWhileTracking(16.5)
-            m.locationComponent.tiltWhileTracking(50.0)
-        } else {
-            m.locationComponent.cameraMode = CameraMode.NONE
-            m.locationComponent.renderMode = RenderMode.COMPASS
+        if (style == null || !hasLocationPermission || !m.locationComponent.isLocationComponentActivated) return@LaunchedEffect
+        val lc = m.locationComponent
+        if (!trackingListenerAdded) {
+            trackingListenerAdded = true
+            lc.addOnCameraTrackingChangedListener(object : OnCameraTrackingChangedListener {
+                override fun onCameraTrackingDismissed() {
+                    if (state.navigating) following = false // the driver panned or zoomed the map
+                }
+                override fun onCameraTrackingChanged(currentMode: Int) = Unit
+            })
+        }
+        if (state.navigating && following) {
+            lc.renderMode = RenderMode.GPS
+            lc.cameraMode = CameraMode.TRACKING_GPS
+            lc.zoomWhileTracking(16.5)
+            lc.tiltWhileTracking(50.0)
+        } else if (!state.navigating) {
+            lc.cameraMode = CameraMode.NONE
+            lc.renderMode = RenderMode.COMPASS
         }
     }
 
@@ -226,59 +258,82 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
         }
     }
 
-    Scaffold(snackbarHost = { SnackbarHost(snackbar) }) { _ ->
+    val density = LocalDensity.current
+    val mode = when {
+        state.navigating -> ScreenMode.DRIVING
+        state.route != null || state.busy && state.destination != null -> ScreenMode.PREVIEW
+        else -> ScreenMode.EXPLORE
+    }
+    // Light map by day; the night style after sunset (or as chosen in settings).
+    val mapColors by DisplaySettings.mapColors.collectAsStateWithLifecycle()
+    var isNight by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            val p = currentLocation() ?: GeoPoint(DEFAULT_CENTER.latitude, DEFAULT_CENTER.longitude)
+            isNight = SunTimes.isNight(p.lat, p.lon, System.currentTimeMillis())
+            delay(60_000)
+        }
+    }
+    val darkMap = mapColors == MapColors.DARK || (mapColors == MapColors.AUTO && isNight)
+    val styleUrl = if (darkMap) BuildConfig.MAP_STYLE_DARK_URL else BuildConfig.MAP_STYLE_URL
+
+    // While driving, keep the car in the lower part of the screen, below the turn card.
+    LaunchedEffect(map, mode) {
+        val m = map ?: return@LaunchedEffect
+        val top = if (mode == ScreenMode.DRIVING) with(density) { 260.dp.toPx().toDouble() } else 0.0
+        m.cameraPosition = CameraPosition.Builder(m.cameraPosition).padding(0.0, top, 0.0, 0.0).build()
+    }
+
+    Scaffold(snackbarHost = { SnackbarHost(snackbar) }, containerColor = RP.Field) { _ ->
         Box(Modifier.fillMaxSize()) {
             MapLibreView(
-                onMapReady = { m, s ->
-                    map = m
-                    style = s
-                }
+                styleUrl = styleUrl,
+                onMapReady = { m -> map = m },
+                onStyleChanging = { style = null },
+                onStyleLoaded = { s -> style = s },
             )
 
-            Column(
-                Modifier
-                    .align(Alignment.TopCenter)
-                    .statusBarsPadding()
-                    .padding(12.dp)
-            ) {
-                if (state.navigating) {
-                    InstructionBanner(state.currentInstruction, state.distanceToTurnMeters, state.navStatus)
-                } else {
-                    SearchBar(
-                        query = state.query,
-                        results = state.searchResults,
-                        onQueryChange = { viewModel.onQueryChange(it, searchBias()) },
-                        onClear = viewModel::clearRoute,
-                        onSelect = { viewModel.onPlaceSelected(it, currentLocation()) },
-                    )
-                }
-                if (state.busy) LinearProgressIndicator(Modifier.fillMaxWidth().padding(top = 4.dp))
-            }
+            when (mode) {
+                ScreenMode.EXPLORE -> ExploreOverlay(
+                    query = state.query,
+                    results = state.searchResults,
+                    onQueryChange = { viewModel.onQueryChange(it, searchBias()) },
+                    onClear = viewModel::clearRoute,
+                    onSelect = { viewModel.onPlaceSelected(it, currentLocation()) },
+                    onOpenSettings = { showVoiceSettings = true },
+                    onRecenter = {
+                        currentLocation()?.let { p ->
+                            map?.animateCamera(CameraUpdateFactory.newLatLngZoom(LatLng(p.lat, p.lon), 15.0))
+                        }
+                    },
+                    onReport = { showReportDialog = true },
+                )
 
-            Column(
-                Modifier
-                    .align(Alignment.BottomCenter)
-                    .navigationBarsPadding()
-                    .padding(12.dp),
-                horizontalAlignment = Alignment.End,
-            ) {
-                FloatingActionButton(onClick = { showReportDialog = true }) {
-                    Icon(Icons.Default.Warning, contentDescription = "Report")
-                }
-                state.route?.let { route ->
-                    RouteCard(
-                        route = route,
-                        destination = state.destination,
-                        navigating = state.navigating,
-                        remainingKm = state.remainingKm,
-                        remainingSeconds = state.remainingSeconds,
-                        onStart = viewModel::startNavigation,
-                        onCancel = viewModel::clearRoute,
-                        onSimulate = if (BuildConfig.DEBUG) ({ showSimulateDialog = true }) else null,
-                    )
-                }
+                ScreenMode.PREVIEW -> PreviewOverlay(
+                    destination = state.destination,
+                    route = state.route,
+                    busy = state.busy,
+                    onBack = viewModel::clearRoute,
+                    onGo = viewModel::startNavigation,
+                    onSimulate = if (BuildConfig.DEBUG) ({ showSimulateDialog = true }) else null,
+                )
+
+                ScreenMode.DRIVING -> DrivingOverlay(
+                    state = state,
+                    narrator = narrator,
+                    muted = voiceMuted,
+                    onToggleMute = { VoiceSettings.setMuted(!voiceMuted) },
+                    onReport = { showReportDialog = true },
+                    onStop = viewModel::clearRoute,
+                    following = following,
+                    onRecenter = { following = true },
+                )
             }
         }
+    }
+
+    if (showVoiceSettings) {
+        VoiceSettingsDialog(onDismiss = { showVoiceSettings = false })
     }
 
     if (showSimulateDialog) {
@@ -315,10 +370,16 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
 }
 
 @Composable
-private fun MapLibreView(onMapReady: (MapLibreMap, Style) -> Unit) {
+private fun MapLibreView(
+    styleUrl: String,
+    onMapReady: (MapLibreMap) -> Unit,
+    onStyleChanging: () -> Unit,
+    onStyleLoaded: (Style) -> Unit,
+) {
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     val mapView = remember { MapView(context).apply { onCreate(null) } }
+    var map by remember { mutableStateOf<MapLibreMap?>(null) }
 
     DisposableEffect(lifecycle, mapView) {
         val observer = LifecycleEventObserver { _, event ->
@@ -338,13 +399,27 @@ private fun MapLibreView(onMapReady: (MapLibreMap, Style) -> Unit) {
     }
 
     LaunchedEffect(mapView) {
-        mapView.getMapAsync { map ->
-            map.cameraPosition = CameraPosition.Builder().target(DEFAULT_CENTER).zoom(11.0).build()
-            map.uiSettings.isCompassEnabled = true
-            map.setStyle(Style.Builder().fromUri(BuildConfig.MAP_STYLE_URL)) { style ->
-                style.addOverlayLayers()
-                onMapReady(map, style)
-            }
+        mapView.getMapAsync { m ->
+            m.cameraPosition = CameraPosition.Builder().target(DEFAULT_CENTER).zoom(11.0).build()
+            m.uiSettings.isCompassEnabled = false
+            m.uiSettings.isLogoEnabled = false
+            // Map data credits are shown as text in the bottom panels; keep the (i) details button
+            // at the top-left, clear of the panels.
+            m.uiSettings.attributionGravity = Gravity.TOP or Gravity.START
+            m.uiSettings.setAttributionMargins(24, 160, 0, 0)
+            map = m
+            onMapReady(m)
+        }
+    }
+
+    // Loads the light style, and switches to the dark one while driving. Our route and marker
+    // layers are added again on every style load.
+    LaunchedEffect(map, styleUrl) {
+        val m = map ?: return@LaunchedEffect
+        onStyleChanging()
+        m.setStyle(Style.Builder().fromUri(styleUrl)) { style ->
+            style.addOverlayLayers()
+            onStyleLoaded(style)
         }
     }
 
@@ -359,7 +434,7 @@ private fun Style.addOverlayLayers() {
 
     addLayer(
         LineLayer("route-casing", ROUTE_SOURCE).withProperties(
-            PropertyFactory.lineColor("#1B4FBF"),
+            PropertyFactory.lineColor("#3C3489"),
             PropertyFactory.lineWidth(10f),
             PropertyFactory.lineCap(Property.LINE_CAP_ROUND),
             PropertyFactory.lineJoin(Property.LINE_JOIN_ROUND),
@@ -367,7 +442,7 @@ private fun Style.addOverlayLayers() {
     )
     addLayer(
         LineLayer("route-line", ROUTE_SOURCE).withProperties(
-            PropertyFactory.lineColor("#3D8BFF"),
+            PropertyFactory.lineColor("#7F77DD"),
             PropertyFactory.lineWidth(6f),
             PropertyFactory.lineCap(Property.LINE_CAP_ROUND),
             PropertyFactory.lineJoin(Property.LINE_JOIN_ROUND),
@@ -376,7 +451,7 @@ private fun Style.addOverlayLayers() {
     addLayer(
         CircleLayer("destination", DEST_SOURCE).withProperties(
             PropertyFactory.circleRadius(9f),
-            PropertyFactory.circleColor("#D20F39"),
+            PropertyFactory.circleColor("#26215C"),
             PropertyFactory.circleStrokeColor("#FFFFFF"),
             PropertyFactory.circleStrokeWidth(3f),
         )
@@ -384,7 +459,7 @@ private fun Style.addOverlayLayers() {
     addLayer(
         CircleLayer("matched-position", MATCHED_SOURCE).withProperties(
             PropertyFactory.circleRadius(10f),
-            PropertyFactory.circleColor("#0B57D0"),
+            PropertyFactory.circleColor("#534AB7"),
             PropertyFactory.circleStrokeColor("#FFFFFF"),
             PropertyFactory.circleStrokeWidth(4f),
         )
@@ -448,97 +523,6 @@ private fun List<Report>.toFeatureCollection(): FeatureCollection =
         }
     )
 
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun SearchBar(
-    query: String,
-    results: List<Place>,
-    onQueryChange: (String) -> Unit,
-    onClear: () -> Unit,
-    onSelect: (Place) -> Unit,
-) {
-    Surface(shape = MaterialTheme.shapes.large, shadowElevation = 6.dp) {
-        Column {
-            OutlinedTextField(
-                value = query,
-                onValueChange = onQueryChange,
-                modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text("Where to?") },
-                singleLine = true,
-                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-                trailingIcon = {
-                    if (query.isNotEmpty()) {
-                        IconButton(onClick = onClear) { Icon(Icons.Default.Close, contentDescription = "Clear") }
-                    }
-                },
-            )
-            LazyColumn {
-                items(results) { place ->
-                    ListItem(
-                        headlineContent = { Text(place.name) },
-                        supportingContent = { if (place.description.isNotBlank()) Text(place.description) },
-                        leadingContent = { Icon(Icons.Default.LocationOn, contentDescription = null) },
-                        modifier = Modifier.clickable { onSelect(place) },
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun InstructionBanner(instruction: String?, distanceToTurnMeters: Double?, status: String?) {
-    Surface(
-        color = MaterialTheme.colorScheme.primary,
-        shape = MaterialTheme.shapes.large,
-        shadowElevation = 6.dp,
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        Column(Modifier.padding(16.dp)) {
-            if (distanceToTurnMeters != null) {
-                Text("In ${formatKm(distanceToTurnMeters / 1000)}", style = MaterialTheme.typography.headlineSmall)
-            }
-            Text(instruction ?: "Follow the route", style = MaterialTheme.typography.titleMedium)
-            if (status != null) {
-                Text(status, style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 6.dp))
-            }
-        }
-    }
-}
-
-@Composable
-private fun RouteCard(
-    route: Route,
-    destination: Place?,
-    navigating: Boolean,
-    remainingKm: Double?,
-    remainingSeconds: Double?,
-    onStart: () -> Unit,
-    onCancel: () -> Unit,
-    onSimulate: (() -> Unit)? = null,
-) {
-    val seconds = if (navigating) remainingSeconds ?: route.timeSeconds else route.timeSeconds
-    val km = if (navigating) remainingKm ?: route.lengthKm else route.lengthKm
-    val context = LocalContext.current
-    Card(Modifier.fillMaxWidth().padding(top = 12.dp)) {
-        Column(Modifier.padding(16.dp)) {
-            Text(destination?.name ?: "Destination", style = MaterialTheme.typography.titleMedium)
-            Text(
-                "${formatDuration(seconds)} · ${formatKm(km)} · arrive ${formatArrival(context, seconds)}",
-                style = MaterialTheme.typography.bodyLarge,
-            )
-            Row(
-                Modifier.fillMaxWidth().padding(top = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
-            ) {
-                if (!navigating && onSimulate != null) TextButton(onClick = onSimulate) { Text("Simulate") }
-                OutlinedButton(onClick = onCancel) { Text(if (navigating) "Stop" else "Cancel") }
-                if (!navigating) Button(onClick = onStart) { Text("Start") }
-            }
-        }
-    }
-}
-
 @Composable
 private fun ReportDialog(onDismiss: () -> Unit, onPick: (ReportType) -> Unit) {
     AlertDialog(
@@ -558,16 +542,16 @@ private fun ReportDialog(onDismiss: () -> Unit, onPick: (ReportType) -> Unit) {
     )
 }
 
-private fun formatKm(km: Double): String =
+internal fun formatKm(km: Double): String =
     if (km < 1) "${(km * 1000).roundToInt()} m" else "%.1f km".format(km)
 
-private fun formatDuration(seconds: Double): String {
+internal fun formatDuration(seconds: Double): String {
     val minutes = (seconds / 60).roundToInt()
     return if (minutes < 60) "$minutes min" else "${minutes / 60} h ${minutes % 60} min"
 }
 
 /** Arrival clock time in the phone's own 12/24-hour style. */
-private fun formatArrival(context: Context, secondsFromNow: Double): String =
+internal fun formatArrival(context: Context, secondsFromNow: Double): String =
     android.text.format.DateFormat.getTimeFormat(context)
         .format(java.util.Date(System.currentTimeMillis() + (secondsFromNow * 1000).toLong()))
 
@@ -581,3 +565,67 @@ private fun LocationFix.toAndroidLocation(): android.location.Location =
         l.time = System.currentTimeMillis()
         l.elapsedRealtimeNanos = android.os.SystemClock.elapsedRealtimeNanos()
     }
+
+@Composable
+private fun VoiceSettingsDialog(onDismiss: () -> Unit) {
+    val context = LocalContext.current
+    val language by VoiceSettings.language.collectAsStateWithLifecycle()
+    val missing by VoiceSettings.missingVoices.collectAsStateWithLifecycle()
+    val muted by VoiceSettings.muted.collectAsStateWithLifecycle()
+    val mapColors by DisplaySettings.mapColors.collectAsStateWithLifecycle()
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Settings") },
+        text = {
+            Column {
+                Text("Voice language", style = MaterialTheme.typography.labelLarge, color = RP.TextSecondary)
+                GuidanceLanguage.entries.forEach { option ->
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                VoiceSettings.setLanguage(option)
+                                VoiceProbe.check(context, option)
+                            },
+                    ) {
+                        RadioButton(selected = language == option, onClick = null)
+                        Text(option.label, modifier = Modifier.padding(start = 8.dp))
+                    }
+                }
+                if (language in missing) {
+                    Text(
+                        "No ${language.label} voice is installed on this phone, so guidance stays in English. " +
+                            "Install one in Android Settings > System > Languages > Text-to-speech output.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.padding(top = 8.dp),
+                    )
+                }
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+                ) {
+                    Text("Mute voice", modifier = Modifier.weight(1f))
+                    Switch(checked = muted, onCheckedChange = VoiceSettings::setMuted)
+                }
+                Text(
+                    "Map colours",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = RP.TextSecondary,
+                    modifier = Modifier.padding(top = 16.dp),
+                )
+                MapColors.entries.forEach { option ->
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth().clickable { DisplaySettings.setMapColors(option) },
+                    ) {
+                        RadioButton(selected = mapColors == option, onClick = null)
+                        Text(option.label, modifier = Modifier.padding(start = 8.dp))
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Done") } },
+    )
+}
