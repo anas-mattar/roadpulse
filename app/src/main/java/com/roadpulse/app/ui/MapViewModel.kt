@@ -154,13 +154,13 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
         if (NavigationSession.state.value == null && NavigationSession.restoreIfSaved()) {
             val name = NavigationSession.state.value?.destination?.name
             runCatching { NavigationService.start(getApplication()) }
-                .onSuccess { _state.update { it.copy(message = "Resumed your drive to $name") } }
+                .onSuccess { _state.update { it.copy(message = com.roadpulse.app.i18n.currentStrings().resumedDrive(name.orEmpty())) } }
                 .onFailure { NavigationSession.stop() }
         }
         viewModelScope.launch {
             NavigationSession.events.collect { event ->
                 when (event) {
-                    is NavEvent.Arrived -> _state.update { it.copy(message = "You have arrived") }
+                    is NavEvent.Arrived -> _state.update { it.copy(message = com.roadpulse.app.i18n.currentStrings().arrived) }
                     is NavEvent.PassedReport -> askStillThere(event.report)
                     else -> Unit
                 }
@@ -194,7 +194,7 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
             } catch (e: CancellationException) {
                 throw e // superseded by newer typing: not an error
             } catch (e: Exception) {
-                _state.update { it.copy(message = "Search failed: ${e.message}") }
+                _state.update { it.copy(message = com.roadpulse.app.i18n.currentStrings().searchFailed(e.message)) }
             }
         }
     }
@@ -204,20 +204,20 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
         val url = ServerSettings.backendUrl()
         if (url.isEmpty() || near == null) return
         searchJob?.cancel()
-        _state.update { it.copy(query = "", categoryTitle = "${category.label} nearby", searchResults = emptyList()) }
+        _state.update { it.copy(query = "", categoryTitle = com.roadpulse.app.i18n.currentStrings().categoryNearby(category), searchResults = emptyList()) }
         searchJob = viewModelScope.launch {
             try {
                 val found = com.roadpulse.app.data.PlacesClient(url).nearby(category, near, radiusM = 10_000)
                 _state.update {
                     it.copy(
-                        searchResults = found.map { p -> p.toPlace() },
-                        categoryTitle = if (found.isEmpty()) "No ${category.label.lowercase()} within 10 km" else it.categoryTitle,
+                        searchResults = found.map { p -> p.toPlace(com.roadpulse.app.i18n.currentStrings()) },
+                        categoryTitle = if (found.isEmpty()) com.roadpulse.app.i18n.currentStrings().noneWithin10Km(category) else it.categoryTitle,
                     )
                 }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                _state.update { it.copy(categoryTitle = null, message = "Could not load places. Check your connection.") }
+                _state.update { it.copy(categoryTitle = null, message = com.roadpulse.app.i18n.currentStrings().couldNotLoadPlaces) }
             }
         }
     }
@@ -227,7 +227,7 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
     /** Use a suggested car park as the destination instead (keeps the stops). */
     fun chooseParking(parking: Place) {
         val dest = _state.value.destination ?: return
-        val named = parking.copy(name = "Parking · ${parking.name}", description = "Near ${dest.name}")
+        val named = parking.copy(name = com.roadpulse.app.i18n.currentStrings().parkingFor(parking.name), description = com.roadpulse.app.i18n.currentStrings().near(dest.name))
         _state.update { it.copy(destination = named, parkingNearby = emptyList(), route = null) }
         lastOrigin?.let { calculateRoute(it, named.location, lookForParking = false) }
     }
@@ -236,9 +236,9 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
         val shortcut = _state.value.settingShortcut
         if (shortcut != null) {
             val saved = placesStore.setShortcut(shortcut, place)
-            val label = if (shortcut == Shortcut.HOME) "Home" else "Work"
+            val savedMessage = com.roadpulse.app.i18n.currentStrings().shortcutSaved(shortcut == Shortcut.HOME)
             _state.update {
-                it.copy(saved = saved, settingShortcut = null, query = "", searchResults = emptyList(), message = "$label saved")
+                it.copy(saved = saved, settingShortcut = null, query = "", searchResults = emptyList(), message = savedMessage)
             }
             return
         }
@@ -248,7 +248,7 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
                 stops = emptyList(), categoryTitle = null, parkingNearby = emptyList())
         }
         if (from == null) {
-            _state.update { it.copy(message = "Waiting for your location. Enable GPS and try again.") }
+            _state.update { it.copy(message = com.roadpulse.app.i18n.currentStrings().waitingForLocation) }
             return
         }
         calculateRoute(from, place.location)
@@ -257,13 +257,13 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
     /** Suggests car parks within 600 m of the destination (shown in the preview). */
     private fun findParkingNear(to: GeoPoint) {
         val url = ServerSettings.backendUrl()
-        if (url.isEmpty() || _state.value.destination?.name?.startsWith("Parking") == true) return
+        if (url.isEmpty() || _state.value.destination?.name?.startsWith(com.roadpulse.app.i18n.currentStrings().parkingFor("")) == true) return
         viewModelScope.launch {
             val found = runCatching { com.roadpulse.app.data.PlacesClient(url).nearby(com.roadpulse.app.data.PlaceCategory.PARKING, to, radiusM = 600, limit = 5) }
                 .getOrNull().orEmpty()
             // Not worth suggesting when the destination itself is (practically) a car park.
             val useful = found.filter { it.distanceM > 40 }
-            _state.update { if (it.destination?.location == to) it.copy(parkingNearby = useful.map { p -> p.toPlace() }) else it }
+            _state.update { if (it.destination?.location == to) it.copy(parkingNearby = useful.map { p -> p.toPlace(com.roadpulse.app.i18n.currentStrings()) }) else it }
         }
     }
 
@@ -295,7 +295,7 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
                     _state.update { it.copy(route = routes.first(), routeChoices = routes, selectedRoute = 0, tollEstimates = emptyList(), busy = false) }
                     estimateTolls(routes)
                 }
-                .onFailure { e -> _state.update { it.copy(busy = false, message = "Routing failed: ${e.message}") } }
+                .onFailure { e -> _state.update { it.copy(busy = false, message = com.roadpulse.app.i18n.currentStrings().routingFailed(e.message)) } }
         }
     }
 
@@ -315,7 +315,7 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
 
     fun clearSavedPlaces() {
         val cleared = placesStore.clear()
-        _state.update { it.copy(saved = cleared, message = "Saved places cleared") }
+        _state.update { it.copy(saved = cleared, message = com.roadpulse.app.i18n.currentStrings().savedPlacesCleared) }
     }
 
     /** Picks one of the route choices in the preview. */
@@ -332,7 +332,7 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
         runCatching { NavigationService.start(getApplication()) }
             .onFailure { e ->
                 NavigationSession.stop()
-                _state.update { it.copy(message = "Could not start navigation: ${e.message}") }
+                _state.update { it.copy(message = com.roadpulse.app.i18n.currentStrings().couldNotStartNavigation(e.message)) }
             }
     }
 
@@ -428,7 +428,7 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
 
     /** The driver long-pressed the map: show actions for that point and look up its name. */
     fun onMapLongPress(point: GeoPoint) {
-        val pin = Place("Dropped pin", "%.5f, %.5f".format(java.util.Locale.ROOT, point.lat, point.lon), point)
+        val pin = Place(com.roadpulse.app.i18n.currentStrings().droppedPin, "%.5f, %.5f".format(java.util.Locale.ROOT, point.lat, point.lon), point)
         _state.update { it.copy(pinned = pin) }
         viewModelScope.launch {
             val named = runCatching { geocoder.reverse(point) }.getOrNull() ?: return@launch
@@ -456,19 +456,19 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
     fun addStop(place: Place, from: GeoPoint?) {
         val ui = _state.value
         if (from == null) {
-            _state.update { it.copy(message = "Waiting for your location. Enable GPS and try again.") }
+            _state.update { it.copy(message = com.roadpulse.app.i18n.currentStrings().waitingForLocation) }
             return
         }
         when {
             ui.navigating -> {
                 NavigationSession.addStop(place.location, from)
-                _state.update { it.copy(stops = it.stops + place, message = "Stop added: ${place.name}") }
+                _state.update { it.copy(stops = it.stops + place, message = com.roadpulse.app.i18n.currentStrings().stopAdded(place.name)) }
             }
             ui.destination != null -> {
                 _state.update { it.copy(stops = it.stops + place) }
                 calculateRoute(from, ui.destination.location)
             }
-            else -> _state.update { it.copy(message = "Choose a destination first, then add stops") }
+            else -> _state.update { it.copy(message = com.roadpulse.app.i18n.currentStrings().chooseDestinationFirst) }
         }
     }
 
@@ -483,21 +483,21 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
     fun saveFavourite(place: Place, name: String) {
         if (name.isBlank()) return
         val saved = placesStore.addFavourite(name, place)
-        _state.update { it.copy(saved = saved, pinned = null, message = "Saved: ${name.trim()}") }
+        _state.update { it.copy(saved = saved, pinned = null, message = com.roadpulse.app.i18n.currentStrings().saved(name.trim())) }
     }
 
     fun removeFavourite(place: Place) {
-        _state.update { it.copy(saved = placesStore.removeFavourite(place), message = "Removed: ${place.name}") }
+        _state.update { it.copy(saved = placesStore.removeFavourite(place), message = com.roadpulse.app.i18n.currentStrings().removed(place.name)) }
     }
 
     /** Marks where the car is parked (the pinned point, or the current position). */
     fun parkHere(point: GeoPoint?) {
         val p = point ?: run {
-            _state.update { it.copy(message = "Location unavailable") }
+            _state.update { it.copy(message = com.roadpulse.app.i18n.currentStrings().locationUnavailable) }
             return
         }
         val saved = placesStore.setParking(com.roadpulse.app.data.ParkedCar(p, System.currentTimeMillis()))
-        _state.update { it.copy(saved = saved, pinned = null, message = "Parking spot saved") }
+        _state.update { it.copy(saved = saved, pinned = null, message = com.roadpulse.app.i18n.currentStrings().parkingSpotSaved) }
     }
 
     fun clearParking() = _state.update { it.copy(saved = placesStore.setParking(null)) }
@@ -525,25 +525,25 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
         if (stillThere == null) return // "Skip"
         viewModelScope.launch {
             runCatching { reportRepository.vote(report.id, stillThere) }
-                .onSuccess { _state.update { it.copy(message = "Thanks!") } }
+                .onSuccess { _state.update { it.copy(message = com.roadpulse.app.i18n.currentStrings().thanks) } }
         }
     }
 
     fun submitReport(type: ReportType, location: GeoPoint?, subtype: String? = null, durationMinutes: Int? = null) {
         if (location == null) {
-            _state.update { it.copy(message = "Location unavailable, cannot place report") }
+            _state.update { it.copy(message = com.roadpulse.app.i18n.currentStrings().locationUnavailableReport) }
             return
         }
         viewModelScope.launch {
             try {
                 reportRepository.submit(type, location, subtype, durationMinutes)
-                _state.update { it.copy(message = "${type.label} reported. Thanks!") }
+                _state.update { it.copy(message = com.roadpulse.app.i18n.currentStrings().reported(type)) }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: ReportRejectedException) {
                 _state.update { it.copy(message = e.message) }
             } catch (e: Exception) {
-                _state.update { it.copy(message = "Could not send report. Check your connection and try again.") }
+                _state.update { it.copy(message = com.roadpulse.app.i18n.currentStrings().couldNotSendReport) }
             }
         }
     }

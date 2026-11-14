@@ -5,6 +5,8 @@ import android.os.SystemClock
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.runtime.getValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.roadpulse.app.nav.DisplaySettings
 import com.roadpulse.app.nav.NavigationService
 import com.roadpulse.app.nav.NavigationSession
@@ -26,8 +28,17 @@ class MainActivity : ComponentActivity() {
         NavigationSession.init(NavigationService.driveStore(this), SystemClock::elapsedRealtime)
         enableEdgeToEdge()
         setContent {
-            RoadPulseTheme {
-                MapScreen()
+            // One language setting for screens and voice; Arabic also turns the layout right to left.
+            val language by VoiceSettings.language.collectAsStateWithLifecycle()
+            val strings = com.roadpulse.app.i18n.stringsFor(language)
+            androidx.compose.runtime.CompositionLocalProvider(
+                com.roadpulse.app.i18n.LocalStrings provides strings,
+                androidx.compose.ui.platform.LocalLayoutDirection provides
+                    if (strings.rtl) androidx.compose.ui.unit.LayoutDirection.Rtl else androidx.compose.ui.unit.LayoutDirection.Ltr,
+            ) {
+                RoadPulseTheme {
+                    MapScreen()
+                }
             }
         }
     }

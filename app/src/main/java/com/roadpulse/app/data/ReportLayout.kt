@@ -40,11 +40,11 @@ object ReportLayout {
 }
 
 /** Short, friendly age such as "just now", "12 min ago", "2 h ago". */
-fun reportAge(createdAtMillis: Long, nowMillis: Long): String {
+fun reportAge(createdAtMillis: Long, nowMillis: Long, s: com.roadpulse.app.i18n.AppStrings = com.roadpulse.app.i18n.EnglishStrings): String {
     val minutes = ((nowMillis - createdAtMillis) / 60_000).coerceAtLeast(0)
     return when {
-        minutes < 1 -> "just now"
-        minutes < 60 -> "$minutes min ago"
-        else -> "${minutes / 60} h ago"
+        minutes < 1 -> s.justNow()
+        minutes < 60 -> s.minutesAgo(minutes)
+        else -> s.hoursAgo(minutes / 60)
     }
 }

@@ -13,7 +13,7 @@ data class RouteChoice(
 
 object RouteChoices {
 
-    fun describe(routes: List<Route>): List<RouteChoice> {
+    fun describe(routes: List<Route>, s: com.roadpulse.app.i18n.AppStrings = com.roadpulse.app.i18n.EnglishStrings): List<RouteChoice> {
         if (routes.isEmpty()) return emptyList()
         val fastest = routes.minOf { it.timeSeconds }
         val shortest = routes.minOf { it.lengthKm }
@@ -22,10 +22,10 @@ object RouteChoices {
         return routes.mapIndexed { i, r ->
             val extraMin = ((r.timeSeconds - fastest) / 60).roundToInt()
             val tag = when {
-                r.timeSeconds <= fastest -> "Fastest"
-                anyToll && !r.hasToll -> "No tolls"
-                r.lengthKm <= shortest && r.lengthKm < routes[0].lengthKm - 0.2 -> "Shortest"
-                else -> "+$extraMin min"
+                r.timeSeconds <= fastest -> s.tagFastest
+                anyToll && !r.hasToll -> s.tagNoTolls
+                r.lengthKm <= shortest && r.lengthKm < routes[0].lengthKm - 0.2 -> s.tagShortest
+                else -> s.tagExtraMinutes(extraMin)
             }
             RouteChoice(tag, distinctiveRoad(i, kmByRoad))
         }

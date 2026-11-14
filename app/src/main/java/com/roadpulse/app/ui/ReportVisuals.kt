@@ -1,5 +1,6 @@
 package com.roadpulse.app.ui
 
+import com.roadpulse.app.i18n.strings
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.getValue
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -122,29 +123,32 @@ fun ReportCard(
                     Icon(report.type.icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(24.dp))
                 }
                 Column(Modifier.padding(start = 12.dp).weight(1f)) {
-                    val detail = com.roadpulse.app.data.ReportDetails.label(report.type, report.subtype)
+                    val detail = report.subtype?.let { strings.reportDetail(report.type, it) }
+                    val typeName = strings.reportType(report.type)
                     Text(
-                        if (detail != null) "${report.type.label} · $detail" else report.type.label,
+                        if (detail != null) "$typeName · $detail" else typeName,
                         fontWeight = FontWeight.SemiBold,
                         fontSize = 18.sp,
                     )
+                    val reportedAgo = strings.reportedAgo(reportAge(report.createdAtMillis, nowMillis, strings))
+                    val confirmed = strings.confirmations(report.confirmations)
                     val details = buildList {
-                        add("Reported ${reportAge(report.createdAtMillis, nowMillis)}")
-                        if (report.confirmations > 0) add("${report.confirmations} confirmed")
+                        add(reportedAgo)
+                        if (report.confirmations > 0) add(confirmed)
                     }
                     Text(details.joinToString(" · "), color = RP.TextSecondary, fontSize = 14.sp)
                 }
-                IconButton(onClick = onClose) { Icon(Icons.Filled.Close, contentDescription = "Close") }
+                IconButton(onClick = onClose) { Icon(Icons.Filled.Close, contentDescription = strings.close) }
             }
             if (own) {
                 Text(
-                    "Your report. Other drivers can confirm it.",
+                    strings.yourReport,
                     color = RP.TextSecondary,
                     fontSize = 14.sp,
                     modifier = Modifier.padding(top = 10.dp, end = 8.dp),
                 )
             } else {
-                Text("Is it still there?", fontSize = 15.sp, modifier = Modifier.padding(top = 12.dp))
+                Text(strings.isItStillThere, fontSize = 15.sp, modifier = Modifier.padding(top = 12.dp))
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                     modifier = Modifier.fillMaxWidth().padding(top = 8.dp, end = 8.dp),
@@ -157,18 +161,18 @@ fun ReportCard(
                     ) {
                         Icon(Icons.Filled.ThumbUp, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(6.dp))
-                        Text("Still there")
+                        Text(strings.stillThere)
                     }
                     OutlinedButton(onClick = onNotThere, enabled = !busy, modifier = Modifier.weight(1f)) {
                         Icon(Icons.Filled.ThumbDown, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(6.dp))
-                        Text("Not there")
+                        Text(strings.notThere)
                     }
                 }
                 TextButton(onClick = onFlag, enabled = !busy) {
                     Icon(Icons.Filled.Flag, contentDescription = null, tint = RP.Danger, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(6.dp))
-                    Text("Report abuse", color = RP.Danger)
+                    Text(strings.reportAbuse, color = RP.Danger)
                 }
             }
         }
@@ -201,40 +205,40 @@ fun ReportPicker(
         Column(Modifier.padding(16.dp)) {
             val type = chosen
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(type?.label ?: "Report", fontWeight = FontWeight.SemiBold, fontSize = 20.sp, modifier = Modifier.weight(1f))
-                IconButton(onClick = onDismiss) { Icon(Icons.Filled.Close, contentDescription = "Close") }
+                Text(type?.let { strings.reportType(it) } ?: strings.report, fontWeight = FontWeight.SemiBold, fontSize = 20.sp, modifier = Modifier.weight(1f))
+                IconButton(onClick = onDismiss) { Icon(Icons.Filled.Close, contentDescription = strings.close) }
             }
             if (type == null) {
                 ReportType.entries.chunked(3).forEach { row ->
-                    TileRow(row.size) { i -> BigTile(row[i].label, row[i].icon, row[i].color) { chosen = row[i] } }
+                    TileRow(row.size) { i -> BigTile(strings.reportType(row[i]), row[i].icon, row[i].color) { chosen = row[i] } }
                 }
             } else {
                 val details = com.roadpulse.app.data.ReportDetails.subtypes[type].orEmpty()
                 if (type == ReportType.ROAD_CLOSED) {
-                    Text("How long?", color = RP.TextSecondary, fontSize = 14.sp, modifier = Modifier.padding(top = 6.dp))
+                    Text(strings.howLong, color = RP.TextSecondary, fontSize = 14.sp, modifier = Modifier.padding(top = 6.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 6.dp)) {
-                        com.roadpulse.app.data.ReportDetails.closureDurations.forEach { (minutes, label) ->
+                        com.roadpulse.app.data.ReportDetails.closureDurations.forEach { (minutes, _) ->
                             androidx.compose.material3.FilterChip(
                                 selected = duration == minutes,
                                 onClick = { duration = minutes },
-                                label = { Text(label) },
+                                label = { Text(strings.closureDuration(minutes)) },
                             )
                         }
                     }
                 }
                 details.chunked(3).forEach { row ->
                     TileRow(row.size, height = 76.dp) { i ->
-                        BigTile(row[i].second, null, type.color, small = true) { onPick(type, row[i].first, duration) }
+                        BigTile(strings.reportDetail(type, row[i].first) ?: row[i].second, null, type.color, small = true) { onPick(type, row[i].first, duration) }
                     }
                 }
                 Row(Modifier.fillMaxWidth().padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                    TextButton(onClick = { chosen = null; duration = null }) { Text("Back") }
+                    TextButton(onClick = { chosen = null; duration = null }) { Text(strings.back) }
                     Spacer(Modifier.weight(1f))
                     Button(
                         onClick = { onPick(type, null, duration) },
                         colors = ButtonDefaults.buttonColors(containerColor = RP.Indigo),
                         modifier = Modifier.height(52.dp),
-                    ) { Text("Send", fontSize = 17.sp, fontWeight = FontWeight.SemiBold) }
+                    ) { Text(strings.send, fontSize = 17.sp, fontWeight = FontWeight.SemiBold) }
                 }
             }
         }
@@ -289,12 +293,12 @@ fun StillThereCard(report: Report, onAnswer: (Boolean?) -> Unit, modifier: Modif
                     Icon(report.type.icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(22.dp))
                 }
                 Text(
-                    "${report.type.label}: still there?",
+                    strings.stillThereQuestion(report.type),
                     fontWeight = FontWeight.SemiBold,
                     fontSize = 18.sp,
                     modifier = Modifier.padding(start = 12.dp).weight(1f),
                 )
-                TextButton(onClick = { onAnswer(null) }) { Text("Skip") }
+                TextButton(onClick = { onAnswer(null) }) { Text(strings.skip) }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth().padding(top = 12.dp)) {
                 Button(
@@ -304,12 +308,12 @@ fun StillThereCard(report: Report, onAnswer: (Boolean?) -> Unit, modifier: Modif
                 ) {
                     Icon(Icons.Filled.ThumbUp, contentDescription = null)
                     Spacer(Modifier.width(8.dp))
-                    Text("Still there", fontSize = 17.sp)
+                    Text(strings.stillThere, fontSize = 17.sp)
                 }
                 OutlinedButton(onClick = { onAnswer(false) }, modifier = Modifier.weight(1f).height(64.dp)) {
                     Icon(Icons.Filled.ThumbDown, contentDescription = null)
                     Spacer(Modifier.width(8.dp))
-                    Text("Not there", fontSize = 17.sp)
+                    Text(strings.notThere, fontSize = 17.sp)
                 }
             }
         }

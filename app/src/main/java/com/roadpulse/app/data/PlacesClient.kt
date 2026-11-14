@@ -34,14 +34,14 @@ data class MapPlace(
     val location get() = GeoPoint(lat, lon)
 
     /** As a destination: its name (or brand, or the category), with distance and parking fee. */
-    fun toPlace(): Place {
-        val title = name ?: brand ?: category.label
+    fun toPlace(s: com.roadpulse.app.i18n.AppStrings = com.roadpulse.app.i18n.EnglishStrings): Place {
+        val title = name ?: brand ?: s.category(category)
         val detail = buildList {
-            if (distanceM > 0) add(if (distanceM < 1000) "${distanceM.toInt()} m" else String.format(Locale.ROOT, "%.1f km", distanceM / 1000))
+            if (distanceM > 0) add(if (distanceM < 1000) s.distance(distanceM.toInt() / 1000.0) else s.distance(distanceM / 1000))
             if (brand != null && brand != title) add(brand)
             when (paid) {
-                true -> add("paid")
-                false -> add("free")
+                true -> add(s.paid)
+                false -> add(s.free)
                 null -> Unit
             }
         }.joinToString(" · ")

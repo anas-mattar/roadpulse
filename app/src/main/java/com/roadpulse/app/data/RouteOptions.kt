@@ -25,16 +25,16 @@ data class RouteOptions(
     val allowUnpaved: Boolean = false,
 ) {
     /** Short description for the route preview, e.g. "Motorcycle · avoiding tolls"; null for the defaults. */
-    fun summary(): String? {
+    fun summary(s: com.roadpulse.app.i18n.AppStrings = com.roadpulse.app.i18n.EnglishStrings): String? {
         val parts = buildList {
-            if (vehicle != Vehicle.CAR) add(vehicle.label)
+            if (vehicle != Vehicle.CAR) add(s.vehicle(vehicle))
             val avoid = buildList {
-                if (avoidTolls) add("tolls")
-                if (avoidHighways) add("highways")
-                if (avoidFerries) add("ferries")
+                if (avoidTolls) add(s.avoidTollsShort)
+                if (avoidHighways) add(s.avoidHighwaysShort)
+                if (avoidFerries) add(s.avoidFerriesShort)
             }
-            if (avoid.isNotEmpty()) add("avoiding " + avoid.joinToString(", "))
-            if (allowUnpaved) add("unpaved roads allowed")
+            if (avoid.isNotEmpty()) add(s.avoiding(avoid))
+            if (allowUnpaved) add(s.unpavedAllowed)
         }
         return parts.joinToString(" · ").ifEmpty { null }
     }

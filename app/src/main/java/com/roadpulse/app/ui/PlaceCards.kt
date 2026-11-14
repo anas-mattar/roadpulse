@@ -1,5 +1,6 @@
 package com.roadpulse.app.ui
 
+import com.roadpulse.app.i18n.strings
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -54,30 +55,31 @@ fun PinnedPlaceCard(
                     Text(place.name, fontWeight = FontWeight.SemiBold, fontSize = 18.sp, maxLines = 1)
                     Text(place.description, color = RP.TextSecondary, fontSize = 13.sp, maxLines = 1)
                 }
-                IconButton(onClick = onClose) { Icon(Icons.Filled.Close, contentDescription = "Close") }
+                IconButton(onClick = onClose) { Icon(Icons.Filled.Close, contentDescription = strings.close) }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth().padding(top = 10.dp, end = 8.dp)) {
-                Action("Drive here", Icons.Filled.Navigation, true, onDrive, Modifier.weight(1f))
-                Action("Add stop", Icons.Filled.AddLocationAlt, canAddStop, onAddStop, Modifier.weight(1f))
+                Action(strings.driveHere, Icons.Filled.Navigation, true, onDrive, Modifier.weight(1f))
+                Action(strings.addStop, Icons.Filled.AddLocationAlt, canAddStop, onAddStop, Modifier.weight(1f))
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth().padding(top = 8.dp, end = 8.dp)) {
-                Action("Save", Icons.Filled.Star, true, { naming = true }, Modifier.weight(1f))
-                Action("Parked here", Icons.Filled.LocalParking, true, onPark, Modifier.weight(1f))
+                Action(strings.save, Icons.Filled.Star, true, { naming = true }, Modifier.weight(1f))
+                Action(strings.parkedHere, Icons.Filled.LocalParking, true, onPark, Modifier.weight(1f))
             }
         }
     }
     if (naming) {
-        var name by remember { mutableStateOf(if (place.name == "Dropped pin") "" else place.name) }
+        val pinLabel = strings.droppedPin
+        var name by remember { mutableStateOf(if (place.name == pinLabel) "" else place.name) }
         AlertDialog(
             onDismissRequest = { naming = false },
-            title = { Text("Save place") },
+            title = { Text(strings.savePlace) },
             text = {
-                OutlinedTextField(value = name, onValueChange = { name = it.take(40) }, label = { Text("Name, e.g. Gym") }, singleLine = true)
+                OutlinedTextField(value = name, onValueChange = { name = it.take(40) }, label = { Text(strings.placeNameHint) }, singleLine = true)
             },
             confirmButton = {
-                TextButton(enabled = name.isNotBlank(), onClick = { naming = false; onSave(name) }) { Text("Save") }
+                TextButton(enabled = name.isNotBlank(), onClick = { naming = false; onSave(name) }) { Text(strings.save) }
             },
-            dismissButton = { TextButton(onClick = { naming = false }) { Text("Cancel") } },
+            dismissButton = { TextButton(onClick = { naming = false }) { Text(strings.cancel) } },
         )
     }
 }

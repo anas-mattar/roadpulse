@@ -1,5 +1,6 @@
 package com.roadpulse.app.ui
 
+import com.roadpulse.app.i18n.strings
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -120,7 +121,7 @@ fun ExploreOverlay(
     Box(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(12.dp)) {
         CircleButton(
             icon = Icons.Filled.Settings,
-            description = "Voice guidance settings",
+            description = strings.settingsButton,
             onClick = onOpenSettings,
             modifier = Modifier.align(Alignment.TopEnd),
             content = RP.TextSecondary,
@@ -128,7 +129,7 @@ fun ExploreOverlay(
 
         Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth()) {
             Column(Modifier.align(Alignment.End), horizontalAlignment = Alignment.End) {
-                CircleButton(icon = Icons.Filled.MyLocation, description = "Show my location", onClick = onRecenter)
+                CircleButton(icon = Icons.Filled.MyLocation, description = strings.showMyLocation, onClick = onRecenter)
                 Spacer(Modifier.height(10.dp))
                 Surface(
                     onClick = onReport,
@@ -140,7 +141,7 @@ fun ExploreOverlay(
                     Row(Modifier.padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Filled.ReportProblem, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(6.dp))
-                        Text("Report", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                        Text(strings.report, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
                     }
                 }
                 Spacer(Modifier.height(12.dp))
@@ -151,7 +152,7 @@ fun ExploreOverlay(
                     if (categoryTitle != null) {
                         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 4.dp, bottom = 4.dp)) {
                             Text(categoryTitle, fontWeight = FontWeight.SemiBold, fontSize = 15.sp, modifier = Modifier.weight(1f))
-                            Icon(Icons.Filled.Close, contentDescription = "Close", tint = RP.TextSecondary,
+                            Icon(Icons.Filled.Close, contentDescription = strings.close, tint = RP.TextSecondary,
                                 modifier = Modifier.size(20.dp).clickable(onClick = onCloseCategory))
                         }
                     }
@@ -163,7 +164,7 @@ fun ExploreOverlay(
                     }
                     if (settingShortcut != null) {
                         Text(
-                            "Set ${if (settingShortcut == Shortcut.HOME) "Home" else "Work"}: search for the address and pick it",
+                            strings.setShortcutHint(settingShortcut == Shortcut.HOME),
                             fontSize = 13.sp,
                             color = RP.Indigo,
                             modifier = Modifier.padding(start = 4.dp, bottom = 8.dp),
@@ -174,9 +175,9 @@ fun ExploreOverlay(
                         onQueryChange = onQueryChange,
                         onClear = onClear,
                         placeholder = when (settingShortcut) {
-                            Shortcut.HOME -> "Your home address"
-                            Shortcut.WORK -> "Your work address"
-                            null -> "Where to?"
+                            Shortcut.HOME -> strings.yourHomeAddress
+                            Shortcut.WORK -> strings.yourWorkAddress
+                            null -> strings.whereTo
                         },
                         showClear = query.isNotEmpty() || settingShortcut != null,
                         onVoice = if (settingShortcut == null) onVoiceSearch else null,
@@ -190,7 +191,7 @@ fun ExploreOverlay(
                                 Surface(onClick = { onCategory(category) }, shape = RoundedCornerShape(18.dp), color = RP.IndigoLight, contentColor = RP.Indigo) {
                                     Row(Modifier.padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                                         Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp))
-                                        Text(category.label, fontSize = 14.sp, fontWeight = FontWeight.Medium, modifier = Modifier.padding(start = 6.dp))
+                                        Text(strings.category(category), fontSize = 14.sp, fontWeight = FontWeight.Medium, modifier = Modifier.padding(start = 6.dp))
                                     }
                                 }
                             }
@@ -198,8 +199,8 @@ fun ExploreOverlay(
                     }
                     if (query.isEmpty() && results.isEmpty() && settingShortcut == null && categoryTitle == null) {
                         Row(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            ShortcutChip("Home", Icons.Filled.Home, saved.home, { onShortcut(Shortcut.HOME) }, { onChangeShortcut(Shortcut.HOME) })
-                            ShortcutChip("Work", Icons.Filled.Work, saved.work, { onShortcut(Shortcut.WORK) }, { onChangeShortcut(Shortcut.WORK) })
+                            ShortcutChip(strings.home, Icons.Filled.Home, saved.home, { onShortcut(Shortcut.HOME) }, { onChangeShortcut(Shortcut.HOME) })
+                            ShortcutChip(strings.work, Icons.Filled.Work, saved.work, { onShortcut(Shortcut.WORK) }, { onChangeShortcut(Shortcut.WORK) })
                         }
                         saved.parking?.let { parked ->
                             Row(
@@ -208,18 +209,18 @@ fun ExploreOverlay(
                             ) {
                                 Icon(Icons.Filled.LocalParking, contentDescription = null, tint = RP.Indigo, modifier = Modifier.size(20.dp))
                                 Text(
-                                    "Your car · parked ${com.roadpulse.app.data.reportAge(parked.savedAtMillis, nowMillis)}",
+                                    strings.yourCarParked(com.roadpulse.app.data.reportAge(parked.savedAtMillis, nowMillis, strings)),
                                     fontSize = 14.sp,
                                     modifier = Modifier.padding(start = 10.dp).weight(1f),
                                 )
-                                Icon(Icons.Filled.Close, contentDescription = "Forget parking spot", tint = RP.TextSecondary,
+                                Icon(Icons.Filled.Close, contentDescription = strings.forgetParking, tint = RP.TextSecondary,
                                     modifier = Modifier.size(18.dp).clickable(onClick = onClearParking))
                             }
                         }
                         saved.favourites.forEach { place ->
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Box(Modifier.weight(1f)) { ResultRow(place, icon = Icons.Filled.Star) { onFavourite(place) } }
-                                Icon(Icons.Filled.Close, contentDescription = "Remove ${place.name}", tint = RP.TextSecondary,
+                                Icon(Icons.Filled.Close, contentDescription = strings.remove(place.name), tint = RP.TextSecondary,
                                     modifier = Modifier.size(18.dp).clickable { onRemoveFavourite(place) })
                             }
                         }
@@ -239,7 +240,7 @@ private fun SearchField(
     query: String,
     onQueryChange: (String) -> Unit,
     onClear: () -> Unit,
-    placeholder: String = "Where to?",
+    placeholder: String = strings.whereTo,
     showClear: Boolean = query.isNotEmpty(),
     onVoice: (() -> Unit)? = null,
 ) {
@@ -265,14 +266,14 @@ private fun SearchField(
         if (showClear) {
             Icon(
                 Icons.Filled.Close,
-                contentDescription = "Clear",
+                contentDescription = strings.clear,
                 tint = RP.TextSecondary,
                 modifier = Modifier.size(20.dp).clickable(onClick = onClear),
             )
         } else if (onVoice != null) {
             Icon(
                 Icons.Filled.Mic,
-                contentDescription = "Search by voice",
+                contentDescription = strings.searchByVoice,
                 tint = RP.Indigo,
                 modifier = Modifier.size(22.dp).clickable(onClick = onVoice),
             )
@@ -326,7 +327,7 @@ fun PreviewOverlay(
     Box(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(12.dp)) {
         CircleButton(
             icon = Icons.AutoMirrored.Filled.ArrowBack,
-            description = "Back",
+            description = strings.back,
             onClick = onBack,
             modifier = Modifier.align(Alignment.TopStart),
             content = Color.Black,
@@ -334,14 +335,14 @@ fun PreviewOverlay(
 
         Island(Modifier.align(Alignment.BottomCenter).fillMaxWidth()) {
             Column(Modifier.padding(16.dp)) {
-                Text(destination?.name ?: "Destination", fontSize = 18.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(destination?.name ?: strings.destination, fontSize = 18.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 if (!destination?.description.isNullOrBlank()) {
                     Text(destination!!.description, fontSize = 13.sp, color = RP.TextSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
                 stops.forEachIndexed { i, stop ->
                     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 6.dp)) {
-                        Text("Stop ${i + 1}: ${stop.name}", fontSize = 14.sp, color = RP.Indigo, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-                        Icon(Icons.Filled.Close, contentDescription = "Remove stop", tint = RP.TextSecondary, modifier = Modifier.size(18.dp).clickable { onRemoveStop(stop) })
+                        Text(strings.stop(i + 1, stop.name), fontSize = 14.sp, color = RP.Indigo, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                        Icon(Icons.Filled.Close, contentDescription = strings.removeStop, tint = RP.TextSecondary, modifier = Modifier.size(18.dp).clickable { onRemoveStop(stop) })
                     }
                 }
                 if (optionsSummary != null) {
@@ -355,23 +356,23 @@ fun PreviewOverlay(
                     ) {
                         Icon(Icons.Filled.LocalParking, contentDescription = null, tint = RP.TealDark, modifier = Modifier.size(20.dp))
                         Text(
-                            "${parkingNearby.size} car park${if (parkingNearby.size > 1) "s" else ""} near your destination",
+                            strings.carParksNearDestination(parkingNearby.size),
                             fontSize = 14.sp, color = RP.TealDark, fontWeight = FontWeight.Medium,
                             modifier = Modifier.padding(start = 8.dp).weight(1f),
                         )
-                        Text(if (open) "Hide" else "Show", fontSize = 13.sp, color = RP.Indigo)
+                        Text(if (open) strings.hide else strings.show, fontSize = 13.sp, color = RP.Indigo)
                     }
                     if (open) parkingNearby.forEach { p -> ResultRow(p, icon = Icons.Filled.LocalParking) { onChooseParking(p) } }
                 }
                 if (stops.isEmpty() && parkingNearby.isEmpty()) {
-                    Text("Tip: press and hold the map to add a stop", fontSize = 12.sp, color = RP.TextSecondary, modifier = Modifier.padding(top = 4.dp))
+                    Text(strings.tipAddStop, fontSize = 12.sp, color = RP.TextSecondary, modifier = Modifier.padding(top = 4.dp))
                 }
                 Spacer(Modifier.height(12.dp))
 
                 if (route == null) {
                     if (busy) LinearProgressIndicator(Modifier.fillMaxWidth(), color = RP.Indigo, trackColor = RP.IndigoLight)
                 } else {
-                    val labels = RouteChoices.describe(choices.ifEmpty { listOf(route) })
+                    val labels = RouteChoices.describe(choices.ifEmpty { listOf(route) }, strings)
                     val cards = choices.ifEmpty { listOf(route) }
                     Row(
                         Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
@@ -384,7 +385,7 @@ fun PreviewOverlay(
                                 selected = i == selected,
                                 single = cards.size == 1,
                                 arrival = formatArrival(context, r.timeSeconds),
-                                toll = com.roadpulse.app.data.TollClient.label(r.hasToll, tolls.getOrNull(i)),
+                                toll = com.roadpulse.app.data.TollClient.label(r.hasToll, tolls.getOrNull(i), strings),
                                 onClick = { onSelectRoute(i) },
                             )
                         }
@@ -394,7 +395,7 @@ fun PreviewOverlay(
                         if (onSimulate != null) {
                             CircleButton(
                                 icon = Icons.Filled.PlayArrow,
-                                description = "Simulate a drive",
+                                description = strings.simulateDrive,
                                 onClick = onSimulate,
                                 container = Color.White,
                                 content = Color.Black,
@@ -411,7 +412,7 @@ fun PreviewOverlay(
                         ) {
                             Icon(Icons.Filled.Navigation, contentDescription = null, modifier = Modifier.size(20.dp))
                             Spacer(Modifier.width(8.dp))
-                            Text("Go now", fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
+                            Text(strings.goNow, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
                         }
                     }
                 }
@@ -489,7 +490,7 @@ fun DrivingOverlay(
                 }
                 CircleButton(
                     icon = if (muted) Icons.AutoMirrored.Filled.VolumeOff else Icons.AutoMirrored.Filled.VolumeUp,
-                    description = if (muted) "Unmute voice" else "Mute voice",
+                    description = if (muted) strings.unmuteVoice else strings.muteVoice,
                     onClick = onToggleMute,
                     container = RP.NightPanel,
                     content = Color.White,
@@ -529,7 +530,7 @@ fun DrivingOverlay(
                     }
                     CircleButton(
                         icon = Icons.Filled.ReportProblem,
-                        description = "Report",
+                        description = strings.report,
                         onClick = onReport,
                         container = RP.Amber,
                         content = RP.AmberDark,
@@ -593,7 +594,7 @@ private fun RouteCard(
                 maxLines = 1,
             )
             choice?.via?.let {
-                Text("via $it", fontSize = 12.sp, color = RP.TextSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(strings.via(it), fontSize = 12.sp, color = RP.TextSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             toll?.let {
                 Text(it, fontSize = 12.sp, fontWeight = FontWeight.Medium, color = RP.AmberDark, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -624,7 +625,7 @@ private fun RowScope.ShortcutChip(
             Column {
                 Text(label, fontSize = 14.sp, fontWeight = FontWeight.Medium)
                 Text(
-                    place?.name ?: "Set address",
+                    place?.name ?: strings.setAddress,
                     fontSize = 11.sp,
                     color = if (place == null) RP.Indigo else RP.TextSecondary,
                     maxLines = 1,

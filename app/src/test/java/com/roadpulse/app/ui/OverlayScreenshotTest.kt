@@ -45,10 +45,17 @@ class OverlayScreenshotTest {
         timeSeconds = 1140.0,
     )
 
-    private fun shot(name: String, mapColor: Color, content: @Composable () -> Unit) {
+    private fun shot(name: String, mapColor: Color, arabic: Boolean = false, content: @Composable () -> Unit) {
+        val strings = if (arabic) com.roadpulse.app.i18n.ArabicStrings else com.roadpulse.app.i18n.EnglishStrings
         compose.setContent {
-            RoadPulseTheme {
-                Box(Modifier.fillMaxSize().background(mapColor)) { content() }
+            androidx.compose.runtime.CompositionLocalProvider(
+                com.roadpulse.app.i18n.LocalStrings provides strings,
+                androidx.compose.ui.platform.LocalLayoutDirection provides
+                    if (arabic) androidx.compose.ui.unit.LayoutDirection.Rtl else androidx.compose.ui.unit.LayoutDirection.Ltr,
+            ) {
+                RoadPulseTheme {
+                    Box(Modifier.fillMaxSize().background(mapColor)) { content() }
+                }
             }
         }
         compose.onRoot().captureRoboImage("build/outputs/roborazzi/$name.png")
@@ -116,7 +123,7 @@ class OverlayScreenshotTest {
     }
 
     @Test
-    fun drivingArabic() = shot("3c_driving_arabic", RP.Field) {
+    fun drivingArabic() = shot("ar_3_driving", RP.Field, arabic = true) {
         val n = com.roadpulse.app.nav.ArabicNarrator
         DrivingOverlay(
             state = MapUiState(
@@ -127,6 +134,52 @@ class OverlayScreenshotTest {
             ),
             narrator = n, muted = false, onToggleMute = {}, onReport = {}, onStop = {},
         )
+    }
+
+    @Test
+    fun exploreArabic() = shot("ar_1_explore", RP.Field, arabic = true) {
+        ExploreOverlay(
+            query = "", results = emptyList(),
+            saved = SavedPlaces(
+                home = Place("Jalan Bangsar 12", "Bangsar", GeoPoint(3.13, 101.67)),
+                recent = listOf(place),
+                favourites = listOf(Place("Gym", "Jalan Telawi, Bangsar", GeoPoint(3.13, 101.67))),
+                parking = com.roadpulse.app.data.ParkedCar(GeoPoint(3.14, 101.69), 1_794_660_000_000L),
+            ),
+            onQueryChange = {}, onClear = {}, onSelect = {}, onOpenSettings = {}, onRecenter = {}, onReport = {},
+            onVoiceSearch = {}, onCategory = {}, nowMillis = 1_794_660_000_000L + 25 * 60_000,
+        )
+    }
+
+    @Test
+    fun previewArabic() = shot("ar_2_preview", RP.Field, arabic = true) {
+        val choices = listOf(
+            route.copy(hasToll = true, maneuvers = listOf(Maneuver("x", 9.0, 900.0, 0, streetNames = listOf("E37")))),
+            route.copy(lengthKm = 10.1, timeSeconds = 1380.0, maneuvers = listOf(Maneuver("x", 8.0, 1300.0, 0, streetNames = listOf("Jalan Tun Razak")))),
+        )
+        PreviewOverlay(
+            place, choices[0], choices, selected = 0, onSelectRoute = {}, busy = false, onBack = {}, onGo = {}, onSimulate = null,
+            tolls = listOf(com.roadpulse.app.data.TollEstimate(totalRm = 6.8, complete = true,
+                plazas = listOf(com.roadpulse.app.data.TollPlaza("Gombak", status = "PRICED", priceRm = 6.8))), null),
+            parkingNearby = listOf(Place("Pavilion Car Park", "240 m", GeoPoint(3.149, 101.713))),
+        )
+    }
+
+    @Test
+    fun reportCardArabic() = shot("ar_6_report_card", RP.Field, arabic = true) {
+        Box(Modifier.fillMaxSize().padding(12.dp), contentAlignment = androidx.compose.ui.Alignment.BottomCenter) {
+            ReportCard(
+                report = reports[0], nowMillis = 1_794_660_000_000L + 12 * 60_000, own = false, busy = false,
+                onStillThere = {}, onNotThere = {}, onFlag = {}, onClose = {},
+            )
+        }
+    }
+
+    @Test
+    fun reportPickerArabic() = shot("ar_9_report_details", RP.NightSurface, arabic = true) {
+        Box(Modifier.fillMaxSize().padding(12.dp), contentAlignment = androidx.compose.ui.Alignment.BottomCenter) {
+            ReportPicker(onPick = { _, _, _ -> }, onDismiss = {}, initialType = com.roadpulse.app.data.ReportType.ROAD_CLOSED)
+        }
     }
 
     @Test

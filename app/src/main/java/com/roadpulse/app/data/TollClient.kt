@@ -51,14 +51,14 @@ class TollClient(private val baseUrl: String) {
          * "Toll ~RM 6.80", "Toll RM 5.00 + ?" (some plazas not priced), "Toll: price unknown",
          * or "Toll road" while the estimate is loading or unavailable.
          */
-        fun label(hasToll: Boolean, estimate: TollEstimate?): String? {
-            if (estimate == null) return if (hasToll) "Toll road" else null
-            if (estimate.plazas.isEmpty()) return if (hasToll) "Toll: price unknown" else null
+        fun label(hasToll: Boolean, estimate: TollEstimate?, s: com.roadpulse.app.i18n.AppStrings = com.roadpulse.app.i18n.EnglishStrings): String? {
+            if (estimate == null) return if (hasToll) s.tollRoad else null
+            if (estimate.plazas.isEmpty()) return if (hasToll) s.tollPriceUnknown else null
             val rm = String.format(Locale.ROOT, "RM %.2f", estimate.totalRm)
             return when {
-                estimate.complete -> "Toll ~$rm"
-                estimate.totalRm > 0 -> "Toll $rm + ?"
-                else -> "Toll: price unknown"
+                estimate.complete -> s.tollAbout(rm)
+                estimate.totalRm > 0 -> s.tollAtLeast(rm)
+                else -> s.tollPriceUnknown
             }
         }
     }

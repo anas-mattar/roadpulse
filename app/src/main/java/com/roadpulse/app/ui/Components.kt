@@ -1,5 +1,6 @@
 package com.roadpulse.app.ui
 
+import com.roadpulse.app.i18n.strings
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -210,7 +211,7 @@ fun SpeedRing(
         }
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text("$speedKmh", color = if (speeding) Color(0xFFF09595) else Color.White, fontSize = 20.sp, fontWeight = FontWeight.SemiBold, lineHeight = 20.sp)
-            Text("km/h", color = RP.NightText, fontSize = 10.sp, lineHeight = 10.sp)
+            Text(strings.kmh, color = RP.NightText, fontSize = 10.sp, lineHeight = 10.sp)
         }
     }
 }
@@ -234,7 +235,7 @@ fun TripIsland(
                 }
                 CircleButton(
                     icon = Icons.Filled.Close,
-                    description = "Stop navigation",
+                    description = strings.stopNavigation,
                     onClick = onStop,
                     container = RP.Danger,
                     content = Color.White,

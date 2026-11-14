@@ -1,5 +1,6 @@
 package com.roadpulse.app.ui
 
+import com.roadpulse.app.i18n.strings
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.verticalScroll
@@ -518,7 +519,7 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                     onSimulate = if (BuildConfig.DEBUG) ({ showSimulateDialog = true }) else null,
                     stops = state.stops,
                     onRemoveStop = viewModel::removeStop,
-                    optionsSummary = state.routeOptions.summary(),
+                    optionsSummary = state.routeOptions.summary(strings),
                     parkingNearby = state.parkingNearby,
                     onChooseParking = viewModel::chooseParking,
                 )
@@ -600,7 +601,7 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
     if (showAbuseDialog) {
         AlertDialog(
             onDismissRequest = { showAbuseDialog = false },
-            title = { Text("What's wrong with this report?") },
+            title = { Text(strings.whatsWrongWithReport) },
             text = {
                 Column {
                     com.roadpulse.app.data.FlagReason.entries.forEach { reason ->
@@ -610,12 +611,12 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                                 viewModel.flagSelected(reason)
                             },
                             modifier = Modifier.fillMaxWidth(),
-                        ) { Text(reason.label) }
+                        ) { Text(strings.flagReason(reason)) }
                     }
                 }
             },
             confirmButton = {},
-            dismissButton = { TextButton(onClick = { showAbuseDialog = false }) { Text("Cancel") } },
+            dismissButton = { TextButton(onClick = { showAbuseDialog = false }) { Text(strings.cancel) } },
         )
     }
 
@@ -911,13 +912,13 @@ private fun List<Report>.toFeatureCollection(selectedId: String?): FeatureCollec
     )
 }
 
-internal fun formatKm(km: Double): String =
-    if (km < 1) "${(km * 1000).roundToInt()} m" else "%.1f km".format(km)
+@Composable
+@androidx.compose.runtime.ReadOnlyComposable
+internal fun formatKm(km: Double): String = strings.distance(km)
 
-internal fun formatDuration(seconds: Double): String {
-    val minutes = (seconds / 60).roundToInt()
-    return if (minutes < 60) "$minutes min" else "${minutes / 60} h ${minutes % 60} min"
-}
+@Composable
+@androidx.compose.runtime.ReadOnlyComposable
+internal fun formatDuration(seconds: Double): String = strings.duration((seconds / 60).roundToInt())
 
 /** Arrival clock time in the phone's own 12/24-hour style. */
 internal fun formatArrival(context: Context, secondsFromNow: Double): String =
@@ -944,10 +945,10 @@ private fun VoiceSettingsDialog(onDismiss: () -> Unit, onClearPlaces: () -> Unit
     val mapColors by DisplaySettings.mapColors.collectAsStateWithLifecycle()
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Settings") },
+        title = { Text(strings.settings) },
         text = {
             Column(Modifier.verticalScroll(androidx.compose.foundation.rememberScrollState())) {
-                Text("Voice language", style = MaterialTheme.typography.labelLarge, color = RP.TextSecondary)
+                Text(strings.language, style = MaterialTheme.typography.labelLarge, color = RP.TextSecondary)
                 GuidanceLanguage.entries.forEach { option ->
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -964,8 +965,7 @@ private fun VoiceSettingsDialog(onDismiss: () -> Unit, onClearPlaces: () -> Unit
                 }
                 if (language in missing) {
                     Text(
-                        "No ${language.label} voice is installed on this phone, so guidance stays in English. " +
-                            "Install one in Android Settings > System > Languages > Text-to-speech output.",
+                        strings.noVoiceInstalled(language.label),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.error,
                         modifier = Modifier.padding(top = 8.dp),
@@ -975,11 +975,11 @@ private fun VoiceSettingsDialog(onDismiss: () -> Unit, onClearPlaces: () -> Unit
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
                 ) {
-                    Text("Mute voice", modifier = Modifier.weight(1f))
+                    Text(strings.muteVoiceSetting, modifier = Modifier.weight(1f))
                     Switch(checked = muted, onCheckedChange = VoiceSettings::setMuted)
                 }
                 Text(
-                    "Map colours",
+                    strings.mapColours,
                     style = MaterialTheme.typography.labelLarge,
                     color = RP.TextSecondary,
                     modifier = Modifier.padding(top = 16.dp),
@@ -990,7 +990,7 @@ private fun VoiceSettingsDialog(onDismiss: () -> Unit, onClearPlaces: () -> Unit
                         modifier = Modifier.fillMaxWidth().clickable { DisplaySettings.setMapColors(option) },
                     ) {
                         RadioButton(selected = mapColors == option, onClick = null)
-                        Text(option.label, modifier = Modifier.padding(start = 8.dp))
+                        Text(strings.mapColors(option), modifier = Modifier.padding(start = 8.dp))
                     }
                 }
                 RouteAndDisplaySettings()
@@ -1040,22 +1040,22 @@ private fun VoiceSettingsDialog(onDismiss: () -> Unit, onClearPlaces: () -> Unit
                     }
                 }
                 Text(
-                    "Privacy",
+                    strings.privacy,
                     style = MaterialTheme.typography.labelLarge,
                     color = RP.TextSecondary,
                     modifier = Modifier.padding(top = 16.dp),
                 )
                 Text(
-                    "Home, Work and recent places are stored only on this phone.",
+                    strings.privacyText,
                     style = MaterialTheme.typography.bodySmall,
                     color = RP.TextSecondary,
                 )
                 TextButton(onClick = onClearPlaces, contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)) {
-                    Text("Clear saved places", color = RP.Danger)
+                    Text(strings.clearSavedPlaces, color = RP.Danger)
                 }
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text("Done") } },
+        confirmButton = { TextButton(onClick = onDismiss) { Text(strings.done) } },
     )
 }
 
@@ -1071,34 +1071,34 @@ private fun RouteAndDisplaySettings() {
     val compass by DisplaySettings.showCompass.collectAsStateWithLifecycle()
     val flat by DisplaySettings.flatDriving.collectAsStateWithLifecycle()
 
-    SettingsHeader("Route")
+    SettingsHeader(strings.route)
     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         com.roadpulse.app.data.Vehicle.entries.forEach { v ->
             androidx.compose.material3.FilterChip(
                 selected = options.vehicle == v,
                 onClick = { com.roadpulse.app.data.RouteSettings.update { it.copy(vehicle = v) } },
-                label = { Text(v.label) },
+                label = { Text(strings.vehicle(v)) },
             )
         }
     }
-    SettingSwitch("Avoid toll roads", options.avoidTolls) { on -> com.roadpulse.app.data.RouteSettings.update { it.copy(avoidTolls = on) } }
-    SettingSwitch("Avoid highways", options.avoidHighways) { on -> com.roadpulse.app.data.RouteSettings.update { it.copy(avoidHighways = on) } }
-    SettingSwitch("Avoid ferries", options.avoidFerries) { on -> com.roadpulse.app.data.RouteSettings.update { it.copy(avoidFerries = on) } }
-    SettingSwitch("Allow unpaved roads", options.allowUnpaved) { on -> com.roadpulse.app.data.RouteSettings.update { it.copy(allowUnpaved = on) } }
+    SettingSwitch(strings.avoidTolls, options.avoidTolls) { on -> com.roadpulse.app.data.RouteSettings.update { it.copy(avoidTolls = on) } }
+    SettingSwitch(strings.avoidHighways, options.avoidHighways) { on -> com.roadpulse.app.data.RouteSettings.update { it.copy(avoidHighways = on) } }
+    SettingSwitch(strings.avoidFerries, options.avoidFerries) { on -> com.roadpulse.app.data.RouteSettings.update { it.copy(avoidFerries = on) } }
+    SettingSwitch(strings.allowUnpaved, options.allowUnpaved) { on -> com.roadpulse.app.data.RouteSettings.update { it.copy(allowUnpaved = on) } }
 
-    SettingsHeader("Speed")
-    SettingSwitch("Show speedometer", showSpeedometer) { DisplaySettings.set(DisplaySettings.showSpeedometer, "show_speedometer", it) }
-    Text("Show speed limit", fontSize = 14.sp, modifier = Modifier.padding(top = 6.dp))
+    SettingsHeader(strings.speed)
+    SettingSwitch(strings.showSpeedometer, showSpeedometer) { DisplaySettings.set(DisplaySettings.showSpeedometer, "show_speedometer", it) }
+    Text(strings.showSpeedLimit, fontSize = 14.sp, modifier = Modifier.padding(top = 6.dp))
     com.roadpulse.app.nav.LimitDisplay.entries.forEach { option ->
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.fillMaxWidth().clickable { DisplaySettings.set(DisplaySettings.limitDisplay, "limit_display", option) },
         ) {
             RadioButton(selected = limitDisplay == option, onClick = null)
-            Text(option.label, modifier = Modifier.padding(start = 8.dp))
+            Text(strings.limitDisplay(option), modifier = Modifier.padding(start = 8.dp))
         }
     }
-    Text("Warn when over the limit by", fontSize = 14.sp, modifier = Modifier.padding(top = 6.dp))
+    Text(strings.warnOverLimitBy, fontSize = 14.sp, modifier = Modifier.padding(top = 6.dp))
     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         listOf(0, 3, 5, 10).forEach { kmh ->
             androidx.compose.material3.FilterChip(
@@ -1108,12 +1108,12 @@ private fun RouteAndDisplaySettings() {
             )
         }
     }
-    SettingSwitch("Sound when speeding", sound) { DisplaySettings.set(DisplaySettings.speedingSound, "speeding_sound", it) }
+    SettingSwitch(strings.soundWhenSpeeding, sound) { DisplaySettings.set(DisplaySettings.speedingSound, "speeding_sound", it) }
 
-    SettingsHeader("Map view")
-    SettingSwitch("North always up", northUp) { DisplaySettings.set(DisplaySettings.northUp, "north_up", it) }
-    SettingSwitch("Show compass", compass) { DisplaySettings.set(DisplaySettings.showCompass, "show_compass", it) }
-    SettingSwitch("Flat map while driving (2D)", flat) { DisplaySettings.set(DisplaySettings.flatDriving, "flat_driving", it) }
+    SettingsHeader(strings.mapView)
+    SettingSwitch(strings.northUp, northUp) { DisplaySettings.set(DisplaySettings.northUp, "north_up", it) }
+    SettingSwitch(strings.showCompass, compass) { DisplaySettings.set(DisplaySettings.showCompass, "show_compass", it) }
+    SettingSwitch(strings.flatMap, flat) { DisplaySettings.set(DisplaySettings.flatDriving, "flat_driving", it) }
 }
 
 @Composable

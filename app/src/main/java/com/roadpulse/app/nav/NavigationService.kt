@@ -175,8 +175,9 @@ class NavigationService : Service() {
     private fun notificationManager() = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
     private fun createChannel() {
-        val channel = NotificationChannel(CHANNEL_ID, "Navigation", NotificationManager.IMPORTANCE_LOW)
-        channel.description = "Shown while RoadPulse is guiding a drive"
+        val s = com.roadpulse.app.i18n.currentStrings()
+        val channel = NotificationChannel(CHANNEL_ID, s.navigation, NotificationManager.IMPORTANCE_LOW)
+        channel.description = s.notificationChannel
         notificationManager().createNotificationChannel(channel)
     }
 
@@ -191,15 +192,16 @@ class NavigationService : Service() {
             Intent(this, NavigationService::class.java).setAction(ACTION_STOP),
             PendingIntent.FLAG_IMMUTABLE,
         )
-        val turn = state?.distanceToTurnMeters?.let { "In ${it.roundToInt()} m: " }.orEmpty()
+        val s = com.roadpulse.app.i18n.currentStrings()
+        val turn = state?.distanceToTurnMeters?.let { s.inMeters(it.roundToInt()) }.orEmpty()
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_menu_directions)
-            .setContentTitle(state?.destination?.name?.let { "Navigating to $it" } ?: "Navigation")
-            .setContentText(turn + (state?.instruction ?: "Follow the route"))
+            .setContentTitle(state?.destination?.name?.let { s.navigatingTo(it) } ?: s.navigation)
+            .setContentText(turn + (state?.instruction ?: VoiceSettings.narrator().followRoute))
             .setContentIntent(openApp)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
-            .addAction(0, "Stop", stop)
+            .addAction(0, s.notificationStop, stop)
             .build()
     }
 
