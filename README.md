@@ -15,7 +15,8 @@ components. "RoadPulse" is a placeholder name; check trademark availability befo
 - Navigation mode: camera follows the driver, banner with the next instruction and distance
   to the turn, live remaining time and arrival time, automatic rerouting, arrival detection
 - Voice guidance (device text-to-speech): a heads-up about 500 m before each turn and the
-  full instruction at the turn. Music lowers its volume during prompts (audio ducking), and a
+  full instruction at the turn; turns less than 150 m apart are announced together ("…, then turn
+  left" / "…, kemudian belok kiri"). Music lowers its volume during prompts (audio ducking), and a
   Mute button in the navigation banner is remembered across restarts. Voice and banner in
   English or Bahasa Melayu (settings button on the search bar). Malay instructions are generated
   by the app (the routing server has none); see `docs/MALAY_PROMPTS.md` for the review sheet
@@ -79,6 +80,14 @@ release builds, and a check that the release build is HTTPS-only. Test reports a
 are attached to each run. Plain HTTP is allowed only in debug builds, and only to a server on the
 developer's machine (`app/src/debug/res/xml/network_security_config_debug.xml`).
 
+## Field testing (Gate 1)
+
+`docs/FIELD_TEST_PLAN.md` lists the Klang Valley test routes, safety rules, how to install the
+debug app on a real phone, and the proposed Gate 1 targets. In debug builds the driving screen has
+a **Flag issue** button that records problems with time and position, and the drive log records
+battery level every 5 minutes. After driving: `pull-drive-logs.bat`, then `analyze-drives.bat`
+(Python 3) writes `navlogs\report.md`.
+
 ## Configuration
 
 Service URLs live in `gradle.properties` (`roadpulse.mapStyleUrl`, `roadpulse.routingUrl`,
@@ -96,7 +105,8 @@ Valhalla routing server and a PostGIS database.
               DriveSimulator + DriveReplay + NavLog (debug)
       ui/     MapScreen (Compose + MapLibre), MapViewModel
     backend/  docker-compose (Valhalla, PostGIS) and database schema
-    docs/     PLAN.md - architecture and roadmap; OFFLINE.md - behaviour without network/GPS
+    docs/     PLAN.md - architecture and roadmap; OFFLINE.md - behaviour without network/GPS;
+              adr/ - architecture decision records; FIELD_TEST_PLAN.md - Gate 1 test drives
 
 ## Licensing notes
 

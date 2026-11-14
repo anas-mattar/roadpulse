@@ -77,6 +77,7 @@ import com.roadpulse.app.nav.MapColors
 import com.roadpulse.app.nav.SunTimes
 import com.roadpulse.app.nav.DriveReplay
 import com.roadpulse.app.nav.LocationFix
+import com.roadpulse.app.nav.NavigationSession
 import com.roadpulse.app.nav.GuidanceLanguage
 import com.roadpulse.app.nav.Narrator
 import com.roadpulse.app.nav.VoiceProbe
@@ -107,6 +108,19 @@ import org.maplibre.geojson.Point
 import kotlin.math.roundToInt
 
 private const val ROUTE_SOURCE = "route-source"
+
+/** Field-test issue categories (code written to the drive log, label shown to the tester). */
+private val FLAG_CATEGORIES = listOf(
+    "wrong_prompt" to "Wrong or missing voice prompt",
+    "prompt_timing" to "Prompt too early or too late",
+    "false_reroute" to "Rerouted but I was on the route",
+    "missed_reroute" to "Off route but no reroute",
+    "wrong_position" to "Car shown in the wrong place",
+    "bad_route" to "Route is wrong or illegal",
+    "speed_limit" to "Speed limit wrong",
+    "map_error" to "Map data error",
+    "other" to "Other",
+)
 private const val ALT_ROUTE_SOURCE = "alt-route-source"
 private const val ALT_ROUTE_LAYER = "alt-route-line"
 private const val DEST_SOURCE = "destination-source"
@@ -131,6 +145,7 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
     val narrator = narratorFor(effectiveLanguage)
     var showVoiceSettings by remember { mutableStateOf(false) }
     var showSimulateDialog by remember { mutableStateOf(false) }
+    var showFlagDialog by remember { mutableStateOf(false) }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -365,6 +380,7 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                     onStop = viewModel::clearRoute,
                     following = following,
                     onRecenter = { following = true },
+                    onFlag = if (BuildConfig.DEBUG) ({ showFlagDialog = true }) else null,
                 )
             }
         }
@@ -399,6 +415,29 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
             },
             confirmButton = {},
             dismissButton = { TextButton(onClick = { showSimulateDialog = false }) { Text("Cancel") } },
+        )
+    }
+
+    if (showFlagDialog) {
+        AlertDialog(
+            onDismissRequest = { showFlagDialog = false },
+            title = { Text("Flag an issue (field test)") },
+            text = {
+                Column {
+                    FLAG_CATEGORIES.forEach { (code, label) ->
+                        TextButton(
+                            onClick = {
+                                showFlagDialog = false
+                                NavigationSession.flag(code)
+                                viewModel.showMessage("Flag saved: $label")
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) { Text(label) }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = { TextButton(onClick = { showFlagDialog = false }) { Text("Cancel") } },
         )
     }
 

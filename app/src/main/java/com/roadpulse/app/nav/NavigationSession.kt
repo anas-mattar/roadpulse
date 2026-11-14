@@ -125,6 +125,17 @@ object NavigationSession {
         )
     }
 
+    /** Debug field tests: records a passenger's issue report at the current position. */
+    fun flag(category: String) {
+        val p = _state.value?.displayPosition
+        log?.event(now(), "flag", "$category;at=${p?.lat},${p?.lon}")
+    }
+
+    /** Debug field tests: periodic battery sample (percent, charging). */
+    fun logBattery(percent: Int, charging: Boolean) {
+        log?.event(now(), "battery", "level=$percent;charging=$charging")
+    }
+
     /** Speaks (and logs) the first instruction of the current route. */
     fun announceStart() {
         val s = _state.value ?: return

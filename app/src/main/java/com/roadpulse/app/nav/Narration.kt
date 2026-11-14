@@ -22,6 +22,11 @@ interface Narrator {
     /** Spoken ahead of the maneuver, e.g. "In 450 meters, turn right onto Jalan Ampang." */
     fun alert(m: Maneuver, meters: Int): String
 
+    /** At-turn prompt that also announces a [next] turn coming right after. */
+    fun atTurnThen(m: Maneuver, next: Maneuver): String
+    /** Advance prompt that also announces a [next] turn coming right after. */
+    fun alertThen(m: Maneuver, meters: Int, next: Maneuver): String
+
     val arrived: String
     val rerouting: String
     val gpsLost: String
@@ -55,6 +60,21 @@ object EnglishNarrator : Narrator {
     override fun atTurn(m: Maneuver) = m.verbalPre ?: m.instruction
     override fun alert(m: Maneuver, meters: Int) =
         "In $meters meters, ${(m.verbalAlert ?: m.instruction).lowercaseFirst()}"
+
+    /** The server already chains some turns ("Turn right. Then turn left."); keep its wording then. */
+    private fun alreadyChained(text: String) = text.contains(" Then ", ignoreCase = true) || text.contains(", then ")
+
+    private fun short(m: Maneuver) = (m.verbalAlert ?: m.instruction).trimEnd('.').lowercaseFirst()
+
+    override fun atTurnThen(m: Maneuver, next: Maneuver): String {
+        val base = atTurn(m)
+        return if (alreadyChained(base)) base else "${base.trimEnd('.')}, then ${short(next)}."
+    }
+
+    override fun alertThen(m: Maneuver, meters: Int, next: Maneuver): String {
+        val base = alert(m, meters)
+        return if (alreadyChained(base)) base else "${base.trimEnd('.')}, then ${short(next)}."
+    }
 
     override val arrived = "You have arrived."
     override val rerouting = "Rerouting."
@@ -136,6 +156,18 @@ object MalayNarrator : Narrator {
     override fun alert(m: Maneuver, meters: Int): String {
         val c = core(m) ?: return EnglishNarrator.alert(m, meters)
         return "Dalam $meters meter, ${c.lowercaseFirst()}".ensurePeriod()
+    }
+
+    override fun atTurnThen(m: Maneuver, next: Maneuver): String {
+        val c = core(m) ?: return EnglishNarrator.atTurnThen(m, next)
+        val n = core(next) ?: return atTurn(m)
+        return "$c, kemudian ${n.lowercaseFirst()}".ensurePeriod()
+    }
+
+    override fun alertThen(m: Maneuver, meters: Int, next: Maneuver): String {
+        val c = core(m) ?: return EnglishNarrator.alertThen(m, meters, next)
+        val n = core(next) ?: return alert(m, meters)
+        return "Dalam $meters meter, ${c.lowercaseFirst()}, kemudian ${n.lowercaseFirst()}".ensurePeriod()
     }
 
     override val arrived = "Anda telah tiba."

@@ -97,7 +97,20 @@ class NavigationService : Service() {
             } else {
                 requestLocationUpdates()
             }
-            if (BuildConfig.DEBUG) openDriveLog(replay)
+            if (BuildConfig.DEBUG) {
+                openDriveLog(replay)
+                // Battery sample every 5 minutes for the field-test battery-per-hour figure.
+                scope.launch {
+                    while (true) {
+                        val bm = getSystemService(Context.BATTERY_SERVICE) as android.os.BatteryManager
+                        NavigationSession.logBattery(
+                            bm.getIntProperty(android.os.BatteryManager.BATTERY_PROPERTY_CAPACITY),
+                            bm.isCharging,
+                        )
+                        delay(5 * 60_000L)
+                    }
+                }
+            }
 
             scope.launch {
                 NavigationSession.events.collect { event ->

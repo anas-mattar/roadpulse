@@ -247,5 +247,7 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun showMessage(text: String) = _state.update { it.copy(message = text) }
+
     fun messageShown() = _state.update { it.copy(message = null) }
 }

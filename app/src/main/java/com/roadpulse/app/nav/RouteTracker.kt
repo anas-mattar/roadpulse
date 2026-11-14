@@ -77,17 +77,25 @@ class RouteTracker(
         val following = route.maneuvers.getOrNull(upcomingIndex + 1)
         val followingGap = if (upcoming != null && following != null) alongAt(following) - alongAt(upcoming) else null
 
+        // Two turns close together are announced in one prompt ("…, then turn left"), and the
+        // second turn's own advance warning is skipped because there is no time for it.
+        val chained = following.takeIf { followingGap != null && followingGap <= MERGE_GAP_M }
         var prompt: String? = null
         if (upcoming != null && match.onRoute && !poor) {
             if (distanceToTurn <= FINAL_PROMPT_M) {
                 if (announced.add(upcomingIndex)) {
                     alerted.add(upcomingIndex)
-                    prompt = narrator().atTurn(upcoming)
+                    prompt = if (chained != null) {
+                        alerted.add(upcomingIndex + 1)
+                        narrator().atTurnThen(upcoming, chained)
+                    } else {
+                        narrator().atTurn(upcoming)
+                    }
                 }
             } else if (distanceToTurn <= ALERT_PROMPT_M && distanceToTurn > ALERT_MIN_M) {
                 if (alerted.add(upcomingIndex)) {
                     val rounded = ((distanceToTurn / 50).roundToInt() * 50).coerceAtLeast(50)
-                    prompt = narrator().alert(upcoming, rounded)
+                    prompt = if (chained != null) narrator().alertThen(upcoming, rounded, chained) else narrator().alert(upcoming, rounded)
                 }
             }
         }
@@ -121,5 +129,7 @@ class RouteTracker(
         const val ALERT_PROMPT_M = 500.0
         const val ALERT_MIN_M = 150.0
         const val FINAL_PROMPT_M = 80.0
+        /** Turns closer together than this are announced together. */
+        const val MERGE_GAP_M = 150.0
     }
 }

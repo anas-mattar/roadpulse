@@ -31,6 +31,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.VolumeOff
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Work
@@ -318,6 +319,8 @@ fun DrivingOverlay(
     onStop: () -> Unit,
     following: Boolean = true,
     onRecenter: () -> Unit = {},
+    /** Debug builds: passenger issue report for field tests. */
+    onFlag: (() -> Unit)? = null,
 ) {
     val context = LocalContext.current
     Box(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(10.dp)) {
@@ -339,6 +342,15 @@ fun DrivingOverlay(
                         )
                     }
                     state.navStatus?.let { Pill(text = it, color = RP.Amber, contentColor = RP.AmberDark) }
+                    if (onFlag != null) {
+                        Surface(onClick = onFlag, shape = RoundedCornerShape(14.dp), color = Color.White, contentColor = RP.Danger, shadowElevation = 4.dp) {
+                            Row(Modifier.padding(horizontal = 12.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Filled.Flag, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(Modifier.width(4.dp))
+                                Text("Flag issue", fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                            }
+                        }
+                    }
                 }
                 CircleButton(
                     icon = if (muted) Icons.AutoMirrored.Filled.VolumeOff else Icons.AutoMirrored.Filled.VolumeUp,

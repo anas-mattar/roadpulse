@@ -9,8 +9,10 @@ Generated from two real routes (© OpenStreetMap contributors). Spoken at the tu
 warning adds "Dalam N meter, …" in front.
 
 Known differences from the English, to be addressed in later batches:
-- The English sometimes chains the next step ("Turn right. Then enter the roundabout…"); the
-  Malay does not yet (batch 7, merged prompts).
+- Turns less than 150 m apart are announced together: "Belok kanan ke Jalan Ampang, kemudian
+  belok kiri ke Jalan Pinang." (advance warning: "Dalam 300 meter, …, kemudian …"). Please check
+  "kemudian" reads naturally here. The server's own English chaining ("… Then …") differs per
+  maneuver, so the English and Malay columns below can still differ in that respect.
 - On motorways the Malay names only the main road number (e.g. "E6"), not every route number.
 
 Status messages: "Anda telah tiba." · "Mencari laluan baharu." · "Isyarat GPS hilang. Teruskan
