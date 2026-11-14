@@ -78,6 +78,9 @@ class MalayPromptSheetTest {
             Triple("Screen", "Status line: GPS lost", en.statusGpsLost to ms.statusGpsLost),
             Triple("Screen", "Status line: weak GPS", en.statusWeakGps to ms.statusWeakGps),
         ).forEach { (g, w, p) -> rows += listOf(g, w, p.first, p.second) }
+        com.roadpulse.app.data.ReportType.entries.forEach { t ->
+            rows += listOf("Reports", "Warning for a report on the route ahead", en.reportAhead(t, 700), ms.reportAhead(t, 700))
+        }
         (1..4).forEach { rows += listOf("Words", "Roundabout exit number", "exit $it", ms.ordinal(it)) }
         listOf(0, 45, 90, 135, 180, 225, 270, 315).forEach { rows += listOf("Words", "Compass direction at the start", "$it°", ms.compass(it)) }
 

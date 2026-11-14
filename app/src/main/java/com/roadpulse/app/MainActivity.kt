@@ -20,6 +20,7 @@ class MainActivity : ComponentActivity() {
         MapLibre.getInstance(this)
         VoiceSettings.init(this)
         DisplaySettings.init(this)
+        com.roadpulse.app.data.RouteSettings.init(this)
         com.roadpulse.app.data.ServerSettings.init(this)
         VoiceProbe.check(this, VoiceSettings.language.value)
         NavigationSession.init(NavigationService.driveStore(this), SystemClock::elapsedRealtime)

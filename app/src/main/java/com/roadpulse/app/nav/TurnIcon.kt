@@ -9,7 +9,7 @@ enum class TurnIcon {
         /** Maps a Valhalla maneuver type to an arrow. */
         fun forType(type: Int?): TurnIcon = when (type) {
             1, 2, 3 -> DEPART
-            4, 5, 6 -> ARRIVE
+            4, 5, 6, com.roadpulse.app.data.RoutingClient.STOP_REACHED -> ARRIVE
             9 -> SLIGHT_RIGHT
             10 -> RIGHT
             11 -> SHARP_RIGHT

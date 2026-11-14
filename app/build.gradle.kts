@@ -25,12 +25,16 @@ android {
         // The developer's own Docker stack; only debug builds may use it (plain HTTP to 10.0.2.2).
         buildConfigField("String", "LOCAL_ROUTING_URL", "\"\"")
         buildConfigField("String", "LOCAL_BACKEND_URL", "\"\"")
+        buildConfigField("String", "LOCAL_MAP_STYLE_URL", "\"\"")
+        buildConfigField("String", "LOCAL_MAP_STYLE_DARK_URL", "\"\"")
     }
 
     buildTypes {
         debug {
             buildConfigField("String", "LOCAL_ROUTING_URL", prop("roadpulse.local.routingUrl"))
             buildConfigField("String", "LOCAL_BACKEND_URL", prop("roadpulse.local.backendUrl"))
+            buildConfigField("String", "LOCAL_MAP_STYLE_URL", prop("roadpulse.local.mapStyleUrl"))
+            buildConfigField("String", "LOCAL_MAP_STYLE_DARK_URL", prop("roadpulse.local.mapStyleDarkUrl"))
         }
         release {
             isMinifyEnabled = false

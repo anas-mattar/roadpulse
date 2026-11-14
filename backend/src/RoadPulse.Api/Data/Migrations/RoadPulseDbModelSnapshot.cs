@@ -190,6 +190,11 @@ namespace RoadPulse.Api.Data.Migrations
                         .HasColumnType("character varying(20)")
                         .HasColumnName("status");
 
+                    b.Property<string>("Subtype")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("subtype");
+
                     b.Property<string>("Type")
                         .IsRequired()
                         .HasMaxLength(20)

@@ -33,6 +33,7 @@ data class ReportDto(
     val expiresAt: String,
     val confirmations: Int = 0,
     val dismissals: Int = 0,
+    val subtype: String? = null,
 ) {
     fun toReport() = Report(
         id = id,
@@ -41,12 +42,19 @@ data class ReportDto(
         createdAtMillis = OffsetDateTime.parse(createdAt).toInstant().toEpochMilli(),
         confirmations = confirmations,
         dismissals = dismissals,
+        subtype = subtype,
         expiresAtMillis = OffsetDateTime.parse(expiresAt).toInstant().toEpochMilli(),
     )
 }
 
 @Serializable
-private data class CreateReportBody(val type: ReportType, val lat: Double, val lon: Double)
+private data class CreateReportBody(
+    val type: ReportType,
+    val lat: Double,
+    val lon: Double,
+    val subtype: String? = null,
+    val durationMinutes: Int? = null,
+)
 
 @Serializable
 private data class CreateReportResult(val report: ReportDto, val merged: Boolean)
@@ -120,8 +128,10 @@ class BackendReportRepository(
         }
     }
 
-    override suspend fun submit(type: ReportType, location: GeoPoint): Report {
-        val body = Http.json.encodeToString(CreateReportBody.serializer(), CreateReportBody(type, location.lat, location.lon))
+    override suspend fun submit(type: ReportType, location: GeoPoint, subtype: String?, durationMinutes: Int?): Report {
+        val body = Http.json.encodeToString(
+            CreateReportBody.serializer(), CreateReportBody(type, location.lat, location.lon, subtype, durationMinutes)
+        )
         // Same key on retry: the server creates the report only once.
         val key = UUID.randomUUID().toString()
         val text = withAuth { token ->

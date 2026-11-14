@@ -198,6 +198,33 @@ public class ReportsApiTests
         Assert.Contains("/v1/reports", doc);
         Assert.Contains("/v1/devices", doc);
     }
+
+    [Fact]
+    public async Task DetailsAndClosureDurationAreStoredAndValidated()
+    {
+        using var api = new ApiFactory();
+        var c = await DeviceClient(api);
+        var (lat, lon) = NewArea();
+
+        var flood = await c.PostAsJsonAsync("/v1/reports", new { type = "HAZARD", lat, lon, subtype = "FLOOD" });
+        Assert.Equal(HttpStatusCode.Created, flood.StatusCode);
+        Assert.Equal("FLOOD", (await flood.Content.ReadFromJsonAsync<CreateReportResponse>(Json))!.Report.Subtype);
+
+        var closure = await c.PostAsJsonAsync("/v1/reports", new { type = "ROAD_CLOSED", lat = lat + 0.005, lon, subtype = "LANE_BLOCKED", durationMinutes = 180 });
+        var closed = (await closure.Content.ReadFromJsonAsync<CreateReportResponse>(Json))!.Report;
+        Assert.Equal(TimeSpan.FromHours(3), closed.ExpiresAt - closed.CreatedAt);
+
+        var allDay = await c.PostAsJsonAsync("/v1/reports", new { type = "ROAD_CLOSED", lat = lat + 0.008, lon, durationMinutes = 1440 });
+        var day = (await allDay.Content.ReadFromJsonAsync<CreateReportResponse>(Json))!.Report;
+        Assert.Equal(TimeSpan.FromHours(24), day.ExpiresAt - day.CreatedAt); // capped at the max lifetime (4 x 6 h)
+
+        Assert.Equal(HttpStatusCode.BadRequest, (await c.PostAsJsonAsync("/v1/reports", new { type = "POLICE", lat, lon, subtype = "FLOOD" })).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await c.PostAsJsonAsync("/v1/reports", new { type = "POLICE", lat, lon, durationMinutes = 60 })).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await c.PostAsJsonAsync("/v1/reports", new { type = "ROAD_CLOSED", lat, lon, durationMinutes = 5 })).StatusCode);
+
+        var listed = await List(c, lat, lon);
+        Assert.Contains(listed, r => r.Subtype == "FLOOD");
+    }
 }
 
 [CollectionDefinition("database", DisableParallelization = true)]

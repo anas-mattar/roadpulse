@@ -169,9 +169,10 @@ fun TurnIsland(turnType: Int?, distanceLabel: String?, instruction: String, modi
 }
 
 /** True when noticeably above the posted limit (small tolerance for speedometer/GPS noise). */
-fun isSpeeding(speedKmh: Int, limitKph: Int?): Boolean = limitKph != null && speedKmh > limitKph + SPEEDING_TOLERANCE_KMH
+fun isSpeeding(speedKmh: Int, limitKph: Int?, marginKmh: Int = DEFAULT_SPEEDING_MARGIN_KMH): Boolean =
+    limitKph != null && speedKmh > limitKph + marginKmh
 
-private const val SPEEDING_TOLERANCE_KMH = 3
+const val DEFAULT_SPEEDING_MARGIN_KMH = 3
 
 /** Round speed-limit sign (white with a red border). */
 @Composable
@@ -185,8 +186,14 @@ fun SpeedLimitSign(limitKph: Int, modifier: Modifier = Modifier) {
 
 /** Speed in a ring that fills towards the limit (or [scaleKmh]); red when speeding. */
 @Composable
-fun SpeedRing(speedKmh: Int, modifier: Modifier = Modifier, limitKph: Int? = null, scaleKmh: Int = limitKph ?: 120) {
-    val speeding = isSpeeding(speedKmh, limitKph)
+fun SpeedRing(
+    speedKmh: Int,
+    modifier: Modifier = Modifier,
+    limitKph: Int? = null,
+    scaleKmh: Int = limitKph ?: 120,
+    marginKmh: Int = DEFAULT_SPEEDING_MARGIN_KMH,
+) {
+    val speeding = isSpeeding(speedKmh, limitKph, marginKmh)
     Box(modifier.size(68.dp), contentAlignment = Alignment.Center) {
         Canvas(Modifier.size(68.dp)) {
             val stroke = 6.dp.toPx()

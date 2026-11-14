@@ -157,4 +157,72 @@ class OverlayScreenshotTest {
             }
         }
     }
+
+    @Test
+    fun drivingWithReportAhead() = shot("3c_driving_report_ahead", RP.NightSurface) {
+        DrivingOverlay(
+            state = MapUiState(
+                navigating = true, route = route, destination = place,
+                currentInstruction = "Continue on E6.", distanceToTurnMeters = 2400.0,
+                remainingKm = 22.0, remainingSeconds = 1100.0, turnType = 8, speedKmh = 92, speedLimitKph = 110,
+                reportAhead = com.roadpulse.app.nav.ReportAhead(reports[0].copy(type = com.roadpulse.app.data.ReportType.POLICE), 640.0),
+            ),
+            narrator = EnglishNarrator, muted = false, onToggleMute = {}, onReport = {}, onStop = {},
+        )
+    }
+
+    @Test
+    fun reportPicker() = shot("9_report_picker", RP.NightSurface) {
+        Box(Modifier.fillMaxSize().padding(12.dp), contentAlignment = androidx.compose.ui.Alignment.BottomCenter) {
+            ReportPicker(onPick = { _, _, _ -> }, onDismiss = {})
+        }
+    }
+
+    @Test
+    fun reportDetails() = shot("9b_report_details", RP.NightSurface) {
+        Box(Modifier.fillMaxSize().padding(12.dp), contentAlignment = androidx.compose.ui.Alignment.BottomCenter) {
+            ReportPicker(onPick = { _, _, _ -> }, onDismiss = {}, initialType = com.roadpulse.app.data.ReportType.ROAD_CLOSED)
+        }
+    }
+
+    @Test
+    fun stillThere() = shot("10_still_there", RP.NightSurface) {
+        Box(Modifier.fillMaxSize().padding(12.dp), contentAlignment = androidx.compose.ui.Alignment.BottomCenter) {
+            StillThereCard(reports[0].copy(type = com.roadpulse.app.data.ReportType.POLICE), onAnswer = {})
+        }
+    }
+
+    @Test
+    fun pinnedPlace() = shot("11_pinned_place", RP.Field) {
+        Box(Modifier.fillMaxSize().padding(12.dp), contentAlignment = androidx.compose.ui.Alignment.BottomCenter) {
+            PinnedPlaceCard(
+                place = Place("Jalan Bukit Bintang 88", "Kuala Lumpur, Malaysia", GeoPoint(3.146, 101.71)),
+                canAddStop = true, onDrive = {}, onAddStop = {}, onSave = {}, onPark = {}, onClose = {},
+            )
+        }
+    }
+
+    @Test
+    fun previewWithStopAndOptions() = shot("2b_preview_stop_options", RP.Field) {
+        PreviewOverlay(
+            destination = place, route = route, busy = false, onBack = {}, onGo = {}, onSimulate = null,
+            stops = listOf(Place("Petronas Jalan Ampang", "", GeoPoint(3.16, 101.72))),
+            optionsSummary = "Motorcycle · avoiding tolls",
+        )
+    }
+
+    @Test
+    fun exploreWithFavouritesAndParking() = shot("1d_explore_favourites", RP.Field) {
+        ExploreOverlay(
+            query = "", results = emptyList(),
+            saved = SavedPlaces(
+                home = Place("Jalan Bangsar 12", "Bangsar", GeoPoint(3.13, 101.67)),
+                recent = listOf(place),
+                favourites = listOf(Place("Gym", "Jalan Telawi, Bangsar", GeoPoint(3.13, 101.67)), Place("Mum's house", "Shah Alam", GeoPoint(3.07, 101.52))),
+                parking = com.roadpulse.app.data.ParkedCar(GeoPoint(3.14, 101.69), 1_794_660_000_000L),
+            ),
+            onQueryChange = {}, onClear = {}, onSelect = {}, onOpenSettings = {}, onRecenter = {}, onReport = {},
+            onVoiceSearch = {}, nowMillis = 1_794_660_000_000L + 25 * 60_000,
+        )
+    }
 }

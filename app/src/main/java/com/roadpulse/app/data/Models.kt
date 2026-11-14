@@ -42,6 +42,10 @@ data class Route(
     val timeSeconds: Double,
     val hasToll: Boolean = false,
     val hasHighway: Boolean = false,
+    /** Stops on the way, in order (not counting the destination). */
+    val stops: List<GeoPoint> = emptyList(),
+    /** Shape index where each stop is reached, same order as [stops]. */
+    val stopShapeIndexes: List<Int> = emptyList(),
 )
 
 enum class ReportType(val label: String, val colorHex: String) {
@@ -67,6 +71,8 @@ data class Report(
     val createdAtMillis: Long,
     val confirmations: Int = 0,
     val dismissals: Int = 0,
+    /** Optional detail, e.g. "POTHOLE" (see ReportDetails). */
+    val subtype: String? = null,
     /** When the server will drop it (null for reports kept only on this phone). */
     val expiresAtMillis: Long? = null,
 )

@@ -27,6 +27,9 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.LocalParking
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.VolumeOff
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
@@ -92,6 +95,14 @@ fun ExploreOverlay(
     onOpenSettings: () -> Unit,
     onRecenter: () -> Unit,
     onReport: () -> Unit,
+    onFavourite: (Place) -> Unit = {},
+    onRemoveFavourite: (Place) -> Unit = {},
+    /** Shows the parked car on the map. */
+    onShowParking: () -> Unit = {},
+    onClearParking: () -> Unit = {},
+    /** Voice search; null hides the microphone (no speech recognizer on the device). */
+    onVoiceSearch: (() -> Unit)? = null,
+    nowMillis: Long = System.currentTimeMillis(),
 ) {
     Box(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(12.dp)) {
         CircleButton(
@@ -148,13 +159,36 @@ fun ExploreOverlay(
                             null -> "Where to?"
                         },
                         showClear = query.isNotEmpty() || settingShortcut != null,
+                        onVoice = if (settingShortcut == null) onVoiceSearch else null,
                     )
                     if (query.isEmpty() && results.isEmpty() && settingShortcut == null) {
                         Row(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             ShortcutChip("Home", Icons.Filled.Home, saved.home, { onShortcut(Shortcut.HOME) }, { onChangeShortcut(Shortcut.HOME) })
                             ShortcutChip("Work", Icons.Filled.Work, saved.work, { onShortcut(Shortcut.WORK) }, { onChangeShortcut(Shortcut.WORK) })
                         }
-                        saved.recent.take(3).forEach { place ->
+                        saved.parking?.let { parked ->
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.fillMaxWidth().padding(top = 8.dp).clickable(onClick = onShowParking),
+                            ) {
+                                Icon(Icons.Filled.LocalParking, contentDescription = null, tint = RP.Indigo, modifier = Modifier.size(20.dp))
+                                Text(
+                                    "Your car · parked ${com.roadpulse.app.data.reportAge(parked.savedAtMillis, nowMillis)}",
+                                    fontSize = 14.sp,
+                                    modifier = Modifier.padding(start = 10.dp).weight(1f),
+                                )
+                                Icon(Icons.Filled.Close, contentDescription = "Forget parking spot", tint = RP.TextSecondary,
+                                    modifier = Modifier.size(18.dp).clickable(onClick = onClearParking))
+                            }
+                        }
+                        saved.favourites.forEach { place ->
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Box(Modifier.weight(1f)) { ResultRow(place, icon = Icons.Filled.Star) { onFavourite(place) } }
+                                Icon(Icons.Filled.Close, contentDescription = "Remove ${place.name}", tint = RP.TextSecondary,
+                                    modifier = Modifier.size(18.dp).clickable { onRemoveFavourite(place) })
+                            }
+                        }
+                        saved.recent.take(if (saved.favourites.size > 2) 1 else 3).forEach { place ->
                             ResultRow(place, icon = Icons.Filled.History) { onRecent(place) }
                         }
                     }
@@ -172,6 +206,7 @@ private fun SearchField(
     onClear: () -> Unit,
     placeholder: String = "Where to?",
     showClear: Boolean = query.isNotEmpty(),
+    onVoice: (() -> Unit)? = null,
 ) {
     Row(
         Modifier.fillMaxWidth().fieldBackground().padding(horizontal = 14.dp, vertical = 12.dp),
@@ -198,6 +233,13 @@ private fun SearchField(
                 contentDescription = "Clear",
                 tint = RP.TextSecondary,
                 modifier = Modifier.size(20.dp).clickable(onClick = onClear),
+            )
+        } else if (onVoice != null) {
+            Icon(
+                Icons.Filled.Mic,
+                contentDescription = "Search by voice",
+                tint = RP.Indigo,
+                modifier = Modifier.size(22.dp).clickable(onClick = onVoice),
             )
         }
     }
@@ -236,6 +278,10 @@ fun PreviewOverlay(
     onBack: () -> Unit,
     onGo: () -> Unit,
     onSimulate: (() -> Unit)?,
+    stops: List<Place> = emptyList(),
+    onRemoveStop: (Place) -> Unit = {},
+    /** e.g. "Motorcycle · avoiding tolls"; null when the defaults are used. */
+    optionsSummary: String? = null,
 ) {
     val context = LocalContext.current
     Box(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(12.dp)) {
@@ -252,6 +298,18 @@ fun PreviewOverlay(
                 Text(destination?.name ?: "Destination", fontSize = 18.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 if (!destination?.description.isNullOrBlank()) {
                     Text(destination!!.description, fontSize = 13.sp, color = RP.TextSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+                stops.forEachIndexed { i, stop ->
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 6.dp)) {
+                        Text("Stop ${i + 1}: ${stop.name}", fontSize = 14.sp, color = RP.Indigo, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                        Icon(Icons.Filled.Close, contentDescription = "Remove stop", tint = RP.TextSecondary, modifier = Modifier.size(18.dp).clickable { onRemoveStop(stop) })
+                    }
+                }
+                if (optionsSummary != null) {
+                    Text(optionsSummary, fontSize = 13.sp, color = RP.TextSecondary, modifier = Modifier.padding(top = 4.dp))
+                }
+                if (stops.isEmpty()) {
+                    Text("Tip: press and hold the map to add a stop", fontSize = 12.sp, color = RP.TextSecondary, modifier = Modifier.padding(top = 4.dp))
                 }
                 Spacer(Modifier.height(12.dp))
 
@@ -321,6 +379,9 @@ fun DrivingOverlay(
     onRecenter: () -> Unit = {},
     /** Debug builds: passenger issue report for field tests. */
     onFlag: (() -> Unit)? = null,
+    showSpeedometer: Boolean = true,
+    limitDisplay: com.roadpulse.app.nav.LimitDisplay = com.roadpulse.app.nav.LimitDisplay.ALWAYS,
+    speedingMarginKmh: Int = DEFAULT_SPEEDING_MARGIN_KMH,
 ) {
     val context = LocalContext.current
     Box(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(10.dp)) {
@@ -339,6 +400,15 @@ fun DrivingOverlay(
                             text = narrator.thenLabel,
                             icon = TurnIcon.forType(state.thenType).vector(),
                             trailing = formatKm(gap / 1000),
+                        )
+                    }
+                    state.reportAhead?.let { ahead ->
+                        Pill(
+                            text = narrator.reportName(ahead.report.type),
+                            icon = ahead.report.type.icon,
+                            trailing = formatKm(ahead.metersAhead / 1000),
+                            color = ahead.report.type.color,
+                            contentColor = Color.White,
                         )
                     }
                     state.navStatus?.let { Pill(text = it, color = RP.Amber, contentColor = RP.AmberDark) }
@@ -364,8 +434,16 @@ fun DrivingOverlay(
 
         Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth()) {
             Row(Modifier.fillMaxWidth().padding(bottom = 10.dp), verticalAlignment = Alignment.Bottom) {
-                state.speedKmh?.let { SpeedRing(speedKmh = it, limitKph = state.speedLimitKph) }
-                state.speedLimitKph?.let { SpeedLimitSign(it, Modifier.padding(start = 8.dp, bottom = 4.dp)) }
+                if (showSpeedometer) {
+                    state.speedKmh?.let { SpeedRing(speedKmh = it, limitKph = state.speedLimitKph, marginKmh = speedingMarginKmh) }
+                }
+                val speeding = state.speedKmh?.let { isSpeeding(it, state.speedLimitKph, speedingMarginKmh) } == true
+                val showLimit = when (limitDisplay) {
+                    com.roadpulse.app.nav.LimitDisplay.ALWAYS -> true
+                    com.roadpulse.app.nav.LimitDisplay.WHEN_SPEEDING -> speeding
+                    com.roadpulse.app.nav.LimitDisplay.NEVER -> false
+                }
+                if (showLimit) state.speedLimitKph?.let { SpeedLimitSign(it, Modifier.padding(start = 8.dp, bottom = 4.dp)) }
                 Spacer(Modifier.weight(1f))
                 Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     if (!following) {

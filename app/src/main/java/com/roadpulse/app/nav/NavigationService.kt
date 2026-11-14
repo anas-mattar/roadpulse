@@ -59,6 +59,8 @@ class NavigationService : Service() {
     override fun onCreate() {
         super.onCreate()
         VoiceSettings.init(this)
+        DisplaySettings.init(this)
+        com.roadpulse.app.data.RouteSettings.init(this)
         com.roadpulse.app.data.ServerSettings.init(this)
         voice = VoiceGuide(this)
         deviceLocation = DeviceLocation(this)
@@ -115,7 +117,11 @@ class NavigationService : Service() {
 
             scope.launch {
                 NavigationSession.events.collect { event ->
-                    if (event is NavEvent.Speak) voice.speak(event.text)
+                    when (event) {
+                        is NavEvent.Speak -> voice.speak(event.text)
+                        is NavEvent.SpeedingAlert -> if (!VoiceSettings.muted.value) beep()
+                        else -> Unit
+                    }
                 }
             }
             NavigationSession.announceStart()
@@ -206,6 +212,15 @@ class NavigationService : Service() {
 
         fun start(context: Context) {
             ContextCompat.startForegroundService(context, Intent(context, NavigationService::class.java))
+        }
+    }
+
+    /** Two short tones through the navigation audio stream (speeding alert). */
+    private fun beep() {
+        runCatching {
+            val tone = android.media.ToneGenerator(android.media.AudioManager.STREAM_MUSIC, 80)
+            tone.startTone(android.media.ToneGenerator.TONE_PROP_BEEP2, 300)
+            android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({ tone.release() }, 500)
         }
     }
 }

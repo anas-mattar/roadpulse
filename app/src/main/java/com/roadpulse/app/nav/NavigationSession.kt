@@ -26,6 +26,10 @@ import java.io.IOException
 sealed interface NavEvent {
     data class Speak(val text: String) : NavEvent
     data object Arrived : NavEvent
+    /** The car just drove past this report: a good moment to ask "still there?". */
+    data class PassedReport(val report: com.roadpulse.app.data.Report) : NavEvent
+    /** Speed went over the limit plus the driver's margin (the service plays a short sound). */
+    data object SpeedingAlert : NavEvent
 }
 
 data class NavState(
@@ -54,6 +58,8 @@ data class NavState(
     val speedMps: Double? = null,
     /** Posted speed limit on the current road, if OpenStreetMap has one. */
     val speedLimitKph: Int? = null,
+    /** Nearest community report on the route ahead (within 1 km), shown as a hint. */
+    val reportAhead: ReportAhead? = null,
 )
 
 /**
@@ -85,6 +91,14 @@ object NavigationSession {
     private var speedLimits: SpeedLimits = SpeedLimits.NONE
     private var lastRerouteAttemptMillis = Long.MIN_VALUE / 2
     private val signal = SignalMonitor()
+    private var routeReports: RouteReports? = null
+    private var announcer = ReportAnnouncer()
+    /** Car position along the current route (metres), from the last matched fix. */
+    private var carAlongM = 0.0
+    /** Notices when the car has driven past a report (for "still there?"). */
+    private val passedReports = PassedReports(PASS_NEAR_M)
+    private var wasSpeeding = false
+    private var lastSpeedingAlert = Long.MIN_VALUE / 2
 
     /** Called once from the activity and the service; safe to repeat. */
     fun init(driveStore: DriveStore, monotonicClock: () -> Long) {
@@ -151,6 +165,10 @@ object NavigationSession {
         speedLimits = SpeedLimits.NONE
         watchdogJob?.cancel()
         tracker = null
+        routeReports = null
+        announcer = ReportAnnouncer()
+        passedReports.reset()
+        carAlongM = 0.0
         store?.clear()
         log?.close()
         log = null
@@ -185,6 +203,22 @@ object NavigationSession {
             return
         }
         progress.prompt?.let { speak(it, fix.timeMillis) }
+        // Community reports on the route ahead: a hint within 1 km, one spoken warning per report.
+        val ahead = routeReports?.let { rr ->
+            if (!progress.matched) null
+            else {
+                carAlongM = rr.totalMeters - progress.remainingMeters
+                rr.ahead(com.roadpulse.app.data.ReportFeed.reports.value, carAlongM, REPORT_HINT_M)
+            }
+        }
+        ahead?.let { noticePassedReports(it) }
+        checkSpeeding(fix.speedMps, if (progress.matched) speedLimits.at(progress.segmentIndex) else current.speedLimitKph)
+        if (progress.prompt == null) { // never talk over a turn instruction
+            ahead?.let(announcer::next)?.let { due ->
+                log?.event(fix.timeMillis, "report_ahead", "type=${due.report.type};m=${due.metersAhead.toInt()}")
+                speak(VoiceSettings.narrator().reportAhead(due.report.type, ReportAnnouncer.spokenMeters(due.metersAhead)), fix.timeMillis)
+            }
+        }
         // Back on the route: the kept route is valid again, so "offline" no longer applies.
         val backOnRoute = progress.matched && current.offline
         if (backOnRoute) log?.event(fix.timeMillis, "back_on_route", "offline cleared")
@@ -202,12 +236,16 @@ object NavigationSession {
                 remainingSeconds = progress.remainingSeconds,
                 displayPosition = progress.displayPosition,
                 poorSignal = progress.poorSignal,
+                reportAhead = if (progress.matched) ahead?.firstOrNull() else it.reportAhead,
             )
         }
     }
 
     private fun applyRoute(route: Route, destination: Place, resumed: Boolean) {
         tracker = RouteTracker(route, resumed, VoiceSettings::narrator)
+        routeReports = RouteReports(route.shape)
+        passedReports.newRoute() // reports no longer on the new route were not "passed"
+        if (!resumed && _state.value == null) announcer = ReportAnnouncer() // a reroute keeps what was already said
         fetchSpeedLimits(route)
         signal.reset(now())
         if (persist) store?.save(route, destination)
@@ -276,7 +314,7 @@ object NavigationSession {
         if (!current.offline) speak(VoiceSettings.narrator().rerouting)
         rerouteJob = scope.launch {
             try {
-                val route = router.route(from, current.destination.location)
+                val route = router.route(from, current.destination.location, remainingStops(), com.roadpulse.app.data.RouteSettings.options.value)
                 if (_state.value == null) return@launch
                 log?.event(now(), "reroute_done", "route_km=${route.lengthKm}")
                 applyRoute(route, current.destination, resumed = false)
@@ -294,5 +332,66 @@ object NavigationSession {
         }
     }
 
+    /** Stops on the current route that the car has not reached yet. */
+    private fun remainingStops(): List<GeoPoint> {
+        val route = _state.value?.route ?: return emptyList()
+        val rr = routeReports ?: return route.stops
+        return route.stops.filterIndexed { i, _ ->
+            val index = route.stopShapeIndexes.getOrNull(i) ?: return@filterIndexed true
+            rr.alongAt(index) > carAlongM + STOP_PASSED_M
+        }
+    }
+
+    /**
+     * Adds a stop on the way during a drive: plans from [from] via [stop] (first), then the
+     * remaining stops, to the destination. Returns false if no drive is active.
+     */
+    fun addStop(stop: GeoPoint, from: GeoPoint): Boolean {
+        val current = _state.value ?: return false
+        val stops = listOf(stop) + remainingStops()
+        rerouteJob?.cancel()
+        _state.value = current.copy(rerouting = true)
+        log?.event(now(), "stop_added", "stops=${stops.size}")
+        rerouteJob = scope.launch {
+            try {
+                val route = router.route(from, current.destination.location, stops, com.roadpulse.app.data.RouteSettings.options.value)
+                if (_state.value == null) return@launch
+                applyRoute(route, current.destination, resumed = false)
+                speak(route.maneuvers.firstOrNull()?.let(VoiceSettings.narrator()::atTurn))
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                log?.event(now(), "stop_add_failed", e.javaClass.simpleName)
+                _state.update { it?.copy(rerouting = false, offline = e is IOException) }
+            }
+        }
+        return true
+    }
+
+    /** Emits [NavEvent.PassedReport] once for each report the car comes close to and then passes. */
+    private fun noticePassedReports(ahead: List<ReportAhead>) {
+        passedReports.update(ahead).forEach { id ->
+            com.roadpulse.app.data.ReportFeed.reports.value.firstOrNull { it.id == id }?.let { _events.tryEmit(NavEvent.PassedReport(it)) }
+        }
+    }
+
+    /** Emits [NavEvent.SpeedingAlert] when the speed first goes over limit + margin (at most every 20 s). */
+    private fun checkSpeeding(speedMps: Double?, limitKph: Int?) {
+        val kmh = speedMps?.let { (it * 3.6).toInt() } ?: return
+        val speeding = com.roadpulse.app.ui.isSpeeding(kmh, limitKph, DisplaySettings.speedingMarginKmh.value)
+        if (speeding && !wasSpeeding && DisplaySettings.speedingSound.value && now() - lastSpeedingAlert > SPEEDING_ALERT_GAP_MS) {
+            lastSpeedingAlert = now()
+            log?.event(now(), "speeding_alert", "kmh=$kmh;limit=$limitKph")
+            _events.tryEmit(NavEvent.SpeedingAlert)
+        }
+        wasSpeeding = speeding
+    }
+
+    private const val STOP_PASSED_M = 30.0
+    private const val PASS_NEAR_M = 80.0
+    private const val SPEEDING_ALERT_GAP_MS = 20_000L
     private const val REROUTE_MIN_INTERVAL_MS = 10_000L
+
+    /** Reports this far ahead on the route are shown as a hint (and warned about from 800 m). */
+    private const val REPORT_HINT_M = 1000.0
 }

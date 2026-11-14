@@ -9,11 +9,12 @@ using RoadPulse.Api.Modules.Live;
 
 namespace RoadPulse.Api.Modules.Reports;
 
-public record CreateReportRequest(ReportType Type, double Lat, double Lon, short? HeadingDeg);
+public record CreateReportRequest(ReportType Type, double Lat, double Lon, short? HeadingDeg,
+    string? Subtype = null, int? DurationMinutes = null);
 public record VoteRequest(bool StillThere);
 public record FlagRequest(FlagReason Reason);
 public record ReportDto(Guid Id, ReportType Type, double Lat, double Lon, short? HeadingDeg,
-    DateTimeOffset CreatedAt, DateTimeOffset ExpiresAt, int Confirmations, int Dismissals);
+    DateTimeOffset CreatedAt, DateTimeOffset ExpiresAt, int Confirmations, int Dismissals, string? Subtype = null);
 public record CreateReportResponse(ReportDto Report, bool Merged);
 
 public static class ReportEndpoints
@@ -142,7 +143,8 @@ public static class ReportEndpoints
             report = new Report
             {
                 Id = Guid.NewGuid(), Type = request.Type, Location = point, HeadingDeg = request.HeadingDeg,
-                DeviceId = deviceId, CreatedAt = now, ExpiresAt = now + ReportRules.TimeToLive(request.Type),
+                DeviceId = deviceId, CreatedAt = now, Subtype = request.Subtype,
+                ExpiresAt = ReportRules.InitialExpiry(request.Type, now, request.DurationMinutes),
             };
             db.Reports.Add(report);
         }
@@ -196,6 +198,12 @@ public static class ReportEndpoints
         if (r.Lat is < -90 or > 90 || double.IsNaN(r.Lat)) errors["lat"] = ["Must be between -90 and 90."];
         if (r.Lon is < -180 or > 180 || double.IsNaN(r.Lon)) errors["lon"] = ["Must be between -180 and 180."];
         if (r.HeadingDeg is < 0 or >= 360) errors["headingDeg"] = ["Must be between 0 and 359."];
+        if (Enum.IsDefined(r.Type) && !ReportRules.IsValidSubtype(r.Type, r.Subtype))
+            errors["subtype"] = [$"For {r.Type}: one of {string.Join(", ", ReportRules.Subtypes[r.Type])}."];
+        if (r.DurationMinutes is not null && Enum.IsDefined(r.Type) && !ReportRules.AllowsDuration(r.Type))
+            errors["durationMinutes"] = ["Only road closures take a duration."];
+        else if (r.DurationMinutes is < ReportRules.MinDurationMinutes or > 24 * 60)
+            errors["durationMinutes"] = [$"Must be between {ReportRules.MinDurationMinutes} and 1440 minutes."];
         return errors;
     }
 
@@ -228,5 +236,5 @@ public static class ReportEndpoints
     }
 
     internal static ReportDto ToDto(Report r) => new(r.Id, r.Type, r.Location.Y, r.Location.X, r.HeadingDeg,
-        r.CreatedAt, r.ExpiresAt, r.Confirmations, r.Dismissals);
+        r.CreatedAt, r.ExpiresAt, r.Confirmations, r.Dismissals, r.Subtype);
 }

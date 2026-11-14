@@ -1,6 +1,7 @@
 package com.roadpulse.app.nav
 
 import com.roadpulse.app.data.Maneuver
+import com.roadpulse.app.data.ReportType
 import java.util.Locale
 
 /** Languages for voice prompts and the navigation banner. */
@@ -44,6 +45,11 @@ interface Narrator {
     val statusOffline: String
     val statusGpsLost: String
     val statusWeakGps: String
+
+    /** Short name of a report type, as shown and spoken ("Police", "Road closure"). */
+    fun reportName(type: ReportType): String
+    /** Warning for a report on the route ahead, e.g. "Police reported 700 meters ahead." */
+    fun reportAhead(type: ReportType, meters: Int): String
 }
 
 fun narratorFor(language: GuidanceLanguage): Narrator = when (language) {
@@ -89,6 +95,15 @@ object EnglishNarrator : Narrator {
     override val statusOffline = "Offline: keeping your current route"
     override val statusGpsLost = "GPS signal lost: keep following the road"
     override val statusWeakGps = "Weak GPS signal"
+
+    override fun reportName(type: ReportType) = when (type) {
+        ReportType.POLICE -> "Police"
+        ReportType.CRASH -> "Crash"
+        ReportType.HAZARD -> "Hazard"
+        ReportType.TRAFFIC_JAM -> "Traffic jam"
+        ReportType.ROAD_CLOSED -> "Road closure"
+    }
+    override fun reportAhead(type: ReportType, meters: Int) = "${reportName(type)} reported $meters meters ahead."
 }
 
 /**
@@ -110,6 +125,7 @@ object MalayNarrator : Narrator {
                 "Pandu$dir" + (name?.let { " di $it" }.orEmpty())
             }
             4 -> "Anda telah tiba di destinasi"
+            com.roadpulse.app.data.RoutingClient.STOP_REACHED -> "Tiba di hentian anda"
             5 -> "Destinasi anda di sebelah kanan"
             6 -> "Destinasi anda di sebelah kiri"
             7 -> "Teruskan$onto"
@@ -183,6 +199,15 @@ object MalayNarrator : Narrator {
     override val statusOffline = "Luar talian: laluan semasa dikekalkan"
     override val statusGpsLost = "Isyarat GPS hilang: teruskan mengikut jalan"
     override val statusWeakGps = "Isyarat GPS lemah"
+
+    override fun reportName(type: ReportType) = when (type) {
+        ReportType.POLICE -> "Polis"
+        ReportType.CRASH -> "Kemalangan"
+        ReportType.HAZARD -> "Bahaya"
+        ReportType.TRAFFIC_JAM -> "Kesesakan lalu lintas"
+        ReportType.ROAD_CLOSED -> "Penutupan jalan"
+    }
+    override fun reportAhead(type: ReportType, meters: Int) = "${reportName(type)} dilaporkan $meters meter di hadapan."
 
     private val ordinals = listOf(
         "pertama", "kedua", "ketiga", "keempat", "kelima",

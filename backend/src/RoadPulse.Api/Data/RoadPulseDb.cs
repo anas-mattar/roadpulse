@@ -31,6 +31,7 @@ public class RoadPulseDb(DbContextOptions<RoadPulseDb> options) : DbContext(opti
             e.HasIndex(r => r.ExpiresAt);
             e.HasIndex(r => r.DeviceId);
             e.Property(r => r.Status).HasConversion<string>().HasMaxLength(20);
+            e.Property(r => r.Subtype).HasMaxLength(30);
             e.HasOne<Device>().WithMany().HasForeignKey(r => r.DeviceId);
         });
 

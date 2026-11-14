@@ -18,3 +18,9 @@ backend/**/TestResults/
 
 # Local secrets (database password, moderator key hashes)
 backend/.env
+
+# Offline map tiles (built locally by backend/setup-offline-maps.ps1)
+backend/maps/malaysia.mbtiles
+backend/maps/sources/
+backend/maps/tmp/
+backend/maps/styles/sprites/

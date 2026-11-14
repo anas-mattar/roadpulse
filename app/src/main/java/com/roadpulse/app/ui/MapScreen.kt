@@ -1,5 +1,7 @@
 package com.roadpulse.app.ui
 
+import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.background
@@ -131,6 +133,8 @@ private val FLAG_CATEGORIES = listOf(
 private const val ALT_ROUTE_SOURCE = "alt-route-source"
 private const val ALT_ROUTE_LAYER = "alt-route-line"
 private const val DEST_SOURCE = "destination-source"
+private const val STOP_SOURCE = "stop-source"
+private const val PARKING_SOURCE = "parking-source"
 private const val REPORT_SOURCE = "report-source"
 private const val REPORT_LAYER = "reports"
 private const val REPORT_CLUSTER_LAYER = "report-clusters"
@@ -207,6 +211,13 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
     // Search near the user; before the first GPS fix, near the area shown on the map.
     fun searchBias(): GeoPoint? = currentLocation()
         ?: map?.cameraPosition?.target?.let { GeoPoint(it.latitude, it.longitude) }
+
+    // Voice search with the phone's own speech recognizer (in the guidance language).
+    val voiceSearchAvailable = remember { android.speech.SpeechRecognizer.isRecognitionAvailable(context) }
+    val voiceSearch = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        result.data?.getStringArrayListExtra(android.speech.RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()
+            ?.let { spoken -> viewModel.onQueryChange(spoken, searchBias()) }
+    }
 
     // Centre on the user once, when the first position arrives.
     var centredOnUser by remember { mutableStateOf(false) }
@@ -285,6 +296,42 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
         m?.addOnMapClickListener(listener)
         onDispose { m?.removeOnMapClickListener(listener) }
     }
+    LaunchedEffect(style, state.route, state.stops) {
+        val points = state.route?.stops?.takeIf { it.isNotEmpty() } ?: state.stops.map { it.location }
+        style?.getSourceAs<GeoJsonSource>(STOP_SOURCE)?.setGeoJson(
+            FeatureCollection.fromFeatures(points.map { Feature.fromGeometry(Point.fromLngLat(it.lon, it.lat)) })
+        )
+    }
+    LaunchedEffect(style, state.saved.parking) {
+        val p = state.saved.parking?.location
+        style?.getSourceAs<GeoJsonSource>(PARKING_SOURCE)?.setGeoJson(
+            if (p == null) FeatureCollection.fromFeatures(emptyList())
+            else FeatureCollection.fromFeature(Feature.fromGeometry(Point.fromLngLat(p.lon, p.lat)))
+        )
+    }
+    // Long press anywhere on the map: actions for that point (drive, stop, save, park).
+    DisposableEffect(map) {
+        val m = map
+        val listener = MapLibreMap.OnMapLongClickListener { point ->
+            viewModel.onMapLongPress(GeoPoint(point.latitude, point.longitude))
+            true
+        }
+        m?.addOnMapLongClickListener(listener)
+        onDispose { m?.removeOnMapLongClickListener(listener) }
+    }
+    // Compass and north-up preferences.
+    val northUp by DisplaySettings.northUp.collectAsStateWithLifecycle()
+    val showCompass by DisplaySettings.showCompass.collectAsStateWithLifecycle()
+    val flatDriving by DisplaySettings.flatDriving.collectAsStateWithLifecycle()
+    LaunchedEffect(map, northUp, showCompass) {
+        val m = map ?: return@LaunchedEffect
+        m.uiSettings.isRotateGesturesEnabled = !northUp
+        m.uiSettings.isCompassEnabled = showCompass
+        m.uiSettings.setCompassMargins(0, 220, 36, 0)
+        if (northUp && m.cameraPosition.bearing != 0.0) {
+            m.animateCamera(CameraUpdateFactory.newCameraPosition(CameraPosition.Builder(m.cameraPosition).bearing(0.0).build()))
+        }
+    }
     LaunchedEffect(style, state.destination) {
         style?.getSourceAs<GeoJsonSource>(DEST_SOURCE)?.setGeoJson(state.destination.toFeatureCollection())
     }
@@ -321,7 +368,7 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
     var following by remember { mutableStateOf(true) }
     var trackingListenerAdded by remember { mutableStateOf(false) }
     LaunchedEffect(state.navigating) { if (state.navigating) following = true }
-    LaunchedEffect(state.navigating, map, style, hasLocationPermission, following) {
+    LaunchedEffect(state.navigating, map, style, hasLocationPermission, following, northUp, flatDriving) {
         val m = map ?: return@LaunchedEffect
         if (style == null || !hasLocationPermission || !m.locationComponent.isLocationComponentActivated) return@LaunchedEffect
         val lc = m.locationComponent
@@ -336,9 +383,9 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
         }
         if (state.navigating && following) {
             lc.renderMode = RenderMode.GPS
-            lc.cameraMode = CameraMode.TRACKING_GPS
+            lc.cameraMode = if (northUp) CameraMode.TRACKING_GPS_NORTH else CameraMode.TRACKING_GPS
             lc.zoomWhileTracking(16.5)
-            lc.tiltWhileTracking(50.0)
+            lc.tiltWhileTracking(if (flatDriving) 0.0 else 50.0)
         } else if (!state.navigating) {
             lc.cameraMode = CameraMode.NONE
             lc.renderMode = RenderMode.COMPASS
@@ -369,7 +416,8 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
         }
     }
     val darkMap = mapColors == MapColors.DARK || (mapColors == MapColors.AUTO && isNight)
-    val styleUrl = if (darkMap) BuildConfig.MAP_STYLE_DARK_URL else BuildConfig.MAP_STYLE_URL
+    val localMaps by ServerSettings.useLocalMaps.collectAsStateWithLifecycle()
+    val styleUrl = remember(darkMap, localMaps) { ServerSettings.mapStyleUrl(darkMap) }
 
     // While driving, keep the car in the lower part of the screen, below the turn card.
     LaunchedEffect(map, mode) {
@@ -406,6 +454,22 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                         }
                     },
                     onReport = { showReportDialog = true },
+                    onFavourite = { viewModel.onPlaceSelected(it, currentLocation()) },
+                    onRemoveFavourite = viewModel::removeFavourite,
+                    onShowParking = {
+                        state.saved.parking?.location?.let { p ->
+                            map?.animateCamera(CameraUpdateFactory.newLatLngZoom(LatLng(p.lat, p.lon), 17.0))
+                        }
+                    },
+                    onClearParking = viewModel::clearParking,
+                    onVoiceSearch = if (voiceSearchAvailable) ({
+                        voiceSearch.launch(
+                            android.content.Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
+                                .putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL, android.speech.RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                                .putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE, if (effectiveLanguage == GuidanceLanguage.MS) "ms-MY" else "en-US")
+                                .putExtra(android.speech.RecognizerIntent.EXTRA_PROMPT, "Where to?")
+                        )
+                    }) else null,
                 )
 
                 ScreenMode.PREVIEW -> PreviewOverlay(
@@ -418,6 +482,9 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                     onBack = viewModel::clearRoute,
                     onGo = viewModel::startNavigation,
                     onSimulate = if (BuildConfig.DEBUG) ({ showSimulateDialog = true }) else null,
+                    stops = state.stops,
+                    onRemoveStop = viewModel::removeStop,
+                    optionsSummary = state.routeOptions.summary(),
                 )
 
                 ScreenMode.DRIVING -> DrivingOverlay(
@@ -430,6 +497,44 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                     following = following,
                     onRecenter = { following = true },
                     onFlag = if (BuildConfig.DEBUG) ({ showFlagDialog = true }) else null,
+                    showSpeedometer = DisplaySettings.showSpeedometer.collectAsStateWithLifecycle().value,
+                    limitDisplay = DisplaySettings.limitDisplay.collectAsStateWithLifecycle().value,
+                    speedingMarginKmh = DisplaySettings.speedingMarginKmh.collectAsStateWithLifecycle().value,
+                )
+            }
+
+            state.pinned?.let { pin ->
+                if (!showReportDialog && state.stillThere == null) {
+                    PinnedPlaceCard(
+                        place = pin,
+                        canAddStop = state.destination != null,
+                        onDrive = { viewModel.driveToPinned(currentLocation()) },
+                        onAddStop = { viewModel.addPinnedAsStop(currentLocation()) },
+                        onSave = { name -> viewModel.saveFavourite(pin, name) },
+                        onPark = { viewModel.parkHere(pin.location) },
+                        onClose = viewModel::dismissPinned,
+                        modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(12.dp),
+                    )
+                }
+            }
+
+            state.stillThere?.let { report ->
+                StillThereCard(
+                    report = report,
+                    onAnswer = viewModel::answerStillThere,
+                    modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(12.dp),
+                )
+            }
+
+            if (showReportDialog) {
+                ReportPicker(
+                    onPick = { type, subtype, minutes ->
+                        showReportDialog = false
+                        viewModel.submitReport(type, currentLocation(), subtype, minutes)
+                    },
+                    onDismiss = { showReportDialog = false },
+                    autoCloseMillis = if (mode == ScreenMode.DRIVING) 10_000L else null,
+                    modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(12.dp),
                 )
             }
 
@@ -533,15 +638,7 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
         )
     }
 
-    if (showReportDialog) {
-        ReportDialog(
-            onDismiss = { showReportDialog = false },
-            onPick = { type ->
-                showReportDialog = false
-                viewModel.submitReport(type, currentLocation())
-            },
-        )
-    }
+
 }
 
 @Composable
@@ -576,7 +673,6 @@ private fun MapLibreView(
     LaunchedEffect(mapView) {
         mapView.getMapAsync { m ->
             m.cameraPosition = CameraPosition.Builder().target(DEFAULT_CENTER).zoom(11.0).build()
-            m.uiSettings.isCompassEnabled = false
             m.uiSettings.isLogoEnabled = false
             // Map data credits are shown as text in the bottom panels; keep the (i) details button
             // at the top-left, clear of the panels.
@@ -605,6 +701,8 @@ private fun Style.addOverlayLayers() {
     addSource(GeoJsonSource(ALT_ROUTE_SOURCE))
     addSource(GeoJsonSource(ROUTE_SOURCE))
     addSource(GeoJsonSource(DEST_SOURCE))
+    addSource(GeoJsonSource(STOP_SOURCE))
+    addSource(GeoJsonSource(PARKING_SOURCE))
     addSource(
         GeoJsonSource(
             REPORT_SOURCE,
@@ -645,6 +743,34 @@ private fun Style.addOverlayLayers() {
             PropertyFactory.circleColor("#26215C"),
             PropertyFactory.circleStrokeColor("#FFFFFF"),
             PropertyFactory.circleStrokeWidth(3f),
+        )
+    )
+    // Stops on the way: smaller indigo dots.
+    addLayer(
+        CircleLayer("stops", STOP_SOURCE).withProperties(
+            PropertyFactory.circleRadius(7f),
+            PropertyFactory.circleColor("#534AB7"),
+            PropertyFactory.circleStrokeColor("#FFFFFF"),
+            PropertyFactory.circleStrokeWidth(3f),
+        )
+    )
+    // The parked car: a teal dot with a "P".
+    addLayer(
+        CircleLayer("parking", PARKING_SOURCE).withProperties(
+            PropertyFactory.circleRadius(12f),
+            PropertyFactory.circleColor("#0F6E56"),
+            PropertyFactory.circleStrokeColor("#FFFFFF"),
+            PropertyFactory.circleStrokeWidth(3f),
+        )
+    )
+    addLayer(
+        SymbolLayer("parking-label", PARKING_SOURCE).withProperties(
+            PropertyFactory.textField("P"),
+            PropertyFactory.textFont(arrayOf("Noto Sans Regular")),
+            PropertyFactory.textSize(14f),
+            PropertyFactory.textColor("#FFFFFF"),
+            PropertyFactory.textAllowOverlap(true),
+            PropertyFactory.textIgnorePlacement(true),
         )
     )
     addLayer(
@@ -752,31 +878,6 @@ private fun List<Report>.toFeatureCollection(selectedId: String?): FeatureCollec
     )
 }
 
-@Composable
-private fun ReportDialog(onDismiss: () -> Unit, onPick: (ReportType) -> Unit) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("What do you see?") },
-        text = {
-            Column {
-                ReportType.entries.forEach { type ->
-                    TextButton(onClick = { onPick(type) }, modifier = Modifier.fillMaxWidth()) {
-                        Box(
-                            Modifier.size(32.dp).background(type.color, androidx.compose.foundation.shape.CircleShape),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Icon(type.icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
-                        }
-                        Text(type.label, color = Color.Black, modifier = Modifier.padding(start = 12.dp).weight(1f))
-                    }
-                }
-            }
-        },
-        confirmButton = {},
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
-    )
-}
-
 internal fun formatKm(km: Double): String =
     if (km < 1) "${(km * 1000).roundToInt()} m" else "%.1f km".format(km)
 
@@ -812,7 +913,7 @@ private fun VoiceSettingsDialog(onDismiss: () -> Unit, onClearPlaces: () -> Unit
         onDismissRequest = onDismiss,
         title = { Text("Settings") },
         text = {
-            Column {
+            Column(Modifier.verticalScroll(androidx.compose.foundation.rememberScrollState())) {
                 Text("Voice language", style = MaterialTheme.typography.labelLarge, color = RP.TextSecondary)
                 GuidanceLanguage.entries.forEach { option ->
                     Row(
@@ -859,6 +960,7 @@ private fun VoiceSettingsDialog(onDismiss: () -> Unit, onClearPlaces: () -> Unit
                         Text(option.label, modifier = Modifier.padding(start = 8.dp))
                     }
                 }
+                RouteAndDisplaySettings()
                 if (ServerSettings.localAvailable) {
                     val useLocal by ServerSettings.useLocal.collectAsStateWithLifecycle()
                     Text(
@@ -877,6 +979,19 @@ private fun VoiceSettingsDialog(onDismiss: () -> Unit, onClearPlaces: () -> Unit
                         style = MaterialTheme.typography.bodySmall,
                         color = RP.TextSecondary,
                     )
+                    if (ServerSettings.localMapsAvailable) {
+                        val useLocalMaps by ServerSettings.useLocalMaps.collectAsStateWithLifecycle()
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
+                            Text("Maps from my laptop", modifier = Modifier.weight(1f))
+                            Switch(checked = useLocalMaps, onCheckedChange = ServerSettings::setUseLocalMaps)
+                        }
+                        Text(
+                            if (useLocalMaps) "Map tiles from this computer (works without internet). Needs setup-offline-maps.ps1."
+                            else "Map tiles from OpenFreeMap (internet).",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = RP.TextSecondary,
+                        )
+                    }
                 }
                 Text(
                     "Privacy",
@@ -897,3 +1012,74 @@ private fun VoiceSettingsDialog(onDismiss: () -> Unit, onClearPlaces: () -> Unit
         confirmButton = { TextButton(onClick = onDismiss) { Text("Done") } },
     )
 }
+
+/** Settings sections: route options, driving display (speed) and map view. */
+@Composable
+private fun RouteAndDisplaySettings() {
+    val options by com.roadpulse.app.data.RouteSettings.options.collectAsStateWithLifecycle()
+    val showSpeedometer by DisplaySettings.showSpeedometer.collectAsStateWithLifecycle()
+    val limitDisplay by DisplaySettings.limitDisplay.collectAsStateWithLifecycle()
+    val margin by DisplaySettings.speedingMarginKmh.collectAsStateWithLifecycle()
+    val sound by DisplaySettings.speedingSound.collectAsStateWithLifecycle()
+    val northUp by DisplaySettings.northUp.collectAsStateWithLifecycle()
+    val compass by DisplaySettings.showCompass.collectAsStateWithLifecycle()
+    val flat by DisplaySettings.flatDriving.collectAsStateWithLifecycle()
+
+    SettingsHeader("Route")
+    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        com.roadpulse.app.data.Vehicle.entries.forEach { v ->
+            androidx.compose.material3.FilterChip(
+                selected = options.vehicle == v,
+                onClick = { com.roadpulse.app.data.RouteSettings.update { it.copy(vehicle = v) } },
+                label = { Text(v.label) },
+            )
+        }
+    }
+    SettingSwitch("Avoid toll roads", options.avoidTolls) { on -> com.roadpulse.app.data.RouteSettings.update { it.copy(avoidTolls = on) } }
+    SettingSwitch("Avoid highways", options.avoidHighways) { on -> com.roadpulse.app.data.RouteSettings.update { it.copy(avoidHighways = on) } }
+    SettingSwitch("Avoid ferries", options.avoidFerries) { on -> com.roadpulse.app.data.RouteSettings.update { it.copy(avoidFerries = on) } }
+    SettingSwitch("Allow unpaved roads", options.allowUnpaved) { on -> com.roadpulse.app.data.RouteSettings.update { it.copy(allowUnpaved = on) } }
+
+    SettingsHeader("Speed")
+    SettingSwitch("Show speedometer", showSpeedometer) { DisplaySettings.set(DisplaySettings.showSpeedometer, "show_speedometer", it) }
+    Text("Show speed limit", fontSize = 14.sp, modifier = Modifier.padding(top = 6.dp))
+    com.roadpulse.app.nav.LimitDisplay.entries.forEach { option ->
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth().clickable { DisplaySettings.set(DisplaySettings.limitDisplay, "limit_display", option) },
+        ) {
+            RadioButton(selected = limitDisplay == option, onClick = null)
+            Text(option.label, modifier = Modifier.padding(start = 8.dp))
+        }
+    }
+    Text("Warn when over the limit by", fontSize = 14.sp, modifier = Modifier.padding(top = 6.dp))
+    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        listOf(0, 3, 5, 10).forEach { kmh ->
+            androidx.compose.material3.FilterChip(
+                selected = margin == kmh,
+                onClick = { DisplaySettings.set(DisplaySettings.speedingMarginKmh, "speeding_margin", kmh) },
+                label = { Text(if (kmh == 0) "0" else "+$kmh") },
+            )
+        }
+    }
+    SettingSwitch("Sound when speeding", sound) { DisplaySettings.set(DisplaySettings.speedingSound, "speeding_sound", it) }
+
+    SettingsHeader("Map view")
+    SettingSwitch("North always up", northUp) { DisplaySettings.set(DisplaySettings.northUp, "north_up", it) }
+    SettingSwitch("Show compass", compass) { DisplaySettings.set(DisplaySettings.showCompass, "show_compass", it) }
+    SettingSwitch("Flat map while driving (2D)", flat) { DisplaySettings.set(DisplaySettings.flatDriving, "flat_driving", it) }
+}
+
+@Composable
+private fun SettingsHeader(text: String) {
+    Text(text, style = MaterialTheme.typography.labelLarge, color = RP.TextSecondary, modifier = Modifier.padding(top = 16.dp))
+}
+
+@Composable
+private fun SettingSwitch(label: String, checked: Boolean, onChange: (Boolean) -> Unit) {
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+        Text(label, modifier = Modifier.weight(1f))
+        Switch(checked = checked, onCheckedChange = onChange)
+    }
+}
+

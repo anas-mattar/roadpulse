@@ -13,27 +13,43 @@ import okhttp3.RequestBody.Companion.toRequestBody
 /** Route calculation backed by a Valhalla server (OpenStreetMap data). */
 class RoutingClient(private val baseUrl: String) {
 
-    internal fun requestBody(from: GeoPoint, to: GeoPoint): String = Http.json.encodeToString(
-        RouteRequest(locations = listOf(Location(from.lat, from.lon), Location(to.lat, to.lon)))
+    internal fun requestBody(
+        from: GeoPoint,
+        to: GeoPoint,
+        stops: List<GeoPoint> = emptyList(),
+        options: RouteOptions = RouteOptions(),
+        alternates: Int? = null,
+    ): String = Http.json.encodeToString(
+        RouteRequest(
+            locations = (listOf(from) + stops + to).map { Location(it.lat, it.lon) },
+            costing = options.vehicle.costing,
+            costingOptions = options.costingOptions(),
+            // The server offers alternatives only for trips without stops.
+            alternates = if (stops.isEmpty()) alternates else null,
+        )
     )
 
     /** The fastest route plus up to [alternates] alternatives (first element = fastest). */
-    suspend fun routes(from: GeoPoint, to: GeoPoint, alternates: Int = 2): List<Route> {
-        val payload = Http.json.encodeToString(
-            RouteRequest(locations = listOf(Location(from.lat, from.lon), Location(to.lat, to.lon)), alternates = alternates)
-        )
+    suspend fun routes(
+        from: GeoPoint,
+        to: GeoPoint,
+        alternates: Int = 2,
+        stops: List<GeoPoint> = emptyList(),
+        options: RouteOptions = RouteOptions(),
+    ): List<Route> {
+        val payload = requestBody(from, to, stops, options, alternates)
         val request = Request.Builder()
             .url("$baseUrl/route")
             .header("User-Agent", "RoadPulse/0.1")
             .post(payload.toRequestBody("application/json".toMediaType()))
             .build()
-        return parseRoutes(Http.execute(request))
+        return parseRoutes(Http.execute(request), stops)
     }
 
     /** Parses the main route and any alternates (visible for tests). */
-    internal fun parseRoutes(body: String): List<Route> {
+    internal fun parseRoutes(body: String, stops: List<GeoPoint> = emptyList()): List<Route> {
         val response = Http.json.decodeFromString<RouteResponse>(body)
-        return listOf(toRoute(response.trip)) + response.alternates.map { toRoute(it.trip) }
+        return listOf(toRoute(response.trip, stops)) + response.alternates.map { toRoute(it.trip, stops) }
     }
 
     /**
@@ -65,24 +81,71 @@ class RoutingClient(private val baseUrl: String) {
     }
 
     /** Single fastest route (used for rerouting, where speed matters more than choice). */
-    suspend fun route(from: GeoPoint, to: GeoPoint): Route {
-        val payload = requestBody(from, to)
+    suspend fun route(
+        from: GeoPoint,
+        to: GeoPoint,
+        stops: List<GeoPoint> = emptyList(),
+        options: RouteOptions = RouteOptions(),
+    ): Route {
+        val payload = requestBody(from, to, stops, options)
         val request = Request.Builder()
             .url("$baseUrl/route")
             .header("User-Agent", "RoadPulse/0.1")
             .post(payload.toRequestBody("application/json".toMediaType()))
             .build()
-        return parseRoute(Http.execute(request))
+        return parseRoute(Http.execute(request), stops)
     }
 
     /** Parses a routing-server response body (visible for tests). */
-    internal fun parseRoute(body: String): Route = toRoute(Http.json.decodeFromString<RouteResponse>(body).trip)
+    internal fun parseRoute(body: String, stops: List<GeoPoint> = emptyList()): Route =
+        toRoute(Http.json.decodeFromString<RouteResponse>(body).trip, stops)
 
-    private fun toRoute(trip: Trip): Route {
-        val leg = trip.legs.firstOrNull() ?: error("Routing server returned no route")
+    /**
+     * Joins the trip's legs (one per stop) into one route: shapes are chained, maneuver shape
+     * indexes shifted, and the arrival at each intermediate stop becomes [STOP_REACHED].
+     */
+    private fun toRoute(trip: Trip, stops: List<GeoPoint>): Route {
+        if (trip.legs.isEmpty()) error("Routing server returned no route")
+        val shape = ArrayList<GeoPoint>()
+        val maneuvers = ArrayList<Maneuver>()
+        val stopIndexes = ArrayList<Int>()
+        trip.legs.forEachIndexed { legIndex, leg ->
+            val legShape = Polyline.decode(leg.shape, precision = 6)
+            // Each leg starts where the previous one ended: drop the repeated point.
+            val offset = if (shape.isEmpty()) 0 else shape.size - 1
+            shape.addAll(if (shape.isEmpty()) legShape else legShape.drop(1))
+            val last = legIndex == trip.legs.lastIndex
+            legManeuvers(leg).forEachIndexed { i, m ->
+                val shifted = m.copy(beginShapeIndex = m.beginShapeIndex + offset)
+                val isLegEnd = i == leg.maneuvers.lastIndex
+                when {
+                    isLegEnd && !last -> {
+                        stopIndexes += shifted.beginShapeIndex
+                        maneuvers += shifted.copy(
+                            type = STOP_REACHED,
+                            instruction = "You have reached your stop.",
+                            verbalAlert = "Arrive at your stop.",
+                            verbalPre = "You have reached your stop.",
+                        )
+                    }
+                    // A leg after a stop begins with "Drive …": keep it, the driver sets off again.
+                    else -> maneuvers += shifted
+                }
+            }
+        }
         return Route(
-            shape = Polyline.decode(leg.shape, precision = 6),
-            maneuvers = withRoundaboutNames(leg.maneuvers.map { m ->
+            shape = shape,
+            maneuvers = withRoundaboutNames(maneuvers),
+            lengthKm = trip.summary.length,
+            timeSeconds = trip.summary.time,
+            hasToll = trip.summary.hasToll,
+            hasHighway = trip.summary.hasHighway,
+            stops = if (stopIndexes.size == stops.size) stops else emptyList(),
+            stopShapeIndexes = if (stopIndexes.size == stops.size) stopIndexes else emptyList(),
+        )
+    }
+
+    private fun legManeuvers(leg: Leg): List<Maneuver> = leg.maneuvers.map { m ->
                 Maneuver(
                     instruction = m.instruction,
                     lengthKm = m.length,
@@ -98,13 +161,7 @@ class RoutingClient(private val baseUrl: String) {
                     exitBranch = m.sign?.exitBranch.orEmpty().map { it.text.trim() }.filter(String::isNotEmpty),
                     exitToward = m.sign?.exitToward.orEmpty().map { it.text.trim() }.filter(String::isNotEmpty),
                 )
-            }),
-            lengthKm = trip.summary.length,
-            timeSeconds = trip.summary.time,
-            hasToll = trip.summary.hasToll,
-            hasHighway = trip.summary.hasHighway,
-        )
-    }
+            }
 
     /**
      * The server names the road on the "exit roundabout" step, not on "enter roundabout";
@@ -120,9 +177,11 @@ class RoutingClient(private val baseUrl: String) {
             }
         }
 
-    private companion object {
-        const val ROUNDABOUT_ENTER = 26
-        const val ROUNDABOUT_EXIT = 27
+    companion object {
+        private const val ROUNDABOUT_ENTER = 26
+        private const val ROUNDABOUT_EXIT = 27
+        /** RoadPulse's own maneuver type: arriving at a stop on the way (not a Valhalla code). */
+        const val STOP_REACHED = 100
     }
 
     @Serializable
@@ -155,6 +214,7 @@ class RoutingClient(private val baseUrl: String) {
     private data class RouteRequest(
         val locations: List<Location>,
         val costing: String = "auto",
+        @SerialName("costing_options") val costingOptions: kotlinx.serialization.json.JsonObject? = null,
         val units: String = "kilometers",
         val language: String = "en-US",
         /** Extra alternative routes to return (0 = only the fastest). Omitted from JSON when 0. */

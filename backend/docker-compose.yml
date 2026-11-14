@@ -47,3 +47,15 @@ services:
       serve_tiles: "True"
       build_admins: "True"
       build_elevation: "False"
+
+  # Map tiles served from this computer (optional): run setup-offline-maps.ps1 once, then
+  #   docker compose --profile maps up -d tiles
+  # Styles: http://localhost:8090/styles/liberty/style.json (day), .../fiord/style.json (night).
+  tiles:
+    image: maptiler/tileserver-gl-light:v5.7.0
+    profiles: ["maps"]
+    volumes:
+      - ./maps:/data:ro
+    ports:
+      - "127.0.0.1:8090:8080" # this computer only; the emulator reaches it as 10.0.2.2:8090
+

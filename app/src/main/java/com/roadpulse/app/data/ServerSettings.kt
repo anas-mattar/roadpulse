@@ -21,11 +21,31 @@ object ServerSettings {
     private val _useLocal = MutableStateFlow(localAvailable)
     val useLocal: StateFlow<Boolean> = _useLocal.asStateFlow()
 
+    /** Map tiles from the developer's own tile server (off by default: it needs a one-time setup). */
+    val localMapsAvailable: Boolean get() = BuildConfig.DEBUG && BuildConfig.LOCAL_MAP_STYLE_URL.isNotEmpty()
+    private val _useLocalMaps = MutableStateFlow(false)
+    val useLocalMaps: StateFlow<Boolean> = _useLocalMaps.asStateFlow()
+
     fun init(context: Context) {
         if (prefs != null) return
         val p = context.applicationContext.getSharedPreferences("roadpulse_settings", Context.MODE_PRIVATE)
         prefs = p
         _useLocal.value = localAvailable && p.getBoolean(KEY, true)
+        _useLocalMaps.value = localMapsAvailable && p.getBoolean(KEY_MAPS, false)
+    }
+
+    fun setUseLocalMaps(value: Boolean) {
+        if (!localMapsAvailable) return
+        _useLocalMaps.value = value
+        prefs?.edit()?.putBoolean(KEY_MAPS, value)?.apply()
+    }
+
+    /** Map style for day or night: the developer's tile server when chosen, otherwise the public one. */
+    fun mapStyleUrl(dark: Boolean): String = when {
+        _useLocalMaps.value && dark -> BuildConfig.LOCAL_MAP_STYLE_DARK_URL
+        _useLocalMaps.value -> BuildConfig.LOCAL_MAP_STYLE_URL
+        dark -> BuildConfig.MAP_STYLE_DARK_URL
+        else -> BuildConfig.MAP_STYLE_URL
     }
 
     fun setUseLocal(value: Boolean) {
@@ -52,6 +72,7 @@ object ServerSettings {
     }
 
     private const val KEY = "use_local_server"
+    private const val KEY_MAPS = "use_local_maps"
 }
 
 /** Keeps the anonymous device token (ADR 0006). It identifies the install, not the person. */

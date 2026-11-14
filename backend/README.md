@@ -10,7 +10,7 @@ use it yet; it switches over after the Gate 1 test drives.
 |---|---|---|---|
 | POST | `/v1/devices` | none | Register an anonymous device; returns `deviceId` and a secret `token` (shown once) |
 | GET | `/v1/reports?bbox=minLon,minLat,maxLon,maxLat` | none | Active reports in a map area (max 0.5° per side, 500 results) |
-| POST | `/v1/reports` | device | Create a report `{type, lat, lon, headingDeg?}`; same type within 100 m in the last 15 min is merged as a confirmation. Send `Idempotency-Key` to make retries safe |
+| POST | `/v1/reports` | device | Create a report `{type, lat, lon, headingDeg?, subtype?, durationMinutes?}` (subtype per type, e.g. HAZARD: POTHOLE, FLOOD; durationMinutes 15-1440 for ROAD_CLOSED only); same type within 100 m in the last 15 min is merged as a confirmation. Send `Idempotency-Key` to make retries safe |
 | POST | `/v1/reports/{id}/votes` | device | `{stillThere: true/false}`; one vote per device, reporters cannot vote on their own |
 | POST | `/v1/reports/{id}/flags` | device | Flag abuse `{reason: FAKE/SPAM/OFFENSIVE/WRONG_LOCATION}`; 3 flags from different devices hide the report until a moderator reviews it |
 | GET | `/v1/moderation/queue` | moderator | Hidden reports first, then flagged ones, with flag reasons and the reporter's history |
@@ -49,6 +49,23 @@ the audit log. The key is kept only in that browser tab (session storage) and ev
 the moderation API with it; the page itself contains no data. Strict browser security headers
 (no inline scripts, no outside resources, no framing). Turn the page off with
 `Moderation__WebPage=false`.
+
+## Offline map tiles (optional)
+
+The app's map normally loads from OpenFreeMap over the internet. To serve map tiles from this
+computer instead (the emulator's map then works with no internet), run once:
+```
+powershell -ExecutionPolicy Bypass -File setup-offline-maps.ps1
+```
+It builds vector tiles for Malaysia, Singapore and Brunei from the same OpenStreetMap file the
+routing server uses (Planetiler, OpenMapTiles schema; first run downloads about 1.3 GB of
+coastline data into `maps/sources`), fetches the map symbols, and starts the `tiles` service
+(TileServer GL) at http://localhost:8090. Then turn on **Settings > Maps from my laptop** in a
+debug build. Later starts: `docker compose --profile maps up -d tiles`.
+
+`maps/styles` holds the day (liberty) and night (fiord) styles from OpenFreeMap, changed to use
+the local tiles and the server's bundled Noto Sans Regular font (bold and italic labels show in
+regular). The country-level shaded relief layer is left out. Search (Photon) still needs internet.
 
 ## Live updates
 

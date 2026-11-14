@@ -40,4 +40,30 @@ public static class ReportRules
 
     /// <summary>Hide for review once enough devices flag it, unless a moderator already restored it.</summary>
     public static bool ShouldHideForReview(int flags, bool reviewed, int threshold) => !reviewed && flags >= threshold;
+
+    /** Details a driver can add to each report type. Names match the Android app. */
+    public static readonly IReadOnlyDictionary<ReportType, string[]> Subtypes = new Dictionary<ReportType, string[]>
+    {
+        [ReportType.POLICE] = ["VISIBLE", "HIDDEN", "OTHER_SIDE"],
+        [ReportType.CRASH] = ["MINOR", "MAJOR", "OTHER_SIDE"],
+        [ReportType.HAZARD] = ["OBJECT_ON_ROAD", "POTHOLE", "STOPPED_VEHICLE", "ANIMAL", "FLOOD", "CONSTRUCTION"],
+        [ReportType.TRAFFIC_JAM] = ["MODERATE", "HEAVY", "STANDSTILL"],
+        [ReportType.ROAD_CLOSED] = ["FULL", "LANE_BLOCKED", "CONSTRUCTION"],
+    };
+
+    public static bool IsValidSubtype(ReportType type, string? subtype) =>
+        subtype is null || (Subtypes.TryGetValue(type, out var allowed) && allowed.Contains(subtype));
+
+    /** Only closures can say how long they will last (the reporter often knows: works, events). */
+    public static bool AllowsDuration(ReportType type) => type == ReportType.ROAD_CLOSED;
+
+    public const int MinDurationMinutes = 15;
+
+    /** Expiry for a new report: the type's time to live, or the reporter's duration (capped at the max lifetime). */
+    public static DateTimeOffset InitialExpiry(ReportType type, DateTimeOffset now, int? durationMinutes)
+    {
+        if (durationMinutes is not { } minutes || !AllowsDuration(type)) return now + TimeToLive(type);
+        var requested = TimeSpan.FromMinutes(Math.Max(minutes, MinDurationMinutes));
+        return now + (requested < MaxLifetime(type) ? requested : MaxLifetime(type));
+    }
 }

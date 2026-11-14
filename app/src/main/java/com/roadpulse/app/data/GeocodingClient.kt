@@ -22,6 +22,18 @@ class GeocodingClient(private val baseUrl: String) {
         return Http.json.decodeFromString<PhotonResponse>(body).features.mapNotNull { it.toPlace() }
     }
 
+    /** Name of the place at [point] (nearest address or named place), or null if none is known. */
+    suspend fun reverse(point: GeoPoint): Place? {
+        val url = "$baseUrl/reverse".toHttpUrl().newBuilder()
+            .addQueryParameter("lat", point.lat.toString())
+            .addQueryParameter("lon", point.lon.toString())
+            .addQueryParameter("limit", "1")
+            .build()
+        val body = Http.execute(Request.Builder().url(url).header("User-Agent", "RoadPulse/0.1").build())
+        // Keep the pressed point itself: the address may be a few metres away.
+        return Http.json.decodeFromString<PhotonResponse>(body).features.firstOrNull()?.toPlace()?.copy(location = point)
+    }
+
     @Serializable
     private data class PhotonResponse(val features: List<Feature> = emptyList())
 

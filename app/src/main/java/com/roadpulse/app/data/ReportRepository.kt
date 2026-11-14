@@ -12,7 +12,7 @@ import java.util.UUID
  */
 interface ReportRepository {
     val reports: StateFlow<List<Report>>
-    suspend fun submit(type: ReportType, location: GeoPoint): Report
+    suspend fun submit(type: ReportType, location: GeoPoint, subtype: String? = null, durationMinutes: Int? = null): Report
     /** "Still there" (true) or "Not there" (false). */
     suspend fun vote(reportId: String, stillThere: Boolean)
     /** Flags a report as abuse for moderators to review. */
@@ -29,8 +29,8 @@ class InMemoryReportRepository : ReportRepository {
     private val state = MutableStateFlow<List<Report>>(emptyList())
     override val reports: StateFlow<List<Report>> = state.asStateFlow()
 
-    override suspend fun submit(type: ReportType, location: GeoPoint): Report {
-        val report = Report(UUID.randomUUID().toString(), type, location, System.currentTimeMillis())
+    override suspend fun submit(type: ReportType, location: GeoPoint, subtype: String?, durationMinutes: Int?): Report {
+        val report = Report(UUID.randomUUID().toString(), type, location, System.currentTimeMillis(), subtype = subtype)
         state.update { it + report }
         return report
     }

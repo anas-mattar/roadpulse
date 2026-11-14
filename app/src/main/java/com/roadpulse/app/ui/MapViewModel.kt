@@ -58,6 +58,8 @@ data class MapUiState(
     val thenGapMeters: Double? = null,
     val speedKmh: Int? = null,
     val speedLimitKph: Int? = null,
+    /** Nearest report on the route ahead while driving. */
+    val reportAhead: com.roadpulse.app.nav.ReportAhead? = null,
     /** Short status shown under the instruction while navigating (rerouting, GPS lost, offline). */
     val navStatus: String? = null,
     val reports: List<Report> = emptyList(),
@@ -71,6 +73,14 @@ data class MapUiState(
     /** Set while the user is choosing the address for Home or Work. */
     val settingShortcut: Shortcut? = null,
     val message: String? = null,
+    /** Stops on the way to [destination], in order (preview and driving). */
+    val stops: List<Place> = emptyList(),
+    /** A point the driver long-pressed on the map, with its name once known. */
+    val pinned: Place? = null,
+    /** Asked right after driving past a report: is it still there? */
+    val stillThere: Report? = null,
+    /** Route options in effect (shown in the preview). */
+    val routeOptions: com.roadpulse.app.data.RouteOptions = com.roadpulse.app.data.RouteOptions(),
 )
 
 class MapViewModel(application: Application) : AndroidViewModel(application) {
@@ -112,6 +122,7 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
                             thenGapMeters = nav.thenGapMeters,
                             speedKmh = nav.speedMps?.let { (it * 3.6).roundToInt() },
                             speedLimitKph = nav.speedLimitKph,
+                            reportAhead = nav.reportAhead,
                             navStatus = VoiceSettings.narrator().let { n ->
                                 when {
                                     nav.rerouting -> n.statusFindingRoute
@@ -122,7 +133,7 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
                                 }
                             },
                         )
-                        ui.navigating -> MapUiState(reports = ui.reports, message = ui.message, saved = ui.saved, selectedReportId = ui.selectedReportId, selectedReportOwn = ui.selectedReportOwn)
+                        ui.navigating -> MapUiState(reports = ui.reports, message = ui.message, saved = ui.saved, selectedReportId = ui.selectedReportId, selectedReportOwn = ui.selectedReportOwn, routeOptions = ui.routeOptions)
                         else -> ui
                     }
                 }
@@ -137,7 +148,22 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
         }
         viewModelScope.launch {
             NavigationSession.events.collect { event ->
-                if (event is NavEvent.Arrived) _state.update { it.copy(message = "You have arrived") }
+                when (event) {
+                    is NavEvent.Arrived -> _state.update { it.copy(message = "You have arrived") }
+                    is NavEvent.PassedReport -> askStillThere(event.report)
+                    else -> Unit
+                }
+            }
+        }
+        // Re-plan the preview when the driver changes vehicle or roads to avoid.
+        viewModelScope.launch {
+            com.roadpulse.app.data.RouteSettings.options.collect { options ->
+                val ui = _state.value
+                val changed = ui.routeOptions != options
+                _state.update { it.copy(routeOptions = options) }
+                if (changed && !ui.navigating && ui.destination != null && ui.route != null) {
+                    lastOrigin?.let { calculateRoute(it, ui.destination.location) }
+                }
             }
         }
     }
@@ -173,7 +199,7 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
             return
         }
         val saved = placesStore.addRecent(place)
-        _state.update { it.copy(saved = saved, query = place.name, searchResults = emptyList(), destination = place, route = null) }
+        _state.update { it.copy(saved = saved, query = place.name, searchResults = emptyList(), destination = place, route = null, stops = emptyList()) }
         if (from == null) {
             _state.update { it.copy(message = "Waiting for your location. Enable GPS and try again.") }
             return
@@ -181,10 +207,15 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
         calculateRoute(from, place.location)
     }
 
+    /** Where the current preview was planned from (to re-plan after a stop or option change). */
+    private var lastOrigin: GeoPoint? = null
+
     private fun calculateRoute(from: GeoPoint, to: GeoPoint) {
+        lastOrigin = from
+        val stops = _state.value.stops.map { it.location }
         viewModelScope.launch {
             _state.update { it.copy(busy = true) }
-            runCatching { router.routes(from, to) }
+            runCatching { router.routes(from, to, stops = stops, options = com.roadpulse.app.data.RouteSettings.options.value) }
                 .onSuccess { routes ->
                     _state.update { it.copy(route = routes.first(), routeChoices = routes, selectedRoute = 0, busy = false) }
                 }
@@ -246,7 +277,7 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
     fun clearRoute() {
         DriveReplay.stop()
         NavigationSession.stop()
-        _state.update { MapUiState(reports = it.reports, message = it.message, saved = it.saved, selectedReportId = it.selectedReportId, selectedReportOwn = it.selectedReportOwn) }
+        _state.update { MapUiState(reports = it.reports, message = it.message, saved = it.saved, selectedReportId = it.selectedReportId, selectedReportOwn = it.selectedReportOwn, routeOptions = it.routeOptions) }
     }
 
     private fun useReportsSource() {
@@ -263,6 +294,7 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
         val repo = reportRepository
         reportsJob = viewModelScope.launch {
             repo.reports.collect { reports ->
+                com.roadpulse.app.data.ReportFeed.reports.value = reports
                 _state.update { ui ->
                     // Close the card when its report leaves the map (expired, removed, voted away).
                     val stillShown = ui.selectedReportId?.let { id -> reports.any { it.id == id } } ?: false
@@ -280,6 +312,7 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
     /** "Still there" / "Not there" on the selected report. */
     fun voteOnSelected(stillThere: Boolean) {
         val id = _state.value.selectedReportId ?: return
+        askedOrVoted += id
         reportAction(if (stillThere) "Thanks! Confirmed for other drivers." else "Thanks! Other drivers will be told it's gone.") {
             reportRepository.vote(id, stillThere)
         }
@@ -314,14 +347,119 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
         reportRepository.watchArea(visible)
     }
 
-    fun submitReport(type: ReportType, location: GeoPoint?) {
+    // --- long press, stops, favourites, parking ------------------------------------------------
+
+    /** The driver long-pressed the map: show actions for that point and look up its name. */
+    fun onMapLongPress(point: GeoPoint) {
+        val pin = Place("Dropped pin", "%.5f, %.5f".format(java.util.Locale.ROOT, point.lat, point.lon), point)
+        _state.update { it.copy(pinned = pin) }
+        viewModelScope.launch {
+            val named = runCatching { geocoder.reverse(point) }.getOrNull() ?: return@launch
+            _state.update { if (it.pinned?.location == point) it.copy(pinned = named) else it }
+        }
+    }
+
+    fun dismissPinned() = _state.update { it.copy(pinned = null) }
+
+    /** Drive to the pinned point (replaces the current destination and stops). */
+    fun driveToPinned(from: GeoPoint?) {
+        val pin = _state.value.pinned ?: return
+        if (_state.value.navigating) clearRoute()
+        _state.update { it.copy(pinned = null, stops = emptyList()) }
+        onPlaceSelected(pin, from)
+    }
+
+    /** Adds the pinned point as a stop: re-plans the preview, or the active drive. */
+    fun addPinnedAsStop(from: GeoPoint?) {
+        val pin = _state.value.pinned ?: return
+        _state.update { it.copy(pinned = null) }
+        addStop(pin, from)
+    }
+
+    fun addStop(place: Place, from: GeoPoint?) {
+        val ui = _state.value
+        if (from == null) {
+            _state.update { it.copy(message = "Waiting for your location. Enable GPS and try again.") }
+            return
+        }
+        when {
+            ui.navigating -> {
+                NavigationSession.addStop(place.location, from)
+                _state.update { it.copy(stops = it.stops + place, message = "Stop added: ${place.name}") }
+            }
+            ui.destination != null -> {
+                _state.update { it.copy(stops = it.stops + place) }
+                calculateRoute(from, ui.destination.location)
+            }
+            else -> _state.update { it.copy(message = "Choose a destination first, then add stops") }
+        }
+    }
+
+    fun removeStop(place: Place) {
+        val ui = _state.value
+        if (ui.navigating) return
+        _state.update { it.copy(stops = it.stops - place) }
+        val from = lastOrigin ?: return
+        ui.destination?.let { calculateRoute(from, it.location) }
+    }
+
+    fun saveFavourite(place: Place, name: String) {
+        if (name.isBlank()) return
+        val saved = placesStore.addFavourite(name, place)
+        _state.update { it.copy(saved = saved, pinned = null, message = "Saved: ${name.trim()}") }
+    }
+
+    fun removeFavourite(place: Place) {
+        _state.update { it.copy(saved = placesStore.removeFavourite(place), message = "Removed: ${place.name}") }
+    }
+
+    /** Marks where the car is parked (the pinned point, or the current position). */
+    fun parkHere(point: GeoPoint?) {
+        val p = point ?: run {
+            _state.update { it.copy(message = "Location unavailable") }
+            return
+        }
+        val saved = placesStore.setParking(com.roadpulse.app.data.ParkedCar(p, System.currentTimeMillis()))
+        _state.update { it.copy(saved = saved, pinned = null, message = "Parking spot saved") }
+    }
+
+    fun clearParking() = _state.update { it.copy(saved = placesStore.setParking(null)) }
+
+    // --- "still there?" after driving past a report ---------------------------------------------
+
+    private val askedOrVoted = HashSet<String>()
+    private var stillThereJob: Job? = null
+
+    private fun askStillThere(report: Report) {
+        if (report.id in askedOrVoted || reportRepository.isOwn(report.id)) return
+        askedOrVoted += report.id
+        _state.update { it.copy(stillThere = report) }
+        stillThereJob?.cancel()
+        stillThereJob = viewModelScope.launch {
+            delay(STILL_THERE_SHOWN_MS)
+            _state.update { if (it.stillThere?.id == report.id) it.copy(stillThere = null) else it }
+        }
+    }
+
+    fun answerStillThere(stillThere: Boolean?) {
+        val report = _state.value.stillThere ?: return
+        _state.update { it.copy(stillThere = null) }
+        stillThereJob?.cancel()
+        if (stillThere == null) return // "Skip"
+        viewModelScope.launch {
+            runCatching { reportRepository.vote(report.id, stillThere) }
+                .onSuccess { _state.update { it.copy(message = "Thanks!") } }
+        }
+    }
+
+    fun submitReport(type: ReportType, location: GeoPoint?, subtype: String? = null, durationMinutes: Int? = null) {
         if (location == null) {
             _state.update { it.copy(message = "Location unavailable, cannot place report") }
             return
         }
         viewModelScope.launch {
             try {
-                reportRepository.submit(type, location)
+                reportRepository.submit(type, location, subtype, durationMinutes)
                 _state.update { it.copy(message = "${type.label} reported. Thanks!") }
             } catch (e: CancellationException) {
                 throw e
@@ -340,4 +478,9 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
     fun showMessage(text: String) = _state.update { it.copy(message = text) }
 
     fun messageShown() = _state.update { it.copy(message = null) }
+
+    private companion object {
+        /** The "still there?" card closes by itself after this long. */
+        const val STILL_THERE_SHOWN_MS = 12_000L
+    }
 }

@@ -29,6 +29,8 @@ public class Report
     /// <summary>WGS84 point stored as PostGIS geography (distances in metres).</summary>
     public required Point Location { get; set; }
     public short? HeadingDeg { get; set; }
+    /** Optional detail within the type, e.g. POTHOLE for a hazard (see ReportRules.Subtypes). */
+    public string? Subtype { get; set; }
     public Guid DeviceId { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset ExpiresAt { get; set; }

@@ -54,8 +54,9 @@ class LiveBackendTest {
             bob.watchArea(visible)
             waitFor("bob's live connection") { bob.live.value }
 
-            val sent = alice.submit(ReportType.HAZARD, p)
+            val sent = alice.submit(ReportType.HAZARD, p, subtype = "FLOOD")
             waitFor("bob to receive the report live") { bob.reports.value.any { it.id == sent.id } }
+            assertEquals("FLOOD", bob.reports.value.first { it.id == sent.id }.subtype)
 
             bob.vote(sent.id, stillThere = true)
             alice.watchArea(visible)

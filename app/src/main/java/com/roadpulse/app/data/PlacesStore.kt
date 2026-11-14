@@ -11,7 +11,15 @@ data class SavedPlaces(
     val work: Place? = null,
     /** Most recent first. */
     val recent: List<Place> = emptyList(),
+    /** Places saved under the driver's own name, in the order saved. */
+    val favourites: List<Place> = emptyList(),
+    /** Where the driver parked, if they marked it. */
+    val parking: ParkedCar? = null,
 )
+
+/** A marked parking spot and when it was marked (wall-clock milliseconds). */
+@Serializable
+data class ParkedCar(val location: GeoPoint, val savedAtMillis: Long)
 
 enum class Shortcut { HOME, WORK }
 
@@ -37,6 +45,18 @@ class PlacesStore(private val file: File, private val maxRecent: Int = 8) {
         val others = saved.recent.filterNot { samePlace(it, place) }
         saved.copy(recent = (listOf(place) + others).take(maxRecent))
     }
+
+    /** Saves [place] as a favourite under [name], replacing a favourite with the same name. */
+    fun addFavourite(name: String, place: Place): SavedPlaces = update { saved ->
+        val named = place.copy(name = name.trim())
+        saved.copy(favourites = saved.favourites.filterNot { it.name.equals(named.name, ignoreCase = true) } + named)
+    }
+
+    fun removeFavourite(place: Place): SavedPlaces = update { saved ->
+        saved.copy(favourites = saved.favourites.filterNot { samePlace(it, place) })
+    }
+
+    fun setParking(parked: ParkedCar?): SavedPlaces = update { it.copy(parking = parked) }
 
     fun clear(): SavedPlaces {
         file.delete()

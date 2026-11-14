@@ -41,3 +41,13 @@ Plan section B separates three capabilities. Today none of them is available ful
 - No offline search or offline route calculation (would need on-device geocoding and routing
   data, such as a local Valhalla tile set). Post-MVP per the plan.
 - Reports are stored on the device only until the Phase 2 backend exists.
+
+## Developer setup: map tiles from your own computer
+
+For development, `backend/setup-offline-maps.ps1` builds RoadPulse's own vector tiles for Malaysia,
+Singapore and Brunei and serves them from the developer's computer (see `backend/README.md`).
+With Settings > "Maps from my laptop" and "Use my laptop's server" on, the emulator's map,
+routing and reports all run without internet; only search still needs it. This is a development
+setup and does not change what the app promises users (ADR 0003): it is also the first step toward
+the downloadable Klang Valley region planned there.
+

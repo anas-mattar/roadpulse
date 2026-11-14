@@ -1,0 +1,23 @@
+{
+  "options": {
+    "paths": {
+      "root": "/data",
+      "styles": "styles",
+      "mbtiles": "/data",
+      "fonts": "/usr/src/app/node_modules/tileserver-gl-styles/fonts"
+    }
+  },
+  "styles": {
+    "liberty": {
+      "style": "liberty.json"
+    },
+    "fiord": {
+      "style": "fiord.json"
+    }
+  },
+  "data": {
+    "malaysia": {
+      "mbtiles": "malaysia.mbtiles"
+    }
+  }
+}

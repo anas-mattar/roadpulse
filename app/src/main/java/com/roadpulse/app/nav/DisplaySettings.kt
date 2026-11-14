@@ -12,11 +12,43 @@ enum class MapColors(val label: String) {
     DARK("Always dark"),
 }
 
-/** Map appearance preferences, kept across restarts. */
+/** When the speed limit sign is shown while driving. */
+enum class LimitDisplay(val label: String) {
+    ALWAYS("Always"),
+    WHEN_SPEEDING("Only when speeding"),
+    NEVER("Never"),
+}
+
+/** Map appearance and driving-display preferences, kept across restarts. */
 object DisplaySettings {
     private var prefs: SharedPreferences? = null
     private val _mapColors = MutableStateFlow(MapColors.AUTO)
     val mapColors: StateFlow<MapColors> = _mapColors.asStateFlow()
+
+    /** Keep north at the top (no map rotation), also while driving. */
+    val northUp = MutableStateFlow(false)
+    /** Show a compass button on the map (tap it to turn north up). */
+    val showCompass = MutableStateFlow(false)
+    /** Flat 2D map while driving instead of the tilted view. */
+    val flatDriving = MutableStateFlow(false)
+    val showSpeedometer = MutableStateFlow(true)
+    val limitDisplay = MutableStateFlow(LimitDisplay.ALWAYS)
+    /** km/h over the limit before the speed turns red (and the alert sounds). */
+    val speedingMarginKmh = MutableStateFlow(3)
+    /** Short sound when the speed goes over limit + margin. */
+    val speedingSound = MutableStateFlow(false)
+
+    /** Saves one of the flags above (keyed by name) and updates it. */
+    fun <T> set(flow: MutableStateFlow<T>, key: String, value: T) {
+        flow.value = value
+        prefs?.edit()?.apply {
+            when (value) {
+                is Boolean -> putBoolean(key, value)
+                is Int -> putInt(key, value)
+                is Enum<*> -> putString(key, value.name)
+            }
+        }?.apply()
+    }
 
     fun init(context: Context) {
         if (prefs != null) return
@@ -24,6 +56,14 @@ object DisplaySettings {
         prefs = p
         _mapColors.value = runCatching { MapColors.valueOf(p.getString(KEY, MapColors.AUTO.name)!!) }
             .getOrDefault(MapColors.AUTO)
+        northUp.value = p.getBoolean("north_up", false)
+        showCompass.value = p.getBoolean("show_compass", false)
+        flatDriving.value = p.getBoolean("flat_driving", false)
+        showSpeedometer.value = p.getBoolean("show_speedometer", true)
+        limitDisplay.value = runCatching { LimitDisplay.valueOf(p.getString("limit_display", LimitDisplay.ALWAYS.name)!!) }
+            .getOrDefault(LimitDisplay.ALWAYS)
+        speedingMarginKmh.value = p.getInt("speeding_margin", 3)
+        speedingSound.value = p.getBoolean("speeding_sound", false)
     }
 
     fun setMapColors(value: MapColors) {
