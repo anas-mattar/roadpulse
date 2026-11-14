@@ -1,11 +1,43 @@
-# Local backend for RoadPulse development.
-#   docker compose up -d
-# First start downloads the Malaysia/Singapore/Brunei OpenStreetMap extract and builds
-# routing tiles (several minutes, a few GB of disk). Then set in gradle.properties:
-#   roadpulse.routingUrl=http://10.0.2.2:8002      (Android emulator -> host machine)
+# Local and server stack for RoadPulse (ADR 0002).
+#   docker compose up -d --build
+# API: http://localhost:8080 (OpenAPI: /openapi/v1.json, health: /health)
+# Routing: http://localhost:8002 (first start downloads the Malaysia/Singapore/Brunei extract and
+# builds routing tiles: several minutes, a few GB of disk).
+# Settings go in a .env file next to this file (never commit it):
+#   POSTGRES_PASSWORD=...
+#   MODERATOR_NAME=...          } from new-moderator-key.ps1
+#   MODERATOR_KEY_HASH=...      }
 services:
+  db:
+    image: postgis/postgis:16-3.4
+    environment:
+      POSTGRES_DB: roadpulse
+      POSTGRES_USER: roadpulse
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me-dev-only}
+    volumes:
+      - ./pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U roadpulse -d roadpulse"]
+      interval: 5s
+      retries: 20
+    ports:
+      - "127.0.0.1:5432:5432"
+
+  api:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      ConnectionStrings__Default: "Host=db;Database=roadpulse;Username=roadpulse;Password=${POSTGRES_PASSWORD:-change-me-dev-only}"
+      Database__MigrateOnStartup: "true"
+      Moderation__Moderators__0__Name: ${MODERATOR_NAME:-}
+      Moderation__Moderators__0__KeyHash: ${MODERATOR_KEY_HASH:-}
+    ports:
+      - "8080:8080"
+
   valhalla:
-    image: ghcr.io/valhalla/valhalla-scripted:latest
+    image: ghcr.io/valhalla/valhalla-scripted:3.9.1
     ports:
       - "8002:8002"
     volumes:
@@ -15,15 +47,3 @@ services:
       serve_tiles: "True"
       build_admins: "True"
       build_elevation: "False"
-
-  db:
-    image: postgis/postgis:16-3.4
-    ports:
-      - "5432:5432"
-    environment:
-      POSTGRES_DB: roadpulse
-      POSTGRES_USER: roadpulse
-      POSTGRES_PASSWORD: change-me-dev-only
-    volumes:
-      - ./pg_data:/var/lib/postgresql/data
-      - ./db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro

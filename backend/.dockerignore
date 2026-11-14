@@ -1,0 +1,4 @@
+**/bin/
+**/obj/
+valhalla_data/
+pg_data/

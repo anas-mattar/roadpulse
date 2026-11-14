@@ -10,6 +10,6 @@ changes an earlier one gets a new record that supersedes it; old records are not
 | [0003](0003-offline-scope.md) | Offline scope for the first public release | Accepted |
 | [0004](0004-location-telemetry.md) | Location telemetry for live traffic: opt-in, aggregated, short retention | Proposed (needs legal review) |
 | [0005](0005-map-data-pipeline.md) | Map data pipeline: weekly OpenStreetMap refresh for routing, search and tiles | Accepted |
-| [0006](0006-identity.md) | User identity for the community beta | Proposed (needs your decision) |
+| [0006](0006-identity.md) | User identity for the community beta | Accepted |
 
 Status values: Proposed, Accepted, Superseded by NNNN.

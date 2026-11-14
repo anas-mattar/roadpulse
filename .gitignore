@@ -10,3 +10,11 @@ captures/
 backend/valhalla_data/
 backend/pg_data/
 navlogs/
+
+# .NET build output
+backend/**/bin/
+backend/**/obj/
+backend/**/TestResults/
+
+# Local secrets (database password, moderator key hashes)
+backend/.env

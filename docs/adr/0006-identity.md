@@ -1,6 +1,6 @@
 # 0006. User identity for the community beta
 
-Date: 2026-11-14 · Status: Proposed (needs your decision)
+Date: 2026-11-14 · Status: Accepted
 
 ## Context
 
@@ -27,4 +27,14 @@ backend (0001) supports both through its standard authentication middleware.
 
 ## Decision
 
-Pending: confirm the recommendation or choose another option.
+Accepted on 2026-11-14: **option 1, anonymous device identity**, for the community beta.
+
+Implementation note (backend/src/RoadPulse.Api/Modules/Devices): instead of a signing key pair, the
+app calls `POST /v1/devices` once and receives a random 256-bit token, sent as
+`Authorization: Bearer <token>` over HTTPS. The server stores only a SHA-256 hash of the token, so a
+database leak does not expose usable tokens. This is simpler to build and test than request
+signing, with the same privacy (no personal data). Abuse controls: registrations limited per IP,
+reports and votes limited per device, one vote per device per report, devices can be blocked.
+
+Revisit when accounts arrive (Phase 4) or if spam appears: add optional Google sign-in (option 3)
+and link it to the device.
