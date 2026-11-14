@@ -1,5 +1,6 @@
 package com.roadpulse.app.ui
 
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.graphics.Color
@@ -142,7 +143,6 @@ private const val REPORT_CLUSTER_COUNT_LAYER = "report-cluster-count"
 
 /** Reports are grouped into a count bubble up to this zoom (city level); closer in, each shows. */
 private const val CLUSTER_MAX_ZOOM = 13
-private const val MATCHED_SOURCE = "matched-source"
 
 // Kuala Lumpur; shown until the first GPS fix arrives.
 private val DEFAULT_CENTER = LatLng(3.139, 101.6869)
@@ -184,14 +184,17 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
     }
 
     // Our own multi-provider location feed (see DeviceLocation); MapLibre's puck is driven from it.
+    // While navigating, the puck shows the route-matched position instead (see below), so raw
+    // fixes only update deviceFix then: one arrow, on the road.
     var deviceFix by remember { mutableStateOf<GeoPoint?>(null) }
+    val navigatingNow by rememberUpdatedState(state.navigating)
     DisposableEffect(hasLocationPermission) {
         val source = DeviceLocation(context)
         if (hasLocationPermission) {
             source.start { location ->
                 if (DriveReplay.active.value) return@start // simulated drive owns the position
                 deviceFix = GeoPoint(location.latitude, location.longitude)
-                map?.locationComponent?.takeIf { it.isLocationComponentActivated }?.forceLocationUpdate(location)
+                if (!navigatingNow) map?.locationComponent?.takeIf { it.isLocationComponentActivated }?.forceLocationUpdate(location)
             }
         }
         onDispose { source.stop() }
@@ -201,7 +204,7 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
     LaunchedEffect(map) {
         DriveReplay.fixes.collect { fix ->
             deviceFix = fix.position
-            map?.locationComponent?.takeIf { it.isLocationComponentActivated }
+            if (!navigatingNow) map?.locationComponent?.takeIf { it.isLocationComponentActivated }
                 ?.forceLocationUpdate(fix.toAndroidLocation())
         }
     }
@@ -335,12 +338,30 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
     LaunchedEffect(style, state.destination) {
         style?.getSourceAs<GeoJsonSource>(DEST_SOURCE)?.setGeoJson(state.destination.toFeatureCollection())
     }
-    // Route-matched position while navigating (the default puck still shows the raw GPS fix).
-    LaunchedEffect(style, state.matchedPosition) {
+    // While navigating, the location arrow shows the route-matched position (on the route line
+    // when matched, the raw fix when off route), pointing in the direction of travel.
+    var lastPuck by remember { mutableStateOf<GeoPoint?>(null) }
+    var lastBearing by remember { mutableStateOf(0f) }
+    LaunchedEffect(state.navigating, state.matchedPosition) {
         val p = state.matchedPosition
-        style?.getSourceAs<GeoJsonSource>(MATCHED_SOURCE)?.setGeoJson(
-            if (p == null) FeatureCollection.fromFeatures(emptyList())
-            else FeatureCollection.fromFeature(Feature.fromGeometry(Point.fromLngLat(p.lon, p.lat)))
+        if (!state.navigating || p == null) {
+            lastPuck = null
+            return@LaunchedEffect
+        }
+        val prev = lastPuck
+        if (prev != null && com.roadpulse.app.data.Geo.distanceMeters(prev, p) >= 1.5) {
+            lastBearing = com.roadpulse.app.nav.RouteMatcher.bearing(prev, p).toFloat()
+        }
+        lastPuck = p
+        map?.locationComponent?.takeIf { it.isLocationComponentActivated }?.forceLocationUpdate(
+            android.location.Location("route").also { l ->
+                l.latitude = p.lat
+                l.longitude = p.lon
+                l.bearing = lastBearing
+                l.accuracy = 5f
+                l.time = System.currentTimeMillis()
+                l.elapsedRealtimeNanos = android.os.SystemClock.elapsedRealtimeNanos()
+            }
         )
     }
     // Tell the reports source which area is on screen whenever the map comes to rest.
@@ -729,7 +750,6 @@ private fun Style.addOverlayLayers() {
                 .withCluster(true).withClusterMaxZoom(CLUSTER_MAX_ZOOM).withClusterRadius(44),
         )
     )
-    addSource(GeoJsonSource(MATCHED_SOURCE))
 
     add(
         LineLayer(ALT_ROUTE_LAYER, ALT_ROUTE_SOURCE).withProperties(
@@ -790,14 +810,6 @@ private fun Style.addOverlayLayers() {
             PropertyFactory.textColor("#FFFFFF"),
             PropertyFactory.textAllowOverlap(true),
             PropertyFactory.textIgnorePlacement(true),
-        )
-    )
-    add(
-        CircleLayer("matched-position", MATCHED_SOURCE).withProperties(
-            PropertyFactory.circleRadius(10f),
-            PropertyFactory.circleColor("#534AB7"),
-            PropertyFactory.circleStrokeColor("#FFFFFF"),
-            PropertyFactory.circleStrokeWidth(4f),
         )
     )
     // Report icons ("report-POLICE" etc., registered by rememberReportMarkers). Reports on the

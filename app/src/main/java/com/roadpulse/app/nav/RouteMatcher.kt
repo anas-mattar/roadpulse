@@ -150,7 +150,8 @@ class RouteMatcher(
 
         fun angleDiff(a: Double, b: Double): Double = abs(((a - b) % 360 + 540) % 360 - 180)
 
-        private fun bearing(a: GeoPoint, b: GeoPoint): Double {
+        /** Compass bearing from a to b, degrees clockwise from north. */
+        fun bearing(a: GeoPoint, b: GeoPoint): Double {
             val k = cos(Math.toRadians((a.lat + b.lat) / 2))
             val dx = (b.lon - a.lon) * k
             val dy = b.lat - a.lat
