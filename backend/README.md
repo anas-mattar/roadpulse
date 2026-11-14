@@ -16,6 +16,8 @@ use it yet; it switches over after the Gate 1 test drives.
 | GET | `/v1/moderation/queue` | moderator | Hidden reports first, then flagged ones, with flag reasons and the reporter's history |
 | POST | `/v1/moderation/reports/{id}/remove` | moderator | `{reason}`; takes a report off the map |
 | POST | `/v1/moderation/reports/{id}/restore` | moderator | `{reason}`; back on the map, and later flags no longer hide it |
+| GET | `/v1/moderation/reports?limit=` | moderator | Newest reports in any status, with flags and reporter history |
+| GET | `/v1/moderation/reports/{id}` | moderator | One report, any status |
 | GET | `/v1/moderation/devices/{id}` | moderator | Device summary: reports, removed reports, blocked |
 | POST | `/v1/moderation/devices/{id}/block` | moderator | `{reason, removeActiveReports=true}`; its token stops working |
 | POST | `/v1/moderation/devices/{id}/unblock` | moderator | `{reason}` |
@@ -37,6 +39,16 @@ Moderator auth: `X-Moderator-Key: <key>`. Configuration holds only SHA-256 hashe
 (`Moderation:Moderators`), separate from device tokens. Every moderator action needs a reason and
 is written to the audit log (IDs only, no locations). Create a key with `new-moderator-key.ps1`
 and put the hash in `.env` (see `docker-compose.yml`).
+
+## Moderation page
+
+Open **http://localhost:8080/admin** and paste your moderator key (see `new-moderator-key.ps1`).
+Tabs: review queue (hidden reports first), recent reports (any status), look up a report or device
+by ID, and the audit log. Remove, restore, block and unblock each ask for a reason, which goes to
+the audit log. The key is kept only in that browser tab (session storage) and every action calls
+the moderation API with it; the page itself contains no data. Strict browser security headers
+(no inline scripts, no outside resources, no framing). Turn the page off with
+`Moderation__WebPage=false`.
 
 ## Live updates
 

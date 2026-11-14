@@ -48,6 +48,27 @@ if (app.Configuration.GetValue("Database:MigrateOnStartup", false))
 }
 
 app.UseExceptionHandler();
+
+// Moderation web page (wwwroot/admin): static files, strict browser security headers, no caching.
+// It shows nothing by itself; every action calls the moderation API with the moderator's key.
+if (app.Configuration.GetValue("Moderation:WebPage", true))
+{
+    app.Use(async (ctx, next) =>
+    {
+        if (ctx.Request.Path.StartsWithSegments("/admin"))
+        {
+            if (ctx.Request.Path.Value == "/admin") { ctx.Response.Redirect("/admin/"); return; }
+            var h = ctx.Response.Headers;
+            h.ContentSecurityPolicy = "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'";
+            h.XContentTypeOptions = "nosniff";
+            h["Referrer-Policy"] = "no-referrer";
+            h.CacheControl = "no-store";
+        }
+        await next();
+    });
+    app.UseDefaultFiles();
+    app.UseStaticFiles();
+}
 app.UseStatusCodePages();
 app.UseAuthentication();
 // Before authorization, so rejected attempts (such as guessed moderator keys) also count.

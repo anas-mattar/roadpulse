@@ -30,7 +30,10 @@ public static class ModerationEndpoints
             .RequireRateLimiting(RateLimits.Moderation);
 
         mod.MapGet("/queue", Queue).WithName("ModerationQueue")
-            .WithSummary("Reports hidden for review, then active reports with abuse flags, most flagged first.");
+            .WithSummary("Unexpired reports hidden for review, then active reports with abuse flags, most flagged first.");
+        mod.MapGet("/reports", RecentReports).WithName("RecentReports")
+            .WithSummary("Newest reports in any status (limit 1-500), for removing reports nobody flagged.");
+        mod.MapGet("/reports/{id:guid}", GetReport).WithName("GetReportForModeration");
         mod.MapPost("/reports/{id:guid}/remove", RemoveReport).WithName("RemoveReport");
         mod.MapPost("/reports/{id:guid}/restore", RestoreReport).WithName("RestoreReport")
             .WithSummary("Puts a report back on the map; later flags no longer hide it automatically.");
@@ -46,12 +49,36 @@ public static class ModerationEndpoints
     {
         var now = clock.GetUtcNow();
         var reports = await db.Reports.AsNoTracking().Include(r => r.FlagEntries)
-            .Where(r => r.Status == ReportStatus.PendingReview
-                        || (r.Status == ReportStatus.Active && !r.Reviewed && r.Flags > 0 && r.ExpiresAt > now))
+            // Only reports that would still be on the map: expired ones no longer need a decision
+            // (they stay findable under recent reports and lookup).
+            .Where(r => r.ExpiresAt > now
+                        && (r.Status == ReportStatus.PendingReview || (r.Status == ReportStatus.Active && !r.Reviewed && r.Flags > 0)))
             .OrderByDescending(r => r.Status == ReportStatus.PendingReview).ThenByDescending(r => r.Flags).ThenBy(r => r.CreatedAt)
             .Take(MaxQueue)
             .ToListAsync();
+        return TypedResults.Ok(await ToItems(db, reports));
+    }
 
+    private static async Task<Results<Ok<List<QueueItem>>, ValidationProblem>> RecentReports(RoadPulseDb db, int? limit)
+    {
+        var take = limit ?? 100;
+        if (take is < 1 or > 500)
+            return TypedResults.ValidationProblem(new Dictionary<string, string[]> { ["limit"] = ["Must be between 1 and 500."] });
+        var reports = await db.Reports.AsNoTracking().Include(r => r.FlagEntries)
+            .OrderByDescending(r => r.CreatedAt).Take(take).ToListAsync();
+        return TypedResults.Ok(await ToItems(db, reports));
+    }
+
+    private static async Task<Results<Ok<QueueItem>, NotFound>> GetReport(Guid id, RoadPulseDb db)
+    {
+        var report = await db.Reports.AsNoTracking().Include(r => r.FlagEntries).FirstOrDefaultAsync(r => r.Id == id);
+        if (report is null) return TypedResults.NotFound();
+        return TypedResults.Ok((await ToItems(db, [report]))[0]);
+    }
+
+    /// <summary>Adds flag reasons and each reporter's history to a list of reports.</summary>
+    private static async Task<List<QueueItem>> ToItems(RoadPulseDb db, List<Report> reports)
+    {
         var deviceIds = reports.Select(r => r.DeviceId).Distinct().ToList();
         var stats = await db.Reports.AsNoTracking().Where(r => deviceIds.Contains(r.DeviceId))
             .GroupBy(r => r.DeviceId)
@@ -59,10 +86,10 @@ public static class ModerationEndpoints
             .ToDictionaryAsync(x => x.Key);
         var blocked = await db.Devices.AsNoTracking().Where(d => deviceIds.Contains(d.Id) && d.Blocked).Select(d => d.Id).ToListAsync();
 
-        return TypedResults.Ok(reports.Select(r => new QueueItem(
+        return reports.Select(r => new QueueItem(
             ReportEndpoints.ToDto(r), r.Status, r.Flags,
             r.FlagEntries.GroupBy(f => f.Reason).ToDictionary(g => g.Key, g => g.Count()),
-            r.DeviceId, stats[r.DeviceId].Total, stats[r.DeviceId].Removed, blocked.Contains(r.DeviceId))).ToList());
+            r.DeviceId, stats[r.DeviceId].Total, stats[r.DeviceId].Removed, blocked.Contains(r.DeviceId))).ToList();
     }
 
     private static async Task<Results<NoContent, NotFound, ValidationProblem>> RemoveReport(

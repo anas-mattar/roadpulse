@@ -133,6 +133,11 @@ private const val ALT_ROUTE_LAYER = "alt-route-line"
 private const val DEST_SOURCE = "destination-source"
 private const val REPORT_SOURCE = "report-source"
 private const val REPORT_LAYER = "reports"
+private const val REPORT_CLUSTER_LAYER = "report-clusters"
+private const val REPORT_CLUSTER_COUNT_LAYER = "report-cluster-count"
+
+/** Reports are grouped into a count bubble up to this zoom (city level); closer in, each shows. */
+private const val CLUSTER_MAX_ZOOM = 13
 private const val MATCHED_SOURCE = "matched-source"
 
 // Kuala Lumpur; shown until the first GPS fix arrives.
@@ -252,6 +257,16 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
         val listener = MapLibreMap.OnMapClickListener { point ->
             val screen = m?.projection?.toScreenLocation(point) ?: return@OnMapClickListener false
             val area = android.graphics.RectF(screen.x - 30, screen.y - 30, screen.x + 30, screen.y + 30)
+            // A count bubble zooms in far enough to split it.
+            val cluster = m.queryRenderedFeatures(area, REPORT_CLUSTER_LAYER).firstOrNull()
+            if (cluster != null) {
+                val source = m.style?.getSourceAs<GeoJsonSource>(REPORT_SOURCE)
+                val zoom = source?.getClusterExpansionZoom(cluster)?.toDouble() ?: (m.cameraPosition.zoom + 2)
+                val p = cluster.geometry() as? Point
+                val target = p?.let { LatLng(it.latitude(), it.longitude()) } ?: point
+                m.animateCamera(CameraUpdateFactory.newLatLngZoom(target, zoom.coerceAtLeast(CLUSTER_MAX_ZOOM + 1.0)))
+                return@OnMapClickListener true
+            }
             // A report icon wins over a route line underneath it.
             val report = m.queryRenderedFeatures(area, REPORT_LAYER).firstOrNull()?.getStringProperty("id")
             if (report != null) {
@@ -590,7 +605,13 @@ private fun Style.addOverlayLayers() {
     addSource(GeoJsonSource(ALT_ROUTE_SOURCE))
     addSource(GeoJsonSource(ROUTE_SOURCE))
     addSource(GeoJsonSource(DEST_SOURCE))
-    addSource(GeoJsonSource(REPORT_SOURCE))
+    addSource(
+        GeoJsonSource(
+            REPORT_SOURCE,
+            org.maplibre.android.style.sources.GeoJsonOptions()
+                .withCluster(true).withClusterMaxZoom(CLUSTER_MAX_ZOOM).withClusterRadius(44),
+        )
+    )
     addSource(GeoJsonSource(MATCHED_SOURCE))
 
     addLayer(
@@ -644,7 +665,29 @@ private fun Style.addOverlayLayers() {
             PropertyFactory.iconIgnorePlacement(true),
             PropertyFactory.symbolSortKey(Expression.get("order")),
             PropertyFactory.iconSize(Expression.switchCase(Expression.get("selected"), Expression.literal(1.25f), Expression.literal(1f))),
-        )
+        ).withFilter(Expression.not(Expression.has("point_count")))
+    )
+    // Zoomed out: nearby reports become one bubble with their count. Tap it to zoom in.
+    addLayer(
+        CircleLayer(REPORT_CLUSTER_LAYER, REPORT_SOURCE).withProperties(
+            PropertyFactory.circleColor("#534AB7"),
+            PropertyFactory.circleRadius(
+                Expression.step(Expression.get("point_count"), Expression.literal(16f),
+                    Expression.stop(5, 19f), Expression.stop(20, 23f))
+            ),
+            PropertyFactory.circleStrokeColor("#FFFFFF"),
+            PropertyFactory.circleStrokeWidth(3f),
+        ).withFilter(Expression.has("point_count"))
+    )
+    addLayer(
+        SymbolLayer(REPORT_CLUSTER_COUNT_LAYER, REPORT_SOURCE).withProperties(
+            PropertyFactory.textField(Expression.toString(Expression.get("point_count_abbreviated"))),
+            PropertyFactory.textFont(arrayOf("Noto Sans Regular")), // in both the day and night styles
+            PropertyFactory.textSize(14f),
+            PropertyFactory.textColor("#FFFFFF"),
+            PropertyFactory.textAllowOverlap(true),
+            PropertyFactory.textIgnorePlacement(true),
+        ).withFilter(Expression.has("point_count"))
     )
 }
 
@@ -653,7 +696,14 @@ private fun MapLibreMap.enableLocation(context: Context, style: Style) {
     val component = locationComponent
     if (!component.isLocationComponentActivated) {
         component.activateLocationComponent(
-            LocationComponentActivationOptions.builder(context, style).useDefaultLocationEngine(false).build()
+            LocationComponentActivationOptions.builder(context, style)
+                .useDefaultLocationEngine(false)
+                // Your position is drawn above report icons and bubbles, never hidden by them.
+                .locationComponentOptions(
+                    org.maplibre.android.location.LocationComponentOptions.builder(context)
+                        .layerAbove(REPORT_CLUSTER_COUNT_LAYER).build()
+                )
+                .build()
         )
     }
     component.isLocationComponentEnabled = true

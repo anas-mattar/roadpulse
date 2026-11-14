@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RoadPulse moderation</title>
+  <link rel="stylesheet" href="admin.css">
+</head>
+<body>
+  <header>
+    <div class="brand"><span class="dot"></span> RoadPulse <span class="muted">moderation</span></div>
+    <div id="who" class="muted" hidden></div>
+    <button id="signOut" class="ghost" hidden>Sign out</button>
+  </header>
+
+  <main>
+    <section id="login" class="card narrow">
+      <h1>Sign in</h1>
+      <p class="muted">Paste your moderator key (from <code>new-moderator-key.ps1</code>). It is kept only in this browser tab and is forgotten when you close it.</p>
+      <form id="loginForm">
+        <label for="key">Moderator key</label>
+        <input id="key" type="password" autocomplete="off" spellcheck="false" required minlength="20">
+        <button type="submit">Sign in</button>
+        <p id="loginError" class="error" hidden></p>
+      </form>
+    </section>
+
+    <section id="app" hidden>
+      <nav class="tabs" role="tablist">
+        <button role="tab" data-tab="queue" aria-selected="true">Review queue <span id="queueCount" class="badge" hidden></span></button>
+        <button role="tab" data-tab="recent">Recent reports</button>
+        <button role="tab" data-tab="lookup">Look up</button>
+        <button role="tab" data-tab="audit">Audit log</button>
+        <span class="spacer"></span>
+        <span id="updated" class="muted small"></span>
+        <button id="refresh" class="ghost">Refresh</button>
+      </nav>
+
+      <div data-panel="queue">
+        <p class="muted">Reports hidden after abuse flags come first, then active reports with flags. Expired reports leave the queue (find them under Recent reports). Reports restored by a moderator are not auto-hidden again.</p>
+        <div id="queueList" class="list"></div>
+      </div>
+
+      <div data-panel="recent" hidden>
+        <p class="muted">The 100 newest reports in any status, so you can remove one nobody flagged.</p>
+        <div id="recentList" class="list"></div>
+      </div>
+
+      <div data-panel="lookup" hidden>
+        <form id="lookupForm" class="row">
+          <input id="lookupId" placeholder="Report ID or device ID" spellcheck="false" required>
+          <button type="submit">Look up</button>
+        </form>
+        <div id="lookupResult" class="list"></div>
+      </div>
+
+      <div data-panel="audit" hidden>
+        <table class="audit">
+          <thead><tr><th>When</th><th>Moderator</th><th>Action</th><th>Target</th><th>Reason</th></tr></thead>
+          <tbody id="auditRows"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <dialog id="reasonDialog">
+    <form method="dialog" id="reasonForm">
+      <h2 id="reasonTitle">Reason</h2>
+      <p id="reasonHint" class="muted small"></p>
+      <label for="reasonText">Reason (recorded in the audit log)</label>
+      <textarea id="reasonText" rows="3" minlength="3" maxlength="500" required></textarea>
+      <label id="removeAllRow" class="check" hidden><input type="checkbox" id="removeAll" checked> Also remove this device's active reports</label>
+      <div class="row end">
+        <button type="button" class="ghost" id="reasonCancel">Cancel</button>
+        <button type="submit" id="reasonOk">Confirm</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div id="toast" role="status" hidden></div>
+  <script src="admin.js"></script>
+</body>
+</html>

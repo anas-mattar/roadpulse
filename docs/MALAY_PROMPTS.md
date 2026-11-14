@@ -1,5 +1,13 @@
 # Malay voice prompts: review sheet
 
+> **Current review (Nov 2026):** the full list of 59 phrases, with suggestions and a column for the
+> reviewer's verdict, is in the shared sheet "RoadPulse Malay voice prompts review"
+> (https://claude.ai/artifact/RHsUnKQZ2iDTewnAFkzPCW, downloadable as .xlsx). It is generated from
+> the app's own code by `MalayPromptSheetTest` (writes `app/build/malay_prompts.tsv`), so re-run that
+> test after any wording change. Lines flagged for attention: sharp turns ("ke kanan ke"), U-turn
+> ("ke" where the English means "to stay on"), "Bergabung ke", and the button "Fokus semula".
+> The tables below are the earlier review from two real routes.
+
 RoadPulse generates Bahasa Melayu instructions itself, because the routing server (Valhalla) has
 no Malay. All Malay wording is in `app/src/main/java/com/roadpulse/app/nav/Narration.kt`
 (`MalayNarrator`). **Please have a native speaker review this sheet** and note corrections next to

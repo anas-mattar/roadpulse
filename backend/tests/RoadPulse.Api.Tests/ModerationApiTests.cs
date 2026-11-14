@@ -187,4 +187,65 @@ public class ModerationApiTests
         Assert.Equal(HttpStatusCode.BadRequest, (await mod.GetAsync("/v1/moderation/audit?limit=501")).StatusCode);
         Assert.Equal(HttpStatusCode.OK, (await mod.GetAsync("/v1/moderation/audit?limit=5")).StatusCode);
     }
+
+    [Fact]
+    public async Task RecentReportsAndLookupShowAnyStatus()
+    {
+        using var api = new ApiFactory();
+        var mod = await Moderator(api);
+        var (reporter, reporterId) = await Device(api);
+        var (lat, lon) = NewArea();
+        var report = await CreateReport(reporter, lat, lon, "CRASH");
+        await mod.PostAsJsonAsync($"/v1/moderation/reports/{report.Id}/remove", new { reason = "Testing lookup" });
+
+        var recent = (await mod.GetFromJsonAsync<List<QueueItem>>("/v1/moderation/reports?limit=500", Json))!;
+        var item = Assert.Single(recent, i => i.Report.Id == report.Id);
+        Assert.Equal(ReportStatus.Removed, item.Status);
+        Assert.Equal(reporterId, item.DeviceId);
+
+        var one = (await mod.GetFromJsonAsync<QueueItem>($"/v1/moderation/reports/{report.Id}", Json))!;
+        Assert.Equal(ReportStatus.Removed, one.Status);
+        Assert.Equal(HttpStatusCode.NotFound, (await mod.GetAsync($"/v1/moderation/reports/{Guid.NewGuid()}")).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await mod.GetAsync("/v1/moderation/reports?limit=0")).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await (await api.ClientAsync()).GetAsync("/v1/moderation/reports")).StatusCode);
+    }
+
+    [Fact]
+    public async Task ModerationPageIsServedWithStrictHeaders()
+    {
+        using var api = new ApiFactory();
+        var client = await api.ClientAsync();
+        var redirect = await api.CreateClient(new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions { AllowAutoRedirect = false }).GetAsync("/admin");
+        Assert.Equal(HttpStatusCode.Redirect, redirect.StatusCode);
+        Assert.Equal("/admin/", redirect.Headers.Location!.ToString());
+
+        var page = await client.GetAsync("/admin/");
+        Assert.Equal(HttpStatusCode.OK, page.StatusCode);
+        Assert.Contains("RoadPulse moderation", await page.Content.ReadAsStringAsync());
+        var csp = string.Join(";", page.Headers.GetValues("Content-Security-Policy"));
+        Assert.Contains("default-src 'none'", csp);
+        Assert.Contains("frame-ancestors 'none'", csp);
+        Assert.DoesNotContain("unsafe-inline", csp);
+        Assert.Equal("nosniff", string.Join("", page.Headers.GetValues("X-Content-Type-Options")));
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/admin/admin.js")).StatusCode);
+        // The page holds no data: the API still needs the key.
+        Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync("/v1/moderation/queue")).StatusCode);
+    }
+
+    [Fact]
+    public async Task ExpiredHiddenReportsLeaveTheQueueButStayFindable()
+    {
+        using var api = new ApiFactory();
+        var mod = await Moderator(api);
+        var (reporter, _) = await Device(api);
+        var (lat, lon) = NewArea();
+        var report = await CreateReport(reporter, lat, lon, "TRAFFIC_JAM"); // 30 min
+        for (var i = 0; i < 3; i++) await Flag((await Device(api)).client, report.Id);
+        Assert.Contains(await Queue(mod), q => q.Report.Id == report.Id);
+
+        api.Clock.Advance(TimeSpan.FromMinutes(31));
+        Assert.DoesNotContain(await Queue(mod), q => q.Report.Id == report.Id);
+        var found = (await mod.GetFromJsonAsync<QueueItem>($"/v1/moderation/reports/{report.Id}", Json))!;
+        Assert.Equal(ReportStatus.PendingReview, found.Status);
+    }
 }
