@@ -3,6 +3,8 @@ package com.roadpulse.app.ui
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -54,6 +56,8 @@ import androidx.compose.ui.unit.sp
 import com.roadpulse.app.data.Place
 import com.roadpulse.app.data.Route
 import com.roadpulse.app.nav.Narrator
+import com.roadpulse.app.nav.RouteChoice
+import com.roadpulse.app.nav.RouteChoices
 import com.roadpulse.app.nav.TurnIcon
 
 enum class ScreenMode { EXPLORE, PREVIEW, DRIVING }
@@ -177,6 +181,9 @@ private fun ResultRow(place: Place, onClick: () -> Unit) {
 fun PreviewOverlay(
     destination: Place?,
     route: Route?,
+    choices: List<Route> = listOfNotNull(route),
+    selected: Int = 0,
+    onSelectRoute: (Int) -> Unit = {},
     busy: Boolean,
     onBack: () -> Unit,
     onGo: () -> Unit,
@@ -203,23 +210,21 @@ fun PreviewOverlay(
                 if (route == null) {
                     if (busy) LinearProgressIndicator(Modifier.fillMaxWidth(), color = RP.Indigo, trackColor = RP.IndigoLight)
                 } else {
-                    Column(
-                        Modifier
-                            .fillMaxWidth()
-                            .border(BorderStroke(1.5.dp, RP.Indigo), RoundedCornerShape(18.dp))
-                            .padding(0.dp),
+                    val labels = RouteChoices.describe(choices.ifEmpty { listOf(route) })
+                    val cards = choices.ifEmpty { listOf(route) }
+                    Row(
+                        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        Surface(color = RP.IndigoLight, shape = RoundedCornerShape(18.dp), modifier = Modifier.fillMaxWidth()) {
-                            Column(Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
-                                Row(verticalAlignment = Alignment.Bottom) {
-                                    Text(formatDuration(route.timeSeconds), fontSize = 26.sp, fontWeight = FontWeight.SemiBold, color = RP.IndigoDeep)
-                                }
-                                Text(
-                                    "${formatKm(route.lengthKm)} · arrive ${formatArrival(context, route.timeSeconds)}",
-                                    fontSize = 13.sp,
-                                    color = RP.Indigo,
-                                )
-                            }
+                        cards.forEachIndexed { i, r ->
+                            RouteCard(
+                                route = r,
+                                choice = labels.getOrNull(i),
+                                selected = i == selected,
+                                single = cards.size == 1,
+                                arrival = formatArrival(context, r.timeSeconds),
+                                onClick = { onSelectRoute(i) },
+                            )
                         }
                     }
                     Spacer(Modifier.height(14.dp))
@@ -345,3 +350,47 @@ fun DrivingOverlay(
 
 /** Show "Then …" only when the next-but-one turn follows within this distance. */
 private const val THEN_HINT_MAX_GAP_M = 300.0
+
+@Composable
+private fun RouteCard(
+    route: Route,
+    choice: RouteChoice?,
+    selected: Boolean,
+    single: Boolean,
+    arrival: String,
+    onClick: () -> Unit,
+) {
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(18.dp),
+        color = if (selected) RP.IndigoLight else RP.Field,
+        border = if (selected) BorderStroke(1.5.dp, RP.Indigo) else null,
+        modifier = if (single) Modifier.width(320.dp) else Modifier.width(160.dp),
+    ) {
+        Column(Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
+            choice?.tag?.let { tag ->
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = if (selected) RP.Indigo else Color.White,
+                    contentColor = if (selected) Color.White else RP.TextSecondary,
+                ) { Text(tag, fontSize = 11.sp, fontWeight = FontWeight.Medium, modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)) }
+            }
+            Text(
+                formatDuration(route.timeSeconds),
+                fontSize = 24.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = if (selected) RP.IndigoDeep else Color.Black,
+                modifier = Modifier.padding(top = 4.dp),
+            )
+            Text(
+                "${formatKm(route.lengthKm)} · $arrival",
+                fontSize = 13.sp,
+                color = if (selected) RP.Indigo else RP.TextSecondary,
+                maxLines = 1,
+            )
+            choice?.via?.let {
+                Text("via $it", fontSize = 12.sp, color = RP.TextSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+        }
+    }
+}

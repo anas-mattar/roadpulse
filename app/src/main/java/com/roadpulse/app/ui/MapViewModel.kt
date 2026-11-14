@@ -32,7 +32,11 @@ data class MapUiState(
     val query: String = "",
     val searchResults: List<Place> = emptyList(),
     val destination: Place? = null,
+    /** The selected route (what Go now will navigate). */
     val route: Route? = null,
+    /** All route choices for the preview; [route] is routeChoices[selectedRoute]. */
+    val routeChoices: List<Route> = emptyList(),
+    val selectedRoute: Int = 0,
     val busy: Boolean = false,
     val navigating: Boolean = false,
     val currentInstruction: String? = null,
@@ -145,10 +149,19 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
     private fun calculateRoute(from: GeoPoint, to: GeoPoint) {
         viewModelScope.launch {
             _state.update { it.copy(busy = true) }
-            runCatching { router.route(from, to) }
-                .onSuccess { route -> _state.update { it.copy(route = route, busy = false) } }
+            runCatching { router.routes(from, to) }
+                .onSuccess { routes ->
+                    _state.update { it.copy(route = routes.first(), routeChoices = routes, selectedRoute = 0, busy = false) }
+                }
                 .onFailure { e -> _state.update { it.copy(busy = false, message = "Routing failed: ${e.message}") } }
         }
+    }
+
+    /** Picks one of the route choices in the preview. */
+    fun selectRoute(index: Int) {
+        val choices = _state.value.routeChoices
+        if (_state.value.navigating || index !in choices.indices) return
+        _state.update { it.copy(route = choices[index], selectedRoute = index) }
     }
 
     fun startNavigation() {

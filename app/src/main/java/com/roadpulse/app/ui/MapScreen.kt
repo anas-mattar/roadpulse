@@ -107,6 +107,8 @@ import org.maplibre.geojson.Point
 import kotlin.math.roundToInt
 
 private const val ROUTE_SOURCE = "route-source"
+private const val ALT_ROUTE_SOURCE = "alt-route-source"
+private const val ALT_ROUTE_LAYER = "alt-route-line"
 private const val DEST_SOURCE = "destination-source"
 private const val REPORT_SOURCE = "report-source"
 private const val MATCHED_SOURCE = "matched-source"
@@ -198,14 +200,42 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
     // Push view-model state into the map's GeoJSON sources.
     LaunchedEffect(style, state.route) {
         style?.getSourceAs<GeoJsonSource>(ROUTE_SOURCE)?.setGeoJson(state.route.toFeatureCollection())
-        val route = state.route
-        val m = map
-        if (route != null && m != null && route.shape.size >= 2 && !state.navigating) {
-            val bounds = LatLngBounds.Builder()
-                .includes(route.shape.map { LatLng(it.lat, it.lon) })
-                .build()
-            m.animateCamera(CameraUpdateFactory.newLatLngBounds(bounds, 120))
+    }
+    // Other route choices in grey (preview only); tapping one selects it.
+    LaunchedEffect(style, state.routeChoices, state.selectedRoute, state.navigating) {
+        val alternatives = if (state.navigating) emptyList() else
+            state.routeChoices.mapIndexedNotNull { i, r -> if (i == state.selectedRoute) null else i to r }
+        style?.getSourceAs<GeoJsonSource>(ALT_ROUTE_SOURCE)?.setGeoJson(
+            FeatureCollection.fromFeatures(
+                alternatives.filter { it.second.shape.size >= 2 }.map { (i, r) ->
+                    Feature.fromGeometry(LineString.fromLngLats(r.shape.map { Point.fromLngLat(it.lon, it.lat) }))
+                        .apply { addNumberProperty("index", i) }
+                }
+            )
+        )
+    }
+    // Fit all route choices on screen when they arrive (not on every selection change).
+    LaunchedEffect(map, state.routeChoices) {
+        val m = map ?: return@LaunchedEffect
+        val points = state.routeChoices.flatMap { it.shape }
+        if (points.size >= 2 && !state.navigating) {
+            val bounds = LatLngBounds.Builder().includes(points.map { LatLng(it.lat, it.lon) }).build()
+            m.animateCamera(CameraUpdateFactory.newLatLngBounds(bounds, 80, 220, 80, 900))
         }
+    }
+    DisposableEffect(map) {
+        val m = map
+        val listener = MapLibreMap.OnMapClickListener { point ->
+            val screen = m?.projection?.toScreenLocation(point) ?: return@OnMapClickListener false
+            val hit = m.queryRenderedFeatures(
+                android.graphics.RectF(screen.x - 30, screen.y - 30, screen.x + 30, screen.y + 30), ALT_ROUTE_LAYER,
+            ).firstOrNull()
+            val index = hit?.getNumberProperty("index")?.toInt() ?: return@OnMapClickListener false
+            viewModel.selectRoute(index)
+            true
+        }
+        m?.addOnMapClickListener(listener)
+        onDispose { m?.removeOnMapClickListener(listener) }
     }
     LaunchedEffect(style, state.destination) {
         style?.getSourceAs<GeoJsonSource>(DEST_SOURCE)?.setGeoJson(state.destination.toFeatureCollection())
@@ -312,6 +342,9 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                 ScreenMode.PREVIEW -> PreviewOverlay(
                     destination = state.destination,
                     route = state.route,
+                    choices = state.routeChoices,
+                    selected = state.selectedRoute,
+                    onSelectRoute = viewModel::selectRoute,
                     busy = state.busy,
                     onBack = viewModel::clearRoute,
                     onGo = viewModel::startNavigation,
@@ -427,11 +460,21 @@ private fun MapLibreView(
 }
 
 private fun Style.addOverlayLayers() {
+    addSource(GeoJsonSource(ALT_ROUTE_SOURCE))
     addSource(GeoJsonSource(ROUTE_SOURCE))
     addSource(GeoJsonSource(DEST_SOURCE))
     addSource(GeoJsonSource(REPORT_SOURCE))
     addSource(GeoJsonSource(MATCHED_SOURCE))
 
+    addLayer(
+        LineLayer(ALT_ROUTE_LAYER, ALT_ROUTE_SOURCE).withProperties(
+            PropertyFactory.lineColor("#9E9C94"),
+            PropertyFactory.lineWidth(7f),
+            PropertyFactory.lineOpacity(0.85f),
+            PropertyFactory.lineCap(Property.LINE_CAP_ROUND),
+            PropertyFactory.lineJoin(Property.LINE_JOIN_ROUND),
+        )
+    )
     addLayer(
         LineLayer("route-casing", ROUTE_SOURCE).withProperties(
             PropertyFactory.lineColor("#3C3489"),

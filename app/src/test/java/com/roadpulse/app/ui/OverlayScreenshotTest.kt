@@ -65,7 +65,12 @@ class OverlayScreenshotTest {
 
     @Test
     fun preview() = shot("2_preview", RP.Field) {
-        PreviewOverlay(place, route, busy = false, onBack = {}, onGo = {}, onSimulate = {})
+        val choices = listOf(
+            route.copy(hasToll = true, maneuvers = listOf(Maneuver("x", 9.0, 900.0, 0, streetNames = listOf("E37")))),
+            route.copy(lengthKm = 10.1, timeSeconds = 1380.0, maneuvers = listOf(Maneuver("x", 8.0, 1300.0, 0, streetNames = listOf("Jalan Tun Razak")))),
+            route.copy(lengthKm = 12.4, timeSeconds = 1500.0, hasToll = true, maneuvers = listOf(Maneuver("x", 10.0, 1400.0, 0, streetNames = listOf("Jalan Belfield")))),
+        )
+        PreviewOverlay(place, choices[0], choices, selected = 0, onSelectRoute = {}, busy = false, onBack = {}, onGo = {}, onSimulate = {})
     }
 
     @Test

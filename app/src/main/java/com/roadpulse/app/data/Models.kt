@@ -40,6 +40,8 @@ data class Route(
     val maneuvers: List<Maneuver>,
     val lengthKm: Double,
     val timeSeconds: Double,
+    val hasToll: Boolean = false,
+    val hasHighway: Boolean = false,
 )
 
 enum class ReportType(val label: String, val colorHex: String) {

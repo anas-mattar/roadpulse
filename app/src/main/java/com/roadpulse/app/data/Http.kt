@@ -20,6 +20,8 @@ internal object Http {
         ignoreUnknownKeys = true
         // Request bodies rely on default values (e.g. costing = "auto"); without this they are omitted.
         encodeDefaults = true
+        // Leave out fields that are null (e.g. "alternates" on reroute requests).
+        explicitNulls = false
     }
 
     suspend fun execute(request: Request): String = withContext(Dispatchers.IO) {
