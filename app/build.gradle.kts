@@ -95,6 +95,8 @@ tasks.withType<Test>().configureEach {
     System.getenv("ROADPULSE_BACKEND_URL")?.let { environment("ROADPULSE_BACKEND_URL", it) }
     System.getenv("ROADPULSE_MODERATOR_KEY")?.let { environment("ROADPULSE_MODERATOR_KEY", it) }
     System.getenv("ROADPULSE_LONG_TEST")?.let { environment("ROADPULSE_LONG_TEST", it) }
+    System.getenv("ROADPULSE_PLACES_LAT")?.let { environment("ROADPULSE_PLACES_LAT", it) }
+    System.getenv("ROADPULSE_PLACES_LON")?.let { environment("ROADPULSE_PLACES_LON", it) }
     // Screenshot tests write PNGs to app/build/outputs/roborazzi/ on every run.
     systemProperty("roborazzi.test.record", "true")
 }

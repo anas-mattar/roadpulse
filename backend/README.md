@@ -50,6 +50,39 @@ the moderation API with it; the page itself contains no data. Strict browser sec
 (no inline scripts, no outside resources, no framing). Turn the page off with
 `Moderation__WebPage=false`.
 
+## Updating the map data
+
+All map data (routing, places, offline tiles) comes from one OpenStreetMap file,
+`valhalla_data/malaysia-singapore-brunei-latest.osm.pbf`, which Geofabrik refreshes daily.
+To update everything:
+```
+powershell -ExecutionPolicy Bypass -File update-map-data.ps1
+```
+It downloads the new file (resumable, checked for completeness before use; the previous file is
+kept as `valhalla_data/previous.osm.pbf`), stops if the data is not newer, rebuilds the routing data
+(`force_rebuild` via `VALHALLA_FORCE_REBUILD`, then back to normal), checks a test route, then runs
+`setup-places.ps1` and, if offline tiles are set up, `setup-offline-maps.ps1`. Options: `-Force`,
+`-SkipDownload`, `-SkipMaps`. Monthly is enough for development; weekly before a public release.
+Community reports are live data and are not affected.
+
+## Places: fuel, parking, food, EV charging, R&R, speed cameras
+
+```
+powershell -ExecutionPolicy Bypass -File setup-places.ps1
+```
+Extracts these places from the Malaysia map file with osmium (`tools/osmium`), then loads them
+into the `places` table with `docker compose run --rm api import-places /maps/places.geojsonseq`
+(replaces all places; re-run after updating the map file). Endpoints:
+
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/v1/places/nearby?category=&lat=&lon=&radiusM=&limit=` | Nearest places of a category (FUEL, PARKING, FOOD, EV_CHARGING, REST_AREA, SPEED_CAMERA) |
+| POST | `/v1/places/along-route` | `{category, points: [[lat, lon], …], corridorM}`: places within the corridor of a route (speed cameras) |
+
+The app uses them for the category buttons under the search box, car parks near the destination,
+and speed camera warnings. Coverage is whatever OpenStreetMap has: speed cameras in particular
+are mapped only in part in Malaysia.
+
 ## Offline map tiles (optional)
 
 The app's map normally loads from OpenFreeMap over the internet. To serve map tiles from this

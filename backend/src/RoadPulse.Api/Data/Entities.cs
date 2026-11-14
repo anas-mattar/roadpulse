@@ -53,6 +53,24 @@ public class ReportFlag
     public DateTimeOffset CreatedAt { get; set; }
 }
 
+/// <summary>Kinds of places drivers search for or are warned about (from OpenStreetMap).</summary>
+public enum PlaceCategory { FUEL, PARKING, FOOD, EV_CHARGING, REST_AREA, SPEED_CAMERA }
+
+/// <summary>A place imported from OpenStreetMap (see Modules/Places/PlaceImporter.cs).</summary>
+public class MapPlace
+{
+    /// <summary>OpenStreetMap object, e.g. "n123" (node) or "w456" (way).</summary>
+    public required string Id { get; set; }
+    public PlaceCategory Category { get; set; }
+    public string? Name { get; set; }
+    public string? Brand { get; set; }
+    /// <summary>Parking: true when OpenStreetMap says a fee is charged.</summary>
+    public bool? Paid { get; set; }
+    /// <summary>Speed camera: the enforced limit, when mapped.</summary>
+    public int? MaxSpeedKph { get; set; }
+    public required Point Location { get; set; }
+}
+
 /// <summary>Append-only record of every moderator action. Holds IDs only, no locations or tokens.</summary>
 public class AuditEntry
 {

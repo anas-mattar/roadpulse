@@ -5,6 +5,7 @@ using RoadPulse.Api.Data;
 using RoadPulse.Api.Modules.Devices;
 using RoadPulse.Api.Modules.Live;
 using RoadPulse.Api.Modules.Moderation;
+using RoadPulse.Api.Modules.Places;
 using RoadPulse.Api.Modules.Reports;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -23,8 +24,10 @@ builder.Services.AddProblemDetails(o => o.CustomizeProblemDetails = ctx =>
         ctx.ProblemDetails.Status = StatusCodes.Status400BadRequest;
         ctx.HttpContext.Response.StatusCode = StatusCodes.Status400BadRequest;
         ctx.ProblemDetails.Title = "Invalid request";
-        ctx.ProblemDetails.Detail = "The request body could not be read. Check the JSON, field names and values " +
-            "(type must be one of: " + string.Join(", ", Enum.GetNames<ReportType>()) + ").";
+        ctx.ProblemDetails.Detail = ctx.HttpContext.Request.Path.StartsWithSegments("/v1/places")
+            ? "Check the parameters (category must be one of: " + string.Join(", ", Enum.GetNames<PlaceCategory>()) + ")."
+            : "The request body could not be read. Check the JSON, field names and values " +
+              "(type must be one of: " + string.Join(", ", Enum.GetNames<ReportType>()) + ").";
     }
 });
 builder.Services.AddSignalR(o => o.MaximumReceiveMessageSize = 4 * 1024)
@@ -40,6 +43,17 @@ builder.Services.AddAuthorizationBuilder()
 builder.Services.AddRoadPulseRateLimits(builder.Configuration);
 
 var app = builder.Build();
+
+// One-off command: load places (fuel, parking, speed cameras…) made by setup-places.ps1, then exit.
+//   dotnet RoadPulse.Api.dll import-places /maps/places.geojsonseq
+if (args.Length >= 2 && args[0] == "import-places")
+{
+    using var scope = app.Services.CreateScope();
+    var db = scope.ServiceProvider.GetRequiredService<RoadPulseDb>();
+    db.Database.Migrate();
+    await PlaceImporter.ImportAsync(db, args[1], app.Logger);
+    return;
+}
 
 if (app.Configuration.GetValue("Database:MigrateOnStartup", false))
 {
@@ -83,6 +97,7 @@ var v1 = app.MapGroup("/v1");
 v1.MapDeviceEndpoints();
 v1.MapReportEndpoints();
 v1.MapModerationEndpoints();
+v1.MapPlaceEndpoints();
 app.MapHub<ReportsHub>(ReportsHub.Path).RequireRateLimiting(RateLimits.Reads);
 
 app.Run();

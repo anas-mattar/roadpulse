@@ -50,6 +50,10 @@ interface Narrator {
     fun reportName(type: ReportType): String
     /** Warning for a report on the route ahead, e.g. "Police reported 700 meters ahead." */
     fun reportAhead(type: ReportType, meters: Int): String
+    /** Warning for a fixed speed camera ahead, with its limit when known. */
+    fun cameraAhead(meters: Int, limitKph: Int?): String
+    /** Short label for the speed camera hint. */
+    val speedCamera: String
 }
 
 fun narratorFor(language: GuidanceLanguage): Narrator = when (language) {
@@ -104,6 +108,9 @@ object EnglishNarrator : Narrator {
         ReportType.ROAD_CLOSED -> "Road closure"
     }
     override fun reportAhead(type: ReportType, meters: Int) = "${reportName(type)} reported $meters meters ahead."
+    override fun cameraAhead(meters: Int, limitKph: Int?) =
+        "Speed camera in $meters meters." + (limitKph?.let { " Limit $it." } ?: "")
+    override val speedCamera = "Speed camera"
 }
 
 /**
@@ -208,6 +215,9 @@ object MalayNarrator : Narrator {
         ReportType.ROAD_CLOSED -> "Penutupan jalan"
     }
     override fun reportAhead(type: ReportType, meters: Int) = "${reportName(type)} dilaporkan $meters meter di hadapan."
+    override fun cameraAhead(meters: Int, limitKph: Int?) =
+        "Kamera had laju dalam $meters meter." + (limitKph?.let { " Had laju $it." } ?: "")
+    override val speedCamera = "Kamera had laju"
 
     private val ordinals = listOf(
         "pertama", "kedua", "ketiga", "keempat", "kelima",

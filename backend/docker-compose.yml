@@ -33,6 +33,8 @@ services:
       Database__MigrateOnStartup: "true"
       Moderation__Moderators__0__Name: ${MODERATOR_NAME:-}
       Moderation__Moderators__0__KeyHash: ${MODERATOR_KEY_HASH:-}
+    volumes:
+      - ./maps:/maps:ro # places file for "import-places" (setup-places.ps1)
     ports:
       - "8080:8080"
 
@@ -47,6 +49,8 @@ services:
       serve_tiles: "True"
       build_admins: "True"
       build_elevation: "False"
+      # Rebuild routing data from a new map file (set to True only by update-map-data.ps1).
+      force_rebuild: ${VALHALLA_FORCE_REBUILD:-False}
 
   # Map tiles served from this computer (optional): run setup-offline-maps.ps1 once, then
   #   docker compose --profile maps up -d tiles

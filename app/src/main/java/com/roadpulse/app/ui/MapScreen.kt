@@ -462,6 +462,9 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                         }
                     },
                     onClearParking = viewModel::clearParking,
+                    onCategory = if (state.placesAvailable) ({ c -> viewModel.searchCategory(c, searchBias()) }) else null,
+                    categoryTitle = state.categoryTitle,
+                    onCloseCategory = viewModel::clearCategory,
                     onVoiceSearch = if (voiceSearchAvailable) ({
                         voiceSearch.launch(
                             android.content.Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
@@ -485,6 +488,8 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                     stops = state.stops,
                     onRemoveStop = viewModel::removeStop,
                     optionsSummary = state.routeOptions.summary(),
+                    parkingNearby = state.parkingNearby,
+                    onChooseParking = viewModel::chooseParking,
                 )
 
                 ScreenMode.DRIVING -> DrivingOverlay(

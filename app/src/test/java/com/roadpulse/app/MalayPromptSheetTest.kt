@@ -81,6 +81,8 @@ class MalayPromptSheetTest {
         com.roadpulse.app.data.ReportType.entries.forEach { t ->
             rows += listOf("Reports", "Warning for a report on the route ahead", en.reportAhead(t, 700), ms.reportAhead(t, 700))
         }
+        rows += listOf("Cameras", "Warning for a fixed speed camera ahead", en.cameraAhead(500, 90), ms.cameraAhead(500, 90))
+        rows += listOf("Cameras", "Label of the speed camera hint", en.speedCamera, ms.speedCamera)
         (1..4).forEach { rows += listOf("Words", "Roundabout exit number", "exit $it", ms.ordinal(it)) }
         listOf(0, 45, 90, 135, 180, 225, 270, 315).forEach { rows += listOf("Words", "Compass direction at the start", "$it°", ms.compass(it)) }
 

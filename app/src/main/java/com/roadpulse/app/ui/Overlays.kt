@@ -27,6 +27,15 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.getValue
+import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.filled.LocalCafe
+import androidx.compose.material.icons.filled.EvStation
+import androidx.compose.material.icons.filled.Restaurant
+import androidx.compose.material.icons.filled.LocalGasStation
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.LocalParking
@@ -103,6 +112,10 @@ fun ExploreOverlay(
     /** Voice search; null hides the microphone (no speech recognizer on the device). */
     onVoiceSearch: (() -> Unit)? = null,
     nowMillis: Long = System.currentTimeMillis(),
+    /** Category buttons under the search box; null hides them (no places server). */
+    onCategory: ((com.roadpulse.app.data.PlaceCategory) -> Unit)? = null,
+    categoryTitle: String? = null,
+    onCloseCategory: () -> Unit = {},
 ) {
     Box(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(12.dp)) {
         CircleButton(
@@ -135,6 +148,13 @@ fun ExploreOverlay(
 
             Island(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(12.dp)) {
+                    if (categoryTitle != null) {
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 4.dp, bottom = 4.dp)) {
+                            Text(categoryTitle, fontWeight = FontWeight.SemiBold, fontSize = 15.sp, modifier = Modifier.weight(1f))
+                            Icon(Icons.Filled.Close, contentDescription = "Close", tint = RP.TextSecondary,
+                                modifier = Modifier.size(20.dp).clickable(onClick = onCloseCategory))
+                        }
+                    }
                     if (results.isNotEmpty()) {
                         LazyColumn(Modifier.heightIn(max = 300.dp)) {
                             items(results) { place -> ResultRow(place) { onSelect(place) } }
@@ -161,7 +181,22 @@ fun ExploreOverlay(
                         showClear = query.isNotEmpty() || settingShortcut != null,
                         onVoice = if (settingShortcut == null) onVoiceSearch else null,
                     )
-                    if (query.isEmpty() && results.isEmpty() && settingShortcut == null) {
+                    if (onCategory != null && query.isEmpty() && settingShortcut == null && categoryTitle == null) {
+                        Row(
+                            Modifier.fillMaxWidth().padding(top = 10.dp).horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            CATEGORY_CHIPS.forEach { (category, icon) ->
+                                Surface(onClick = { onCategory(category) }, shape = RoundedCornerShape(18.dp), color = RP.IndigoLight, contentColor = RP.Indigo) {
+                                    Row(Modifier.padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp))
+                                        Text(category.label, fontSize = 14.sp, fontWeight = FontWeight.Medium, modifier = Modifier.padding(start = 6.dp))
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    if (query.isEmpty() && results.isEmpty() && settingShortcut == null && categoryTitle == null) {
                         Row(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             ShortcutChip("Home", Icons.Filled.Home, saved.home, { onShortcut(Shortcut.HOME) }, { onChangeShortcut(Shortcut.HOME) })
                             ShortcutChip("Work", Icons.Filled.Work, saved.work, { onShortcut(Shortcut.WORK) }, { onChangeShortcut(Shortcut.WORK) })
@@ -282,6 +317,8 @@ fun PreviewOverlay(
     onRemoveStop: (Place) -> Unit = {},
     /** e.g. "Motorcycle · avoiding tolls"; null when the defaults are used. */
     optionsSummary: String? = null,
+    parkingNearby: List<Place> = emptyList(),
+    onChooseParking: (Place) -> Unit = {},
 ) {
     val context = LocalContext.current
     Box(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(12.dp)) {
@@ -308,7 +345,23 @@ fun PreviewOverlay(
                 if (optionsSummary != null) {
                     Text(optionsSummary, fontSize = 13.sp, color = RP.TextSecondary, modifier = Modifier.padding(top = 4.dp))
                 }
-                if (stops.isEmpty()) {
+                if (parkingNearby.isNotEmpty()) {
+                    var open by remember { mutableStateOf(false) }
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp).clickable { open = !open },
+                    ) {
+                        Icon(Icons.Filled.LocalParking, contentDescription = null, tint = RP.TealDark, modifier = Modifier.size(20.dp))
+                        Text(
+                            "${parkingNearby.size} car park${if (parkingNearby.size > 1) "s" else ""} near your destination",
+                            fontSize = 14.sp, color = RP.TealDark, fontWeight = FontWeight.Medium,
+                            modifier = Modifier.padding(start = 8.dp).weight(1f),
+                        )
+                        Text(if (open) "Hide" else "Show", fontSize = 13.sp, color = RP.Indigo)
+                    }
+                    if (open) parkingNearby.forEach { p -> ResultRow(p, icon = Icons.Filled.LocalParking) { onChooseParking(p) } }
+                }
+                if (stops.isEmpty() && parkingNearby.isEmpty()) {
                     Text("Tip: press and hold the map to add a stop", fontSize = 12.sp, color = RP.TextSecondary, modifier = Modifier.padding(top = 4.dp))
                 }
                 Spacer(Modifier.height(12.dp))
@@ -408,6 +461,15 @@ fun DrivingOverlay(
                             icon = ahead.report.type.icon,
                             trailing = formatKm(ahead.metersAhead / 1000),
                             color = ahead.report.type.color,
+                            contentColor = Color.White,
+                        )
+                    }
+                    state.cameraAhead?.let { cam ->
+                        Pill(
+                            text = narrator.speedCamera + (cam.maxSpeedKph?.let { " $it" } ?: ""),
+                            icon = Icons.Filled.CameraAlt,
+                            trailing = formatKm(cam.metersAhead / 1000),
+                            color = Color(0xFF26215C),
                             contentColor = Color.White,
                         )
                     }
@@ -565,3 +627,13 @@ private fun RowScope.ShortcutChip(
         }
     }
 }
+
+/** Categories offered under the search box, with their icons. */
+private val CATEGORY_CHIPS = listOf(
+    com.roadpulse.app.data.PlaceCategory.FUEL to Icons.Filled.LocalGasStation,
+    com.roadpulse.app.data.PlaceCategory.PARKING to Icons.Filled.LocalParking,
+    com.roadpulse.app.data.PlaceCategory.FOOD to Icons.Filled.Restaurant,
+    com.roadpulse.app.data.PlaceCategory.EV_CHARGING to Icons.Filled.EvStation,
+    com.roadpulse.app.data.PlaceCategory.REST_AREA to Icons.Filled.LocalCafe,
+)
+

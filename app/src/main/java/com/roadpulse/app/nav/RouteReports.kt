@@ -28,6 +28,9 @@ class RouteReports(private val shape: List<GeoPoint>, private val corridorM: Dou
     /** Metres from the route start to the report, or null if it is not on the route. */
     fun alongOf(report: Report): Double? = alongCache.getOrPut(report.id) { project(report.location) }
 
+    /** Metres from the route start to a point identified by [id], or null if it is not on the route. */
+    fun alongOfPoint(id: String, point: GeoPoint): Double? = alongCache.getOrPut(id) { project(point) }
+
     /** Reports ahead of [carAlongM], nearest first, up to [maxAheadM] away. */
     fun ahead(reports: List<Report>, carAlongM: Double, maxAheadM: Double): List<ReportAhead> =
         reports.mapNotNull { r ->
@@ -111,4 +114,7 @@ class PassedReports(private val nearM: Double = 80.0) {
         done.clear()
     }
 }
+
+/** A speed camera on the route ahead. */
+data class CameraAhead(val id: String, val metersAhead: Double, val maxSpeedKph: Int?)
 

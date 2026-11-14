@@ -24,3 +24,5 @@ backend/maps/malaysia.mbtiles
 backend/maps/sources/
 backend/maps/tmp/
 backend/maps/styles/sprites/
+backend/maps/places.geojsonseq
+backend/maps/places-filtered.osm.pbf

@@ -10,6 +10,7 @@ public class RoadPulseDb(DbContextOptions<RoadPulseDb> options) : DbContext(opti
     public DbSet<IdempotencyRecord> IdempotencyRecords => Set<IdempotencyRecord>();
     public DbSet<ReportFlag> ReportFlags => Set<ReportFlag>();
     public DbSet<AuditEntry> AuditLog => Set<AuditEntry>();
+    public DbSet<MapPlace> Places => Set<MapPlace>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -61,6 +62,18 @@ public class RoadPulseDb(DbContextOptions<RoadPulseDb> options) : DbContext(opti
             e.Property(a => a.Reason).HasMaxLength(500);
             e.HasIndex(a => a.At);
             e.HasIndex(a => a.TargetId);
+        });
+
+        b.Entity<MapPlace>(e =>
+        {
+            e.ToTable("places");
+            e.Property(p => p.Id).HasMaxLength(24);
+            e.Property(p => p.Category).HasConversion<string>().HasMaxLength(20);
+            e.Property(p => p.Name).HasMaxLength(200);
+            e.Property(p => p.Brand).HasMaxLength(100);
+            e.Property(p => p.Location).HasColumnType("geography (point, 4326)");
+            e.HasIndex(p => p.Location).HasMethod("gist");
+            e.HasIndex(p => p.Category);
         });
 
         b.Entity<IdempotencyRecord>(e =>

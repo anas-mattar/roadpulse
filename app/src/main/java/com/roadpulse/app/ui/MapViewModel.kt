@@ -79,6 +79,14 @@ data class MapUiState(
     val pinned: Place? = null,
     /** Asked right after driving past a report: is it still there? */
     val stillThere: Report? = null,
+    /** Category results are shown (e.g. "Fuel"): the header above the results. */
+    val categoryTitle: String? = null,
+    /** The RoadPulse backend is configured, so places (fuel, parking…) can be searched. */
+    val placesAvailable: Boolean = false,
+    /** Car parks near the destination (preview), nearest first. */
+    val parkingNearby: List<Place> = emptyList(),
+    /** Nearest fixed speed camera ahead while driving. */
+    val cameraAhead: com.roadpulse.app.nav.CameraAhead? = null,
     /** Route options in effect (shown in the preview). */
     val routeOptions: com.roadpulse.app.data.RouteOptions = com.roadpulse.app.data.RouteOptions(),
 )
@@ -123,6 +131,7 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
                             speedKmh = nav.speedMps?.let { (it * 3.6).roundToInt() },
                             speedLimitKph = nav.speedLimitKph,
                             reportAhead = nav.reportAhead,
+                            cameraAhead = nav.cameraAhead,
                             navStatus = VoiceSettings.narrator().let { n ->
                                 when {
                                     nav.rerouting -> n.statusFindingRoute
@@ -133,7 +142,7 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
                                 }
                             },
                         )
-                        ui.navigating -> MapUiState(reports = ui.reports, message = ui.message, saved = ui.saved, selectedReportId = ui.selectedReportId, selectedReportOwn = ui.selectedReportOwn, routeOptions = ui.routeOptions)
+                        ui.navigating -> MapUiState(reports = ui.reports, message = ui.message, saved = ui.saved, selectedReportId = ui.selectedReportId, selectedReportOwn = ui.selectedReportOwn, routeOptions = ui.routeOptions, placesAvailable = ui.placesAvailable)
                         else -> ui
                     }
                 }
@@ -169,7 +178,7 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun onQueryChange(query: String, near: GeoPoint?) {
-        _state.update { it.copy(query = query) }
+        _state.update { it.copy(query = query, categoryTitle = null) }
         searchJob?.cancel()
         if (query.length < 3) {
             _state.update { it.copy(searchResults = emptyList()) }
@@ -188,6 +197,39 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    /** Lists places of [category] nearest to [near] (the user's position or the map centre). */
+    fun searchCategory(category: com.roadpulse.app.data.PlaceCategory, near: GeoPoint?) {
+        val url = ServerSettings.backendUrl()
+        if (url.isEmpty() || near == null) return
+        searchJob?.cancel()
+        _state.update { it.copy(query = "", categoryTitle = "${category.label} nearby", searchResults = emptyList()) }
+        searchJob = viewModelScope.launch {
+            try {
+                val found = com.roadpulse.app.data.PlacesClient(url).nearby(category, near, radiusM = 10_000)
+                _state.update {
+                    it.copy(
+                        searchResults = found.map { p -> p.toPlace() },
+                        categoryTitle = if (found.isEmpty()) "No ${category.label.lowercase()} within 10 km" else it.categoryTitle,
+                    )
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _state.update { it.copy(categoryTitle = null, message = "Could not load places. Check your connection.") }
+            }
+        }
+    }
+
+    fun clearCategory() = _state.update { it.copy(categoryTitle = null, searchResults = emptyList()) }
+
+    /** Use a suggested car park as the destination instead (keeps the stops). */
+    fun chooseParking(parking: Place) {
+        val dest = _state.value.destination ?: return
+        val named = parking.copy(name = "Parking · ${parking.name}", description = "Near ${dest.name}")
+        _state.update { it.copy(destination = named, parkingNearby = emptyList(), route = null) }
+        lastOrigin?.let { calculateRoute(it, named.location, lookForParking = false) }
+    }
+
     fun onPlaceSelected(place: Place, from: GeoPoint?) {
         val shortcut = _state.value.settingShortcut
         if (shortcut != null) {
@@ -199,7 +241,10 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
             return
         }
         val saved = placesStore.addRecent(place)
-        _state.update { it.copy(saved = saved, query = place.name, searchResults = emptyList(), destination = place, route = null, stops = emptyList()) }
+        _state.update {
+            it.copy(saved = saved, query = place.name, searchResults = emptyList(), destination = place, route = null,
+                stops = emptyList(), categoryTitle = null, parkingNearby = emptyList())
+        }
         if (from == null) {
             _state.update { it.copy(message = "Waiting for your location. Enable GPS and try again.") }
             return
@@ -207,11 +252,25 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
         calculateRoute(from, place.location)
     }
 
+    /** Suggests car parks within 600 m of the destination (shown in the preview). */
+    private fun findParkingNear(to: GeoPoint) {
+        val url = ServerSettings.backendUrl()
+        if (url.isEmpty() || _state.value.destination?.name?.startsWith("Parking") == true) return
+        viewModelScope.launch {
+            val found = runCatching { com.roadpulse.app.data.PlacesClient(url).nearby(com.roadpulse.app.data.PlaceCategory.PARKING, to, radiusM = 600, limit = 5) }
+                .getOrNull().orEmpty()
+            // Not worth suggesting when the destination itself is (practically) a car park.
+            val useful = found.filter { it.distanceM > 40 }
+            _state.update { if (it.destination?.location == to) it.copy(parkingNearby = useful.map { p -> p.toPlace() }) else it }
+        }
+    }
+
     /** Where the current preview was planned from (to re-plan after a stop or option change). */
     private var lastOrigin: GeoPoint? = null
 
-    private fun calculateRoute(from: GeoPoint, to: GeoPoint) {
+    private fun calculateRoute(from: GeoPoint, to: GeoPoint, lookForParking: Boolean = true) {
         lastOrigin = from
+        if (lookForParking) findParkingNear(to)
         val stops = _state.value.stops.map { it.location }
         viewModelScope.launch {
             _state.update { it.copy(busy = true) }
@@ -277,13 +336,14 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
     fun clearRoute() {
         DriveReplay.stop()
         NavigationSession.stop()
-        _state.update { MapUiState(reports = it.reports, message = it.message, saved = it.saved, selectedReportId = it.selectedReportId, selectedReportOwn = it.selectedReportOwn, routeOptions = it.routeOptions) }
+        _state.update { MapUiState(reports = it.reports, message = it.message, saved = it.saved, selectedReportId = it.selectedReportId, selectedReportOwn = it.selectedReportOwn, routeOptions = it.routeOptions, placesAvailable = it.placesAvailable) }
     }
 
     private fun useReportsSource() {
         reportsJob?.cancel()
         reportRepository.close()
         val url = ServerSettings.backendUrl()
+        _state.update { it.copy(placesAvailable = url.isNotEmpty()) }
         reportRepository = if (url.isEmpty()) {
             InMemoryReportRepository()
         } else {

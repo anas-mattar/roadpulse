@@ -60,6 +60,8 @@ data class NavState(
     val speedLimitKph: Int? = null,
     /** Nearest community report on the route ahead (within 1 km), shown as a hint. */
     val reportAhead: ReportAhead? = null,
+    /** Nearest fixed speed camera on the route ahead (within 1 km). */
+    val cameraAhead: CameraAhead? = null,
 )
 
 /**
@@ -98,6 +100,10 @@ object NavigationSession {
     /** Notices when the car has driven past a report (for "still there?"). */
     private val passedReports = PassedReports(PASS_NEAR_M)
     private var wasSpeeding = false
+    /** Fixed speed cameras on the current route (from the backend's map places). */
+    private var cameras: List<com.roadpulse.app.data.MapPlace> = emptyList()
+    private var camerasJob: Job? = null
+    private val announcedCameras = HashSet<String>()
     private var lastSpeedingAlert = Long.MIN_VALUE / 2
 
     /** Called once from the activity and the service; safe to repeat. */
@@ -169,6 +175,9 @@ object NavigationSession {
         announcer = ReportAnnouncer()
         passedReports.reset()
         carAlongM = 0.0
+        camerasJob?.cancel()
+        cameras = emptyList()
+        announcedCameras.clear()
         store?.clear()
         log?.close()
         log = null
@@ -212,6 +221,11 @@ object NavigationSession {
             }
         }
         ahead?.let { noticePassedReports(it) }
+        val camera = if (progress.matched) camerasAhead().firstOrNull() else null
+        if (camera != null && progress.prompt == null && camera.metersAhead <= CAMERA_WARN_M && announcedCameras.add(camera.id)) {
+            log?.event(fix.timeMillis, "camera_ahead", "m=${camera.metersAhead.toInt()}")
+            speak(VoiceSettings.narrator().cameraAhead(ReportAnnouncer.spokenMeters(camera.metersAhead), camera.maxSpeedKph), fix.timeMillis)
+        }
         checkSpeeding(fix.speedMps, if (progress.matched) speedLimits.at(progress.segmentIndex) else current.speedLimitKph)
         if (progress.prompt == null) { // never talk over a turn instruction
             ahead?.let(announcer::next)?.let { due ->
@@ -237,6 +251,7 @@ object NavigationSession {
                 displayPosition = progress.displayPosition,
                 poorSignal = progress.poorSignal,
                 reportAhead = if (progress.matched) ahead?.firstOrNull() else it.reportAhead,
+                cameraAhead = if (progress.matched) camera else it.cameraAhead,
             )
         }
     }
@@ -245,6 +260,7 @@ object NavigationSession {
         tracker = RouteTracker(route, resumed, VoiceSettings::narrator)
         routeReports = RouteReports(route.shape)
         passedReports.newRoute() // reports no longer on the new route were not "passed"
+        fetchCameras(route)
         if (!resumed && _state.value == null) announcer = ReportAnnouncer() // a reroute keeps what was already said
         fetchSpeedLimits(route)
         signal.reset(now())
@@ -332,6 +348,34 @@ object NavigationSession {
         }
     }
 
+    /** Loads the speed cameras along [route] in the background (needs the RoadPulse backend). */
+    private fun fetchCameras(route: com.roadpulse.app.data.Route) {
+        camerasJob?.cancel()
+        cameras = emptyList()
+        val url = com.roadpulse.app.data.ServerSettings.backendUrl()
+        if (url.isEmpty()) return
+        camerasJob = scope.launch {
+            try {
+                val found = com.roadpulse.app.data.PlacesClient(url).alongRoute(com.roadpulse.app.data.PlaceCategory.SPEED_CAMERA, route.shape)
+                if (_state.value?.route === route) cameras = found
+                log?.event(now(), "speed_cameras", "count=${found.size}")
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                log?.event(now(), "speed_cameras", "failed: ${e.javaClass.simpleName}")
+            }
+        }
+    }
+
+    private fun camerasAhead(): List<CameraAhead> {
+        val rr = routeReports ?: return emptyList()
+        return cameras.mapNotNull { c ->
+            val along = rr.alongOfPoint("cam:" + c.id, c.location) ?: return@mapNotNull null
+            val ahead = along - carAlongM
+            if (ahead > 0 && ahead <= REPORT_HINT_M) CameraAhead(c.id, ahead, c.maxSpeedKph) else null
+        }.sortedBy { it.metersAhead }
+    }
+
     /** Stops on the current route that the car has not reached yet. */
     private fun remainingStops(): List<GeoPoint> {
         val route = _state.value?.route ?: return emptyList()
@@ -388,6 +432,7 @@ object NavigationSession {
     }
 
     private const val STOP_PASSED_M = 30.0
+    private const val CAMERA_WARN_M = 500.0
     private const val PASS_NEAR_M = 80.0
     private const val SPEEDING_ALERT_GAP_MS = 20_000L
     private const val REROUTE_MIN_INTERVAL_MS = 10_000L

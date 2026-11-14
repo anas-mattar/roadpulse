@@ -140,6 +140,56 @@ namespace RoadPulse.Api.Data.Migrations
                     b.ToTable("idempotency_records", (string)null);
                 });
 
+            modelBuilder.Entity("RoadPulse.Api.Data.MapPlace", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasMaxLength(24)
+                        .HasColumnType("character varying(24)")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Brand")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("brand");
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("category");
+
+                    b.Property<Point>("Location")
+                        .IsRequired()
+                        .HasColumnType("geography (point, 4326)")
+                        .HasColumnName("location");
+
+                    b.Property<int?>("MaxSpeedKph")
+                        .HasColumnType("integer")
+                        .HasColumnName("max_speed_kph");
+
+                    b.Property<string>("Name")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("name");
+
+                    b.Property<bool?>("Paid")
+                        .HasColumnType("boolean")
+                        .HasColumnName("paid");
+
+                    b.HasKey("Id")
+                        .HasName("pk_places");
+
+                    b.HasIndex("Category")
+                        .HasDatabaseName("ix_places_category");
+
+                    b.HasIndex("Location")
+                        .HasDatabaseName("ix_places_location");
+
+                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("Location"), "gist");
+
+                    b.ToTable("places", (string)null);
+                });
+
             modelBuilder.Entity("RoadPulse.Api.Data.Report", b =>
                 {
                     b.Property<Guid>("Id")

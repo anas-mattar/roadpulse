@@ -225,4 +225,48 @@ class OverlayScreenshotTest {
             onVoiceSearch = {}, nowMillis = 1_794_660_000_000L + 25 * 60_000,
         )
     }
+
+    @Test
+    fun exploreCategories() = shot("1e_explore_categories", RP.Field) {
+        ExploreOverlay(
+            query = "", results = emptyList(), saved = SavedPlaces(home = place),
+            onQueryChange = {}, onClear = {}, onSelect = {}, onOpenSettings = {}, onRecenter = {}, onReport = {},
+            onCategory = {},
+        )
+    }
+
+    @Test
+    fun categoryResults() = shot("1f_category_results", RP.Field) {
+        ExploreOverlay(
+            query = "",
+            results = listOf(
+                Place("Petronas Jalan Ampang", "650 m", GeoPoint(3.16, 101.72)),
+                Place("Shell Jalan Tun Razak", "1.4 km", GeoPoint(3.16, 101.72)),
+                Place("Caltex", "2.2 km", GeoPoint(3.16, 101.72)),
+            ),
+            onQueryChange = {}, onClear = {}, onSelect = {}, onOpenSettings = {}, onRecenter = {}, onReport = {},
+            onCategory = {}, categoryTitle = "Fuel nearby",
+        )
+    }
+
+    @Test
+    fun previewWithParking() = shot("2c_preview_parking", RP.Field) {
+        PreviewOverlay(
+            destination = place, route = route, busy = false, onBack = {}, onGo = {}, onSimulate = null,
+            parkingNearby = listOf(Place("Pavilion Car Park", "240 m · paid", GeoPoint(3.149, 101.713))),
+        )
+    }
+
+    @Test
+    fun drivingWithCamera() = shot("3d_driving_camera", RP.NightSurface) {
+        DrivingOverlay(
+            state = MapUiState(
+                navigating = true, route = route, destination = place,
+                currentInstruction = "Continue on E6.", distanceToTurnMeters = 5200.0,
+                remainingKm = 40.0, remainingSeconds = 1800.0, turnType = 8, speedKmh = 96, speedLimitKph = 90,
+                cameraAhead = com.roadpulse.app.nav.CameraAhead("n9", 420.0, 90),
+            ),
+            narrator = MalayNarrator, muted = false, onToggleMute = {}, onReport = {}, onStop = {},
+        )
+    }
 }
