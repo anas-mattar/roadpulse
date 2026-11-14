@@ -7,6 +7,7 @@ import com.roadpulse.app.BuildConfig
 import com.roadpulse.app.data.GeoPoint
 import com.roadpulse.app.data.GeocodingClient
 import com.roadpulse.app.data.BackendReportRepository
+import com.roadpulse.app.data.FlagReason
 import com.roadpulse.app.data.InMemoryReportRepository
 import com.roadpulse.app.data.MapArea
 import com.roadpulse.app.data.ReportRejectedException
@@ -60,6 +61,11 @@ data class MapUiState(
     /** Short status shown under the instruction while navigating (rerouting, GPS lost, offline). */
     val navStatus: String? = null,
     val reports: List<Report> = emptyList(),
+    /** Report the driver tapped (its card is shown while it is still on the map). */
+    val selectedReportId: String? = null,
+    val selectedReportOwn: Boolean = false,
+    /** A vote or flag is being sent. */
+    val reportBusy: Boolean = false,
     /** Home, Work and recent destinations (stored on the device only). */
     val saved: SavedPlaces = SavedPlaces(),
     /** Set while the user is choosing the address for Home or Work. */
@@ -116,7 +122,7 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
                                 }
                             },
                         )
-                        ui.navigating -> MapUiState(reports = ui.reports, message = ui.message, saved = ui.saved)
+                        ui.navigating -> MapUiState(reports = ui.reports, message = ui.message, saved = ui.saved, selectedReportId = ui.selectedReportId, selectedReportOwn = ui.selectedReportOwn)
                         else -> ui
                     }
                 }
@@ -240,7 +246,7 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
     fun clearRoute() {
         DriveReplay.stop()
         NavigationSession.stop()
-        _state.update { MapUiState(reports = it.reports, message = it.message, saved = it.saved) }
+        _state.update { MapUiState(reports = it.reports, message = it.message, saved = it.saved, selectedReportId = it.selectedReportId, selectedReportOwn = it.selectedReportOwn) }
     }
 
     private fun useReportsSource() {
@@ -256,9 +262,50 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
         }
         val repo = reportRepository
         reportsJob = viewModelScope.launch {
-            repo.reports.collect { reports -> _state.update { it.copy(reports = reports) } }
+            repo.reports.collect { reports ->
+                _state.update { ui ->
+                    // Close the card when its report leaves the map (expired, removed, voted away).
+                    val stillShown = ui.selectedReportId?.let { id -> reports.any { it.id == id } } ?: false
+                    ui.copy(reports = reports, selectedReportId = if (stillShown) ui.selectedReportId else null)
+                }
+            }
         }
         lastVisibleArea?.let(repo::watchArea)
+    }
+
+    fun selectReport(id: String?) {
+        _state.update { it.copy(selectedReportId = id, selectedReportOwn = id != null && reportRepository.isOwn(id)) }
+    }
+
+    /** "Still there" / "Not there" on the selected report. */
+    fun voteOnSelected(stillThere: Boolean) {
+        val id = _state.value.selectedReportId ?: return
+        reportAction(if (stillThere) "Thanks! Confirmed for other drivers." else "Thanks! Other drivers will be told it's gone.") {
+            reportRepository.vote(id, stillThere)
+        }
+    }
+
+    fun flagSelected(reason: FlagReason) {
+        val id = _state.value.selectedReportId ?: return
+        reportAction("Thanks. Our moderators will review it.", closeCard = true) { reportRepository.flag(id, reason) }
+    }
+
+    private fun reportAction(thanks: String, closeCard: Boolean = true, action: suspend () -> Unit) {
+        if (_state.value.reportBusy) return
+        _state.update { it.copy(reportBusy = true) }
+        viewModelScope.launch {
+            val message = try {
+                action()
+                thanks
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: ReportRejectedException) {
+                e.message
+            } catch (e: Exception) {
+                "Could not send. Check your connection and try again."
+            }
+            _state.update { it.copy(reportBusy = false, message = message, selectedReportId = if (closeCard) null else it.selectedReportId) }
+        }
     }
 
     /** The map stopped moving: load and watch reports for this area. */

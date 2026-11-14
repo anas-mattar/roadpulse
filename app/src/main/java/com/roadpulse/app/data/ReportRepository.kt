@@ -13,7 +13,12 @@ import java.util.UUID
 interface ReportRepository {
     val reports: StateFlow<List<Report>>
     suspend fun submit(type: ReportType, location: GeoPoint): Report
-    suspend fun confirm(reportId: String)
+    /** "Still there" (true) or "Not there" (false). */
+    suspend fun vote(reportId: String, stillThere: Boolean)
+    /** Flags a report as abuse for moderators to review. */
+    suspend fun flag(reportId: String, reason: FlagReason)
+    /** True for reports sent from this phone (you cannot vote on or flag your own). */
+    fun isOwn(reportId: String): Boolean
     /** The part of the map on screen; server-backed repositories load and watch it. */
     fun watchArea(visible: MapArea) {}
     /** Stops network activity (called when switching servers or closing the screen). */
@@ -30,9 +35,17 @@ class InMemoryReportRepository : ReportRepository {
         return report
     }
 
-    override suspend fun confirm(reportId: String) {
+    // Every report here was made on this phone, so the vote buttons are not shown for them.
+    override fun isOwn(reportId: String) = state.value.any { it.id == reportId }
+
+    override suspend fun vote(reportId: String, stillThere: Boolean) {
         state.update { list ->
-            list.map { if (it.id == reportId) it.copy(confirmations = it.confirmations + 1) else it }
+            if (stillThere) list.map { if (it.id == reportId) it.copy(confirmations = it.confirmations + 1) else it }
+            else list.filterNot { it.id == reportId }
         }
+    }
+
+    override suspend fun flag(reportId: String, reason: FlagReason) {
+        state.update { list -> list.filterNot { it.id == reportId } }
     }
 }

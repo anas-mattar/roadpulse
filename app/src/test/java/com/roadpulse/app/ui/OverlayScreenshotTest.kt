@@ -4,6 +4,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.layout.padding
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -115,5 +118,43 @@ class OverlayScreenshotTest {
             narrator = MalayNarrator, muted = true, onToggleMute = {}, onReport = {}, onStop = {},
             following = false,
         )
+    }
+
+    private val reports = listOf(
+        com.roadpulse.app.data.Report("r1", com.roadpulse.app.data.ReportType.CRASH, GeoPoint(3.1466, 101.7108), 1_794_660_000_000L, confirmations = 2),
+    )
+
+    @Test
+    fun reportCard() = shot("6_report_card", RP.Field) {
+        Box(Modifier.fillMaxSize().padding(12.dp), contentAlignment = androidx.compose.ui.Alignment.BottomCenter) {
+            ReportCard(
+                report = reports[0], nowMillis = 1_794_660_000_000L + 12 * 60_000, own = false, busy = false,
+                onStillThere = {}, onNotThere = {}, onFlag = {}, onClose = {},
+            )
+        }
+    }
+
+    @Test
+    fun ownReportCard() = shot("7_report_card_own", RP.Field) {
+        Box(Modifier.fillMaxSize().padding(12.dp), contentAlignment = androidx.compose.ui.Alignment.BottomCenter) {
+            ReportCard(
+                report = reports[0].copy(confirmations = 0), nowMillis = 1_794_660_000_000L + 20_000, own = true, busy = false,
+                onStillThere = {}, onNotThere = {}, onFlag = {}, onClose = {},
+            )
+        }
+    }
+
+    /** The map marker bitmaps, as the map will draw them. */
+    @Test
+    fun reportMarkers() = shot("8_report_markers", Color(0xFFE8E4DA)) {
+        val markers = rememberReportMarkers()
+        androidx.compose.foundation.layout.Row(
+            Modifier.padding(24.dp),
+            horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(16.dp),
+        ) {
+            markers.values.forEach { bitmap ->
+                androidx.compose.foundation.Image(bitmap.asImageBitmap(), contentDescription = null)
+            }
+        }
     }
 }

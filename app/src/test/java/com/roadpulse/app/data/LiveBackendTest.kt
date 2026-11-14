@@ -57,7 +57,7 @@ class LiveBackendTest {
             val sent = alice.submit(ReportType.HAZARD, p)
             waitFor("bob to receive the report live") { bob.reports.value.any { it.id == sent.id } }
 
-            bob.confirm(sent.id)
+            bob.vote(sent.id, stillThere = true)
             alice.watchArea(visible)
             waitFor("alice to see bob's confirmation") {
                 alice.reports.value.firstOrNull { it.id == sent.id }?.confirmations == 1
@@ -99,6 +99,38 @@ class LiveBackendTest {
             watcher.cancel()
             assertEquals("live connection dropped during the quiet minute", 0, drops) // collect starts with true
             bob.close()
+        } finally {
+            scope.cancel()
+        }
+    }
+
+    @Test
+    fun twoNotThereVotesRemoveAReportForEveryone() = runBlocking {
+        assumeTrue("ROADPULSE_BACKEND_URL not set", !url.isNullOrBlank())
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        try {
+            val p = GeoPoint(1.5 + Random.nextDouble(0.0, 0.3), 103.5 + Random.nextDouble(0.0, 0.3))
+            val visible = MapArea(p.lon - 0.02, p.lat - 0.02, p.lon + 0.02, p.lat + 0.02)
+            val reporter = BackendReportRepository(url!!, MemoryTokens(), scope)
+            val watcher = BackendReportRepository(url, MemoryTokens(), scope)
+            watcher.watchArea(visible)
+            waitFor("live connection") { watcher.live.value }
+            val sent = reporter.submit(ReportType.TRAFFIC_JAM, p)
+            assertEquals(true, reporter.isOwn(sent.id))
+            waitFor("report to arrive") { watcher.reports.value.any { it.id == sent.id } }
+
+            BackendReportRepository(url, MemoryTokens(), scope).flag(sent.id, FlagReason.WRONG_LOCATION) // accepted (204)
+            BackendReportRepository(url, MemoryTokens(), scope).vote(sent.id, stillThere = false)
+            BackendReportRepository(url, MemoryTokens(), scope).vote(sent.id, stillThere = false)
+            waitFor("the report to disappear live") { watcher.reports.value.none { it.id == sent.id } }
+
+            try {
+                reporter.vote(sent.id, stillThere = true)
+                throw AssertionError("voting on an ended report should be refused")
+            } catch (e: ReportRejectedException) {
+                assertEquals("That report is no longer active.", e.message)
+            }
+            watcher.close()
         } finally {
             scope.cancel()
         }

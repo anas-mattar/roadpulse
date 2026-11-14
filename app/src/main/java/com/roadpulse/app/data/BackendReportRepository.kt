@@ -40,6 +40,7 @@ data class ReportDto(
         location = GeoPoint(lat, lon),
         createdAtMillis = OffsetDateTime.parse(createdAt).toInstant().toEpochMilli(),
         confirmations = confirmations,
+        dismissals = dismissals,
         expiresAtMillis = OffsetDateTime.parse(expiresAt).toInstant().toEpochMilli(),
     )
 }
@@ -55,6 +56,9 @@ private data class Registration(val deviceId: String, val token: String)
 
 @Serializable
 private data class VoteBody(val stillThere: Boolean)
+
+@Serializable
+private data class FlagBody(val reason: FlagReason)
 
 /** Thrown when the server refuses an action with a message worth showing (for example 409). */
 class ReportRejectedException(message: String) : Exception(message)
@@ -85,6 +89,8 @@ class BackendReportRepository(
     private var connectJob: Job? = null
     private var closed = false
     private val registerMutex = Mutex()
+    /** Reports created from this phone in this session (the server also refuses self-votes). */
+    private val ownIds = java.util.Collections.synchronizedSet(HashSet<String>())
 
     init {
         // Drop expired reports (the server does not push natural expiry).
@@ -121,15 +127,25 @@ class BackendReportRepository(
         val text = withAuth { token ->
             post("/v1/reports", body, token, idempotencyKey = key, retries = 1)
         }
-        val report = Http.json.decodeFromString(CreateReportResult.serializer(), text).report.toReport()
+        val result = Http.json.decodeFromString(CreateReportResult.serializer(), text)
+        val report = result.report.toReport()
+        if (!result.merged) ownIds += report.id // merged = you confirmed someone else's report
         upsert(report)
         return report
     }
 
-    override suspend fun confirm(reportId: String) {
-        val body = Http.json.encodeToString(VoteBody.serializer(), VoteBody(true))
+    override fun isOwn(reportId: String) = reportId in ownIds
+
+    override suspend fun vote(reportId: String, stillThere: Boolean) {
+        val body = Http.json.encodeToString(VoteBody.serializer(), VoteBody(stillThere))
         val text = withAuth { token -> post("/v1/reports/$reportId/votes", body, token) }
+        // A "not there" vote may end the report; upsert drops it when it has expired.
         upsert(Http.json.decodeFromString(ReportDto.serializer(), text).toReport())
+    }
+
+    override suspend fun flag(reportId: String, reason: FlagReason) {
+        val body = Http.json.encodeToString(FlagBody.serializer(), FlagBody(reason))
+        withAuth { token -> post("/v1/reports/$reportId/flags", body, token) }
     }
 
     override fun close() {
@@ -268,7 +284,7 @@ class BackendReportRepository(
                 r.code == 401 -> throw UnauthorizedException()
                 r.code == 404 -> throw ReportRejectedException("That report is no longer active.")
                 r.code == 409 -> throw ReportRejectedException(text.trim('"').ifBlank { "Not allowed." })
-                r.code == 429 -> throw ReportRejectedException("Too many reports. Please wait a few minutes.")
+                r.code == 429 -> throw ReportRejectedException("Too many requests. Please wait a few minutes and try again.")
                 else -> throw HttpStatusException(r.code, text.take(200))
             }
         }

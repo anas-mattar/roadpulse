@@ -108,7 +108,9 @@ End-to-end check of the app's reports code against a running backend (two simula
 set ROADPULSE_BACKEND_URL=http://localhost:8080
 gradlew testDebugUnitTest --tests com.roadpulse.app.data.LiveBackendTest
 ```
-Add `ROADPULSE_MODERATOR_KEY` to also check moderator removals.
+Add `ROADPULSE_MODERATOR_KEY` to also check moderator removals. Each run registers a few test devices; the API allows 10
+registrations per hour per address, so for repeated runs raise `RateLimits__RegistrationsPerHour`
+on the API container.
 
 ## Layout
 

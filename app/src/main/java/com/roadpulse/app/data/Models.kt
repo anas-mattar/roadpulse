@@ -48,8 +48,16 @@ enum class ReportType(val label: String, val colorHex: String) {
     POLICE("Police", "#1E66F5"),
     CRASH("Crash", "#D20F39"),
     HAZARD("Hazard", "#DF8E1D"),
-    TRAFFIC_JAM("Traffic jam", "#E64553"),
+    TRAFFIC_JAM("Traffic jam", "#E8590C"),
     ROAD_CLOSED("Road closed", "#4C4F69"),
+}
+
+/** Why a driver flags a report as abuse (matches the backend's FlagReason). */
+enum class FlagReason(val label: String) {
+    FAKE("Fake report"),
+    SPAM("Spam"),
+    OFFENSIVE("Offensive"),
+    WRONG_LOCATION("Wrong location"),
 }
 
 data class Report(
@@ -58,6 +66,7 @@ data class Report(
     val location: GeoPoint,
     val createdAtMillis: Long,
     val confirmations: Int = 0,
+    val dismissals: Int = 0,
     /** When the server will drop it (null for reports kept only on this phone). */
     val expiresAtMillis: Long? = null,
 )

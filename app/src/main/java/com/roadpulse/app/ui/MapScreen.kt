@@ -1,5 +1,9 @@
 package com.roadpulse.app.ui
 
+import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.background
+import androidx.compose.runtime.produceState
 import android.Manifest
 import android.annotation.SuppressLint
 import android.content.Context
@@ -99,6 +103,7 @@ import org.maplibre.android.maps.MapView
 import org.maplibre.android.maps.Style
 import org.maplibre.android.style.expressions.Expression
 import org.maplibre.android.style.layers.CircleLayer
+import org.maplibre.android.style.layers.SymbolLayer
 import org.maplibre.android.style.layers.LineLayer
 import org.maplibre.android.style.layers.Property
 import org.maplibre.android.style.layers.PropertyFactory
@@ -127,6 +132,7 @@ private const val ALT_ROUTE_SOURCE = "alt-route-source"
 private const val ALT_ROUTE_LAYER = "alt-route-line"
 private const val DEST_SOURCE = "destination-source"
 private const val REPORT_SOURCE = "report-source"
+private const val REPORT_LAYER = "reports"
 private const val MATCHED_SOURCE = "matched-source"
 
 // Kuala Lumpur; shown until the first GPS fix arrives.
@@ -142,6 +148,7 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
     var style by remember { mutableStateOf<Style?>(null) }
     var hasLocationPermission by remember { mutableStateOf(context.hasLocationPermission()) }
     var showReportDialog by remember { mutableStateOf(false) }
+    var showAbuseDialog by remember { mutableStateOf(false) }
     val voiceMuted by VoiceSettings.muted.collectAsStateWithLifecycle()
     val effectiveLanguage by VoiceSettings.effectiveLanguage.collectAsStateWithLifecycle()
     val narrator = narratorFor(effectiveLanguage)
@@ -244,10 +251,19 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
         val m = map
         val listener = MapLibreMap.OnMapClickListener { point ->
             val screen = m?.projection?.toScreenLocation(point) ?: return@OnMapClickListener false
-            val hit = m.queryRenderedFeatures(
-                android.graphics.RectF(screen.x - 30, screen.y - 30, screen.x + 30, screen.y + 30), ALT_ROUTE_LAYER,
-            ).firstOrNull()
-            val index = hit?.getNumberProperty("index")?.toInt() ?: return@OnMapClickListener false
+            val area = android.graphics.RectF(screen.x - 30, screen.y - 30, screen.x + 30, screen.y + 30)
+            // A report icon wins over a route line underneath it.
+            val report = m.queryRenderedFeatures(area, REPORT_LAYER).firstOrNull()?.getStringProperty("id")
+            if (report != null) {
+                viewModel.selectReport(report)
+                return@OnMapClickListener true
+            }
+            val hit = m.queryRenderedFeatures(area, ALT_ROUTE_LAYER).firstOrNull()
+            val index = hit?.getNumberProperty("index")?.toInt()
+            if (index == null) {
+                viewModel.selectReport(null) // tap on empty map closes the report card
+                return@OnMapClickListener false
+            }
             viewModel.selectRoute(index)
             true
         }
@@ -276,8 +292,13 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
         m?.addOnCameraIdleListener(listener)
         onDispose { m?.removeOnCameraIdleListener(listener) }
     }
-    LaunchedEffect(style, state.reports) {
-        style?.getSourceAs<GeoJsonSource>(REPORT_SOURCE)?.setGeoJson(state.reports.toFeatureCollection())
+    val reportMarkers = rememberReportMarkers()
+    LaunchedEffect(style, reportMarkers) {
+        val s = style ?: return@LaunchedEffect
+        reportMarkers.forEach { (type, bitmap) -> s.addImage(markerImageName(type), bitmap) }
+    }
+    LaunchedEffect(style, state.reports, state.selectedReportId) {
+        style?.getSourceAs<GeoJsonSource>(REPORT_SOURCE)?.setGeoJson(state.reports.toFeatureCollection(state.selectedReportId))
     }
 
     // Navigation mode: follow the car with a tilted camera. Re-applied after every map style load
@@ -396,7 +417,50 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                     onFlag = if (BuildConfig.DEBUG) ({ showFlagDialog = true }) else null,
                 )
             }
+
+            val selected = state.reports.firstOrNull { it.id == state.selectedReportId }
+            if (selected != null) {
+                val now by produceState(System.currentTimeMillis(), selected.id) {
+                    while (true) {
+                        kotlinx.coroutines.delay(30_000)
+                        value = System.currentTimeMillis()
+                    }
+                }
+                ReportCard(
+                    report = selected,
+                    nowMillis = now,
+                    own = state.selectedReportOwn,
+                    busy = state.reportBusy,
+                    onStillThere = { viewModel.voteOnSelected(true) },
+                    onNotThere = { viewModel.voteOnSelected(false) },
+                    onFlag = { showAbuseDialog = true },
+                    onClose = { viewModel.selectReport(null) },
+                    modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(12.dp),
+                )
+            }
         }
+    }
+
+    if (showAbuseDialog) {
+        AlertDialog(
+            onDismissRequest = { showAbuseDialog = false },
+            title = { Text("What's wrong with this report?") },
+            text = {
+                Column {
+                    com.roadpulse.app.data.FlagReason.entries.forEach { reason ->
+                        TextButton(
+                            onClick = {
+                                showAbuseDialog = false
+                                viewModel.flagSelected(reason)
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) { Text(reason.label) }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = { TextButton(onClick = { showAbuseDialog = false }) { Text("Cancel") } },
+        )
     }
 
     if (showVoiceSettings) {
@@ -570,12 +634,16 @@ private fun Style.addOverlayLayers() {
             PropertyFactory.circleStrokeWidth(4f),
         )
     )
+    // Report icons ("report-POLICE" etc., registered by rememberReportMarkers). Reports on the
+    // same spot are fanned out with per-feature offsets (ReportLayout); newest drawn on top.
     addLayer(
-        CircleLayer("reports", REPORT_SOURCE).withProperties(
-            PropertyFactory.circleRadius(11f),
-            PropertyFactory.circleColor(Expression.toColor(Expression.get("color"))),
-            PropertyFactory.circleStrokeColor("#FFFFFF"),
-            PropertyFactory.circleStrokeWidth(3f),
+        SymbolLayer(REPORT_LAYER, REPORT_SOURCE).withProperties(
+            PropertyFactory.iconImage(Expression.concat(Expression.literal("report-"), Expression.get("type"))),
+            PropertyFactory.iconOffset(Expression.get("offset")),
+            PropertyFactory.iconAllowOverlap(true),
+            PropertyFactory.iconIgnorePlacement(true),
+            PropertyFactory.symbolSortKey(Expression.get("order")),
+            PropertyFactory.iconSize(Expression.switchCase(Expression.get("selected"), Expression.literal(1.25f), Expression.literal(1f))),
         )
     )
 }
@@ -618,16 +686,21 @@ private fun Place?.toFeatureCollection(): FeatureCollection {
     return FeatureCollection.fromFeature(Feature.fromGeometry(Point.fromLngLat(location.lon, location.lat)))
 }
 
-private fun List<Report>.toFeatureCollection(): FeatureCollection =
-    FeatureCollection.fromFeatures(
-        map { report ->
+private fun List<Report>.toFeatureCollection(selectedId: String?): FeatureCollection {
+    val offsets = com.roadpulse.app.data.ReportLayout.offsets(this)
+    return FeatureCollection.fromFeatures(
+        sortedBy { it.createdAtMillis }.mapIndexed { order, report ->
             Feature.fromGeometry(Point.fromLngLat(report.location.lon, report.location.lat)).apply {
                 addStringProperty("id", report.id)
                 addStringProperty("type", report.type.name)
-                addStringProperty("color", report.type.colorHex)
+                addNumberProperty("order", if (report.id == selectedId) Int.MAX_VALUE else order)
+                addBooleanProperty("selected", report.id == selectedId)
+                val (dx, dy) = offsets[report.id] ?: (0f to 0f)
+                addProperty("offset", com.google.gson.JsonArray().apply { add(dx); add(dy) })
             }
         }
     )
+}
 
 @Composable
 private fun ReportDialog(onDismiss: () -> Unit, onPick: (ReportType) -> Unit) {
@@ -638,7 +711,13 @@ private fun ReportDialog(onDismiss: () -> Unit, onPick: (ReportType) -> Unit) {
             Column {
                 ReportType.entries.forEach { type ->
                     TextButton(onClick = { onPick(type) }, modifier = Modifier.fillMaxWidth()) {
-                        Text(type.label)
+                        Box(
+                            Modifier.size(32.dp).background(type.color, androidx.compose.foundation.shape.CircleShape),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(type.icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
+                        }
+                        Text(type.label, color = Color.Black, modifier = Modifier.padding(start = 12.dp).weight(1f))
                     }
                 }
             }

@@ -28,6 +28,7 @@ class BackendReportRepositoryTest {
     private val validTokens = mutableSetOf<String>()
     private var clock = 1_794_660_000_000L // 2026-11-14 around 12:00 UTC
     private var voteResponse: MockResponse? = null
+    private var mergedCreate = false
 
     private class MemoryTokens(var token: String? = null) : DeviceTokenStore {
         override fun load() = token
@@ -55,7 +56,9 @@ class BackendReportRepositoryTest {
                         "[${dto("live")},${dto("old", expires = "2026-11-14T11:00:00+00:00")}]"
                     )
                     auth !in validTokens -> MockResponse().setResponseCode(401)
-                    path == "/v1/reports" -> MockResponse().setResponseCode(201).setBody("""{"report":${dto("new")},"merged":false}""")
+                    path == "/v1/reports" -> if (mergedCreate) MockResponse().setBody("""{"report":${dto("someone-else")},"merged":true}""")
+                        else MockResponse().setResponseCode(201).setBody("""{"report":${dto("new")},"merged":false}""")
+                    path.endsWith("/flags") -> MockResponse().setResponseCode(204)
                     path.endsWith("/votes") -> voteResponse ?: MockResponse().setBody(dto("live"))
                     else -> MockResponse().setResponseCode(404) // live updates hub: not served here
                 }
@@ -99,7 +102,7 @@ class BackendReportRepositoryTest {
     fun serverRefusalsBecomeReadableMessages() = runBlocking {
         voteResponse = MockResponse().setResponseCode(409).setBody("\"You cannot vote on your own report.\"")
         try {
-            repo().confirm("live")
+            repo().vote("live", stillThere = true)
             fail("expected a refusal")
         } catch (e: ReportRejectedException) {
             assertEquals("You cannot vote on your own report.", e.message)
@@ -118,6 +121,35 @@ class BackendReportRepositoryTest {
         clock += 3 * 60 * 60_000L // three hours later
         r.pruneExpired()
         assertTrue(r.reports.value.isEmpty())
+        r.close()
+    }
+
+    @Test
+    fun ownReportsAreKnownButMergedOnesAreNot() = runBlocking {
+        val r = repo()
+        r.submit(ReportType.POLICE, GeoPoint(3.1, 101.6))
+        assertTrue(r.isOwn("new"))
+        mergedCreate = true // the server merged it into another driver's report
+        r.submit(ReportType.POLICE, GeoPoint(3.1, 101.6))
+        assertTrue(!r.isOwn("someone-else"))
+    }
+
+    @Test
+    fun notThereThatEndsAReportRemovesItAndFlagsSendTheReason() = runBlocking {
+        val r = repo()
+        r.watchArea(MapArea(101.55, 3.05, 101.65, 3.15))
+        withTimeout(5_000) { while (r.reports.value.isEmpty()) delay(20) }
+        // Server answers a "not there" vote that ended the report (expiresAt = now).
+        voteResponse = MockResponse().setBody(dto("live", expires = "2026-11-14T11:59:00+00:00"))
+        r.vote("live", stillThere = false)
+        assertTrue(r.reports.value.none { it.id == "live" })
+        val vote = requests.last { it.path!!.endsWith("/votes") }
+        assertEquals("""{"stillThere":false}""", vote.body.readUtf8())
+
+        r.flag("live", FlagReason.WRONG_LOCATION)
+        val flag = requests.last { it.path!!.endsWith("/flags") }
+        assertEquals("/v1/reports/live/flags", flag.path)
+        assertEquals("""{"reason":"WRONG_LOCATION"}""", flag.body.readUtf8())
         r.close()
     }
 }
