@@ -23,6 +23,9 @@ components. "RoadPulse" is a placeholder name; check trademark availability befo
   `docs/MALAY_PROMPTS.md`, `docs/ARABIC_PROMPTS.md`. Choosing Arabic also shows every screen in
   Arabic, laid out right to left (`app/.../i18n/Strings.kt`, review sheet `docs/ARABIC_SCREENS.md`).
   Malay screens are not translated yet (voice is Malay, screens English)
+- Lane arrows before turns and exits (lane data from the map), an Overview button while driving,
+  school zone warnings (spoken and shown; not on expressways), and "Open now / closes 22:00" in
+  fuel, food and parking lists (from OpenStreetMap opening hours)
 - Toll estimates on route cards from a price table you maintain (`backend/tolls/`)
 - Real phone over USB with everything on the laptop: `connect-phone.bat`, `docs/REAL_PHONE.md`
 - Navigation keeps running in the background and with the screen off (foreground service

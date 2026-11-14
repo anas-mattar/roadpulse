@@ -71,6 +71,7 @@ public class RoadPulseDb(DbContextOptions<RoadPulseDb> options) : DbContext(opti
             e.Property(p => p.Category).HasConversion<string>().HasMaxLength(20);
             e.Property(p => p.Name).HasMaxLength(200);
             e.Property(p => p.Brand).HasMaxLength(100);
+            e.Property(p => p.OpeningHours).HasMaxLength(255);
             e.Property(p => p.Location).HasColumnType("geography (point, 4326)");
             e.HasIndex(p => p.Location).HasMethod("gist");
             e.HasIndex(p => p.Category);

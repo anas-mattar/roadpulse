@@ -32,7 +32,44 @@ data class Maneuver(
     val exitBranch: List<String> = emptyList(),
     /** Signposted destinations, e.g. "Putrajaya", "Cyberjaya". */
     val exitToward: List<String> = emptyList(),
+    /** Lanes on the approach to this maneuver, left to right (empty when the map has none). */
+    val lanes: List<Lane> = emptyList(),
 )
+
+/**
+ * One lane before a maneuver. Each field is a set of directions as bit flags (see [Lane.Companion]):
+ * [directions] = the arrows painted on the lane, [active] = the direction to take when this is
+ * the lane to be in, [valid] = it also works but is not preferred. Values from the routing server.
+ */
+@Serializable
+data class Lane(val directions: Int, val valid: Int = 0, val active: Int = 0) {
+    /** The lane the driver should use. */
+    val recommended: Boolean get() = active != 0
+    /** Also leads to the maneuver. */
+    val usable: Boolean get() = active != 0 || valid != 0
+
+    /** The arrow to draw: the direction being taken in this lane, else its first painted arrow. */
+    val arrow: Int get() = lowestBit(if (active != 0) active else if (valid != 0) valid else directions)
+
+    companion object {
+        const val NONE = 1
+        const val THROUGH = 2
+        const val SHARP_LEFT = 4
+        const val LEFT = 8
+        const val SLIGHT_LEFT = 16
+        const val SLIGHT_RIGHT = 32
+        const val RIGHT = 64
+        const val SHARP_RIGHT = 128
+        const val REVERSE = 256
+        const val MERGE_TO_LEFT = 512
+        const val MERGE_TO_RIGHT = 1024
+
+        private fun lowestBit(v: Int) = if (v == 0) THROUGH else Integer.lowestOneBit(v)
+
+        /** Lanes worth showing: at least two lanes and at least one recommended or usable. */
+        fun worthShowing(lanes: List<Lane>) = lanes.size >= 2 && lanes.any { it.usable } && !lanes.all { it.usable }
+    }
+}
 
 @Serializable
 data class Route(

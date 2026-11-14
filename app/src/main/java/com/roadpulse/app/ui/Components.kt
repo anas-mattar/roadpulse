@@ -142,6 +142,40 @@ fun TurnIcon.vector(): ImageVector = when (this) {
     TurnIcon.FERRY -> Icons.Filled.DirectionsBoat
 }
 
+/**
+ * Lane arrows under the turn card: white = the lane to be in, faint = also works, grey = wrong
+ * lane. Always left to right as on the road, also in Arabic (right-to-left) layout.
+ */
+@Composable
+fun LaneStrip(lanes: List<com.roadpulse.app.data.Lane>, modifier: Modifier = Modifier) {
+    androidx.compose.runtime.CompositionLocalProvider(
+        androidx.compose.ui.platform.LocalLayoutDirection provides androidx.compose.ui.unit.LayoutDirection.Ltr,
+    ) {
+        androidx.compose.material3.Surface(
+            shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
+            color = RP.IndigoDeep,
+            shadowElevation = 4.dp,
+            modifier = modifier,
+        ) {
+            Row(Modifier.padding(horizontal = 10.dp, vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                lanes.forEach { lane ->
+                    val tint = when {
+                        lane.recommended -> Color.White
+                        lane.usable -> RP.IndigoSoft.copy(alpha = 0.7f)
+                        else -> Color.White.copy(alpha = 0.25f)
+                    }
+                    Icon(
+                        TurnIcon.forLane(lane.arrow).vector(),
+                        contentDescription = null,
+                        tint = tint,
+                        modifier = Modifier.size(34.dp),
+                    )
+                }
+            }
+        }
+    }
+}
+
 /** Big turn card at the top while driving. */
 @Composable
 fun TurnIsland(turnType: Int?, distanceLabel: String?, instruction: String, modifier: Modifier = Modifier) {

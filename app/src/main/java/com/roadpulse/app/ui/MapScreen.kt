@@ -533,6 +533,20 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                     onStop = viewModel::clearRoute,
                     following = following,
                     onRecenter = { following = true },
+                    onOverview = {
+                        following = false
+                        val m = map
+                        val r = state.route
+                        if (m != null && r != null) {
+                            m.locationComponent.takeIf { it.isLocationComponentActivated }?.cameraMode = CameraMode.NONE
+                            val rest = com.roadpulse.app.nav.RouteGeometry.remaining(r.shape, state.matchedPosition)
+                            if (rest.size >= 2) {
+                                val bounds = LatLngBounds.Builder().includes(rest.map { LatLng(it.lat, it.lon) }).build()
+                                // Room for the turn card at the top and the trip card at the bottom.
+                                m.animateCamera(CameraUpdateFactory.newLatLngBounds(bounds, 120, 520, 120, 560), 800)
+                            }
+                        }
+                    },
                     onFlag = if (BuildConfig.DEBUG) ({ showFlagDialog = true }) else null,
                     showSpeedometer = DisplaySettings.showSpeedometer.collectAsStateWithLifecycle().value,
                     limitDisplay = DisplaySettings.limitDisplay.collectAsStateWithLifecycle().value,

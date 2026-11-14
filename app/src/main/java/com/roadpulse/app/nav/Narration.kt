@@ -55,6 +55,10 @@ interface Narrator {
     fun cameraAhead(meters: Int, limitKph: Int?): String
     /** Short label for the speed camera hint. */
     val speedCamera: String
+    /** Warning for a school zone on the route ahead. */
+    fun schoolZoneAhead(meters: Int): String
+    /** Short label for the school zone hint. */
+    val schoolZone: String
 }
 
 fun narratorFor(language: GuidanceLanguage): Narrator = when (language) {
@@ -113,6 +117,8 @@ object EnglishNarrator : Narrator {
     override fun cameraAhead(meters: Int, limitKph: Int?) =
         "Speed camera in $meters meters." + (limitKph?.let { " Limit $it." } ?: "")
     override val speedCamera = "Speed camera"
+    override fun schoolZoneAhead(meters: Int) = "School zone in $meters meters. Watch for children."
+    override val schoolZone = "School zone"
 }
 
 /**
@@ -220,6 +226,8 @@ object MalayNarrator : Narrator {
     override fun cameraAhead(meters: Int, limitKph: Int?) =
         "Kamera had laju dalam $meters meter." + (limitKph?.let { " Had laju $it." } ?: "")
     override val speedCamera = "Kamera had laju"
+    override fun schoolZoneAhead(meters: Int) = "Zon sekolah dalam $meters meter. Berhati-hati dengan kanak-kanak."
+    override val schoolZone = "Zon sekolah"
 
     private val ordinals = listOf(
         "pertama", "kedua", "ketiga", "keempat", "kelima",
@@ -353,6 +361,8 @@ object ArabicNarrator : Narrator {
     override fun cameraAhead(meters: Int, limitKph: Int?) =
         "كاميرا سرعة بعد ${meters(meters)}." + (limitKph?.let { " الحد الأقصى $it." } ?: "")
     override val speedCamera = "كاميرا سرعة"
+    override fun schoolZoneAhead(meters: Int) = "منطقة مدرسة بعد ${meters(meters)}. انتبه للأطفال."
+    override val schoolZone = "منطقة مدرسة"
 
     private val ordinals = listOf("الأول", "الثاني", "الثالث", "الرابع", "الخامس", "السادس", "السابع", "الثامن", "التاسع", "العاشر")
 

@@ -74,6 +74,10 @@ to delete the task. To test it: `schtasks /Run /TN "RoadPulse monthly map update
 
 ## Places: fuel, parking, food, EV charging, R&R, speed cameras
 
+Schools (`amenity=school`, `hazard=school_zone`) are loaded as `SCHOOL_ZONE` for the school zone
+warning while driving, and fuel/food/parking/EV/R&R places keep their `opening_hours` for the app's
+"Open now". After updating, run `setup-places.ps1` once (the database gets a new column automatically).
+
 ```
 powershell -ExecutionPolicy Bypass -File setup-places.ps1
 ```

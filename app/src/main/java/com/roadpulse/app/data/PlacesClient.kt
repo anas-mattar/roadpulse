@@ -16,6 +16,7 @@ enum class PlaceCategory(val label: String) {
     EV_CHARGING("EV charging"),
     REST_AREA("R&R"),
     SPEED_CAMERA("Speed camera"),
+    SCHOOL_ZONE("School"),
 }
 
 /** A place from the backend's OpenStreetMap places, with its distance from the search point. */
@@ -30,11 +31,16 @@ data class MapPlace(
     val paid: Boolean? = null,
     val maxSpeedKph: Int? = null,
     val distanceM: Double = 0.0,
+    /** OpenStreetMap opening_hours text, when mapped. */
+    val openingHours: String? = null,
 ) {
     val location get() = GeoPoint(lat, lon)
 
     /** As a destination: its name (or brand, or the category), with distance and parking fee. */
-    fun toPlace(s: com.roadpulse.app.i18n.AppStrings = com.roadpulse.app.i18n.EnglishStrings): Place {
+    fun toPlace(
+        s: com.roadpulse.app.i18n.AppStrings = com.roadpulse.app.i18n.EnglishStrings,
+        now: java.time.LocalDateTime = java.time.LocalDateTime.now(),
+    ): Place {
         val title = name ?: brand ?: s.category(category)
         val detail = buildList {
             if (distanceM > 0) add(if (distanceM < 1000) s.distance(distanceM.toInt() / 1000.0) else s.distance(distanceM / 1000))
@@ -44,6 +50,7 @@ data class MapPlace(
                 false -> add(s.free)
                 null -> Unit
             }
+            OpeningHours.status(openingHours, now)?.let { add(s.openStatus(it)) }
         }.joinToString(" · ")
         return Place(title, detail, location)
     }

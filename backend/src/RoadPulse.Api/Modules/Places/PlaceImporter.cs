@@ -19,6 +19,7 @@ public static class PlaceImporter
     /// <summary>Maps OpenStreetMap tags to a category, or null for places RoadPulse does not use.</summary>
     public static PlaceCategory? CategoryOf(IReadOnlyDictionary<string, string> tags) =>
         tags.GetValueOrDefault("barrier") == "toll_booth" ? PlaceCategory.TOLL_PLAZA :
+        tags.GetValueOrDefault("hazard") == "school_zone" || tags.GetValueOrDefault("amenity") == "school" ? PlaceCategory.SCHOOL_ZONE :
         (tags.GetValueOrDefault("amenity"), tags.GetValueOrDefault("highway")) switch
         {
             ("fuel", _) => PlaceCategory.FUEL,
@@ -59,6 +60,8 @@ public static class PlaceImporter
             Brand = Trim(tags.GetValueOrDefault("brand"), 100),
             Paid = category == PlaceCategory.PARKING ? tags.GetValueOrDefault("fee") switch { "yes" => true, "no" => false, _ => null } : null,
             MaxSpeedKph = category == PlaceCategory.SPEED_CAMERA ? ParseKph(tags.GetValueOrDefault("maxspeed")) : null,
+            OpeningHours = category is PlaceCategory.FUEL or PlaceCategory.PARKING or PlaceCategory.FOOD or PlaceCategory.EV_CHARGING or PlaceCategory.REST_AREA
+                ? Trim(tags.GetValueOrDefault("opening_hours"), 255) : null,
             Location = point,
         };
     }

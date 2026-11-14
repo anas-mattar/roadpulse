@@ -33,6 +33,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.getValue
 import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.filled.Route
+import androidx.compose.material.icons.filled.School
 import androidx.compose.material.icons.filled.LocalCafe
 import androidx.compose.material.icons.filled.EvStation
 import androidx.compose.material.icons.filled.Restaurant
@@ -434,6 +436,8 @@ fun DrivingOverlay(
     onStop: () -> Unit,
     following: Boolean = true,
     onRecenter: () -> Unit = {},
+    /** Shows the whole remaining route (then Re-center returns to the car). */
+    onOverview: () -> Unit = {},
     /** Debug builds: passenger issue report for field tests. */
     onFlag: (() -> Unit)? = null,
     showSpeedometer: Boolean = true,
@@ -448,6 +452,10 @@ fun DrivingOverlay(
                 distanceLabel = state.distanceToTurnMeters?.let { formatKm(it / 1000) },
                 instruction = state.currentInstruction ?: narrator.followRoute,
             )
+            val toTurn = state.distanceToTurnMeters
+            if (com.roadpulse.app.data.Lane.worthShowing(state.lanes) && toTurn != null && toTurn <= LANES_SHOW_M) {
+                LaneStrip(state.lanes, Modifier.align(Alignment.CenterHorizontally).padding(top = 6.dp))
+            }
             Spacer(Modifier.height(8.dp))
             Row(verticalAlignment = Alignment.Top) {
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -475,6 +483,15 @@ fun DrivingOverlay(
                             trailing = formatKm(cam.metersAhead / 1000),
                             color = Color(0xFF26215C),
                             contentColor = Color.White,
+                        )
+                    }
+                    state.schoolAhead?.let { school ->
+                        Pill(
+                            text = narrator.schoolZone,
+                            icon = Icons.Filled.School,
+                            trailing = formatKm(school.metersAhead / 1000),
+                            color = Color(0xFFFAC775),
+                            contentColor = Color(0xFF633806),
                         )
                     }
                     state.navStatus?.let { Pill(text = it, color = RP.Amber, contentColor = RP.AmberDark) }
@@ -512,7 +529,15 @@ fun DrivingOverlay(
                 if (showLimit) state.speedLimitKph?.let { SpeedLimitSign(it, Modifier.padding(start = 8.dp, bottom = 4.dp)) }
                 Spacer(Modifier.weight(1f))
                 Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    if (!following) {
+                    if (following) {
+                        CircleButton(
+                            icon = Icons.Filled.Route,
+                            description = strings.overview,
+                            onClick = onOverview,
+                            container = Color.White,
+                            content = RP.Indigo,
+                        )
+                    } else {
                         // Shown after the driver moves the map; brings the camera back to the car.
                         Surface(
                             onClick = onRecenter,
@@ -551,6 +576,9 @@ fun DrivingOverlay(
         }
     }
 }
+
+/** Lane arrows appear this close to the turn. */
+private const val LANES_SHOW_M = 1500.0
 
 /** Show "Then …" only when the next-but-one turn follows within this distance. */
 private const val THEN_HINT_MAX_GAP_M = 300.0

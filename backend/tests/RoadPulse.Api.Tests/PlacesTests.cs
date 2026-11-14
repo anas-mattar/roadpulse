@@ -34,6 +34,14 @@ public class PlaceImporterTests
         Assert.Equal(PlaceCategory.REST_AREA, rnr.Category);
 
         Assert.Null(PlaceImporter.Parse("""{"type":"Feature","geometry":{"type":"Point","coordinates":[1,1]},"properties":{"@type":"node","@id":5,"shop":"bakery"}}"""));
+
+        var school = PlaceImporter.Parse("""{"type":"Feature","geometry":{"type":"Point","coordinates":[101.6,3.0]},"properties":{"@type":"way","@id":6,"amenity":"school","name":"SK Bangsar"}}""")!;
+        Assert.Equal(PlaceCategory.SCHOOL_ZONE, school.Category);
+        var zone = PlaceImporter.Parse("""{"type":"Feature","geometry":{"type":"Point","coordinates":[101.6,3.0]},"properties":{"@type":"node","@id":7,"hazard":"school_zone"}}""")!;
+        Assert.Equal(PlaceCategory.SCHOOL_ZONE, zone.Category);
+        var shell = PlaceImporter.Parse("""{"type":"Feature","geometry":{"type":"Point","coordinates":[101.6,3.0]},"properties":{"@type":"node","@id":8,"amenity":"fuel","opening_hours":"24/7"}}""")!;
+        Assert.Equal("24/7", shell.OpeningHours);
+        Assert.Null(school.OpeningHours);
         Assert.Null(PlaceImporter.Parse(""));
     }
 }

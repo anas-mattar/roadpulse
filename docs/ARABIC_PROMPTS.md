@@ -66,15 +66,17 @@ Regenerate after changes: `gradlew :app:testDebugUnitTest --tests *MalayPromptSh
 | 52 | Reports | Warning for a report on the route ahead | Road closure reported 700 meters ahead. | إغلاق طريق على بعد 700 متر أمامك. | |
 | 53 | Cameras | Warning for a fixed speed camera ahead | Speed camera in 500 meters. Limit 90. | كاميرا سرعة بعد 500 متر. الحد الأقصى 90. | |
 | 54 | Cameras | Label of the speed camera hint | Speed camera | كاميرا سرعة | |
-| 55 | Words | Roundabout exit number | exit 1 | الأول | |
-| 56 | Words | Roundabout exit number | exit 2 | الثاني | |
-| 57 | Words | Roundabout exit number | exit 3 | الثالث | |
-| 58 | Words | Roundabout exit number | exit 4 | الرابع | |
-| 59 | Words | Compass direction at the start | 0° | الشمال | |
-| 60 | Words | Compass direction at the start | 45° | الشمال الشرقي | |
-| 61 | Words | Compass direction at the start | 90° | الشرق | |
-| 62 | Words | Compass direction at the start | 135° | الجنوب الشرقي | |
-| 63 | Words | Compass direction at the start | 180° | الجنوب | |
-| 64 | Words | Compass direction at the start | 225° | الجنوب الغربي | |
-| 65 | Words | Compass direction at the start | 270° | الغرب | |
-| 66 | Words | Compass direction at the start | 315° | الشمال الغربي | |
+| 55 | Schools | Warning for a school on the route ahead | School zone in 300 meters. Watch for children. | منطقة مدرسة بعد 300 متر. انتبه للأطفال. | |
+| 56 | Schools | Label of the school zone hint | School zone | منطقة مدرسة | |
+| 57 | Words | Roundabout exit number | exit 1 | الأول | |
+| 58 | Words | Roundabout exit number | exit 2 | الثاني | |
+| 59 | Words | Roundabout exit number | exit 3 | الثالث | |
+| 60 | Words | Roundabout exit number | exit 4 | الرابع | |
+| 61 | Words | Compass direction at the start | 0° | الشمال | |
+| 62 | Words | Compass direction at the start | 45° | الشمال الشرقي | |
+| 63 | Words | Compass direction at the start | 90° | الشرق | |
+| 64 | Words | Compass direction at the start | 135° | الجنوب الشرقي | |
+| 65 | Words | Compass direction at the start | 180° | الجنوب | |
+| 66 | Words | Compass direction at the start | 225° | الجنوب الغربي | |
+| 67 | Words | Compass direction at the start | 270° | الغرب | |
+| 68 | Words | Compass direction at the start | 315° | الشمال الغربي | |

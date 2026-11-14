@@ -182,6 +182,29 @@ class OverlayScreenshotTest {
         }
     }
 
+    private val laneState = MapUiState(
+        navigating = true, route = route, destination = place,
+        currentInstruction = "Keep left to stay on E10.", distanceToTurnMeters = 400.0,
+        remainingKm = 7.2, remainingSeconds = 720.0, turnType = 24, speedKmh = 48, speedLimitKph = 60,
+        lanes = listOf(
+            com.roadpulse.app.data.Lane(16, active = 16), com.roadpulse.app.data.Lane(16, active = 16),
+            com.roadpulse.app.data.Lane(2 or 32, valid = 2), com.roadpulse.app.data.Lane(32),
+        ),
+        schoolAhead = com.roadpulse.app.nav.SchoolAhead("w1", 350.0),
+    )
+
+    @Test
+    fun drivingWithLanesAndSchool() = shot("3e_driving_lanes_school", RP.Field) {
+        DrivingOverlay(state = laneState, narrator = EnglishNarrator, muted = false, onToggleMute = {}, onReport = {}, onStop = {})
+    }
+
+    @Test
+    fun drivingWithLanesArabic() = shot("ar_3e_driving_lanes", RP.Field, arabic = true) {
+        val n = com.roadpulse.app.nav.ArabicNarrator
+        DrivingOverlay(state = laneState.copy(currentInstruction = "الزم اليسار للبقاء على E10."), narrator = n,
+            muted = false, onToggleMute = {}, onReport = {}, onStop = {})
+    }
+
     @Test
     fun drivingMalayWithStatus() = shot("3b_driving_malay_gps_lost", RP.NightSurface) {
         DrivingOverlay(

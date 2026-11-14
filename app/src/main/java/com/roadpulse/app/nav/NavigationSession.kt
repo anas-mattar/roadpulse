@@ -62,6 +62,10 @@ data class NavState(
     val reportAhead: ReportAhead? = null,
     /** Nearest fixed speed camera on the route ahead (within 1 km). */
     val cameraAhead: CameraAhead? = null,
+    /** Lanes before the next maneuver, left to right (empty when the map has none). */
+    val lanes: List<com.roadpulse.app.data.Lane> = emptyList(),
+    /** Nearest school on the route ahead (within 600 m). */
+    val schoolAhead: SchoolAhead? = null,
 )
 
 /**
@@ -104,6 +108,11 @@ object NavigationSession {
     private var cameras: List<com.roadpulse.app.data.MapPlace> = emptyList()
     private var camerasJob: Job? = null
     private val announcedCameras = HashSet<String>()
+    /** Schools along the current route; they are set back from the road, hence a wider corridor. */
+    private var schools: List<com.roadpulse.app.data.MapPlace> = emptyList()
+    private var schoolRoute: RouteReports? = null
+    private var schoolsJob: Job? = null
+    private val schoolAlerts = SchoolZoneAnnouncer()
     private var lastSpeedingAlert = Long.MIN_VALUE / 2
 
     /** Called once from the activity and the service; safe to repeat. */
@@ -178,6 +187,10 @@ object NavigationSession {
         camerasJob?.cancel()
         cameras = emptyList()
         announcedCameras.clear()
+        schoolsJob?.cancel()
+        schools = emptyList()
+        schoolRoute = null
+        schoolAlerts.reset()
         store?.clear()
         log?.close()
         log = null
@@ -222,11 +235,18 @@ object NavigationSession {
         }
         ahead?.let { noticePassedReports(it) }
         val camera = if (progress.matched) camerasAhead().firstOrNull() else null
-        if (camera != null && progress.prompt == null && camera.metersAhead <= CAMERA_WARN_M && announcedCameras.add(camera.id)) {
+        val cameraDue = camera != null && progress.prompt == null && camera.metersAhead <= CAMERA_WARN_M && announcedCameras.add(camera.id)
+        if (camera != null && cameraDue) {
             log?.event(fix.timeMillis, "camera_ahead", "m=${camera.metersAhead.toInt()}")
             speak(VoiceSettings.narrator().cameraAhead(ReportAnnouncer.spokenMeters(camera.metersAhead), camera.maxSpeedKph), fix.timeMillis)
         }
-        checkSpeeding(fix.speedMps, if (progress.matched) speedLimits.at(progress.segmentIndex) else current.speedLimitKph)
+        val limitHere = if (progress.matched) speedLimits.at(progress.segmentIndex) else current.speedLimitKph
+        val school = if (progress.matched) schoolsAhead().firstOrNull() else null
+        if (school != null && progress.prompt == null && !cameraDue && schoolAlerts.shouldWarn(school, carAlongM, limitHere)) {
+            log?.event(fix.timeMillis, "school_ahead", "m=${school.metersAhead.toInt()}")
+            speak(VoiceSettings.narrator().schoolZoneAhead(ReportAnnouncer.spokenMeters(school.metersAhead)), fix.timeMillis)
+        }
+        checkSpeeding(fix.speedMps, limitHere)
         if (progress.prompt == null) { // never talk over a turn instruction
             ahead?.let(announcer::next)?.let { due ->
                 log?.event(fix.timeMillis, "report_ahead", "type=${due.report.type};m=${due.metersAhead.toInt()}")
@@ -252,6 +272,8 @@ object NavigationSession {
                 poorSignal = progress.poorSignal,
                 reportAhead = if (progress.matched) ahead?.firstOrNull() else it.reportAhead,
                 cameraAhead = if (progress.matched) camera else it.cameraAhead,
+                lanes = progress.upcoming?.lanes.orEmpty(),
+                schoolAhead = if (progress.matched) school else it.schoolAhead,
             )
         }
     }
@@ -261,6 +283,7 @@ object NavigationSession {
         routeReports = RouteReports(route.shape)
         passedReports.newRoute() // reports no longer on the new route were not "passed"
         fetchCameras(route)
+        fetchSchools(route)
         if (!resumed && _state.value == null) announcer = ReportAnnouncer() // a reroute keeps what was already said
         fetchSpeedLimits(route)
         signal.reset(now())
@@ -367,6 +390,37 @@ object NavigationSession {
         }
     }
 
+    /** Loads the schools along [route] in the background (needs the RoadPulse backend). */
+    private fun fetchSchools(route: com.roadpulse.app.data.Route) {
+        schoolsJob?.cancel()
+        schools = emptyList()
+        schoolRoute = RouteReports(route.shape, corridorM = SCHOOL_CORRIDOR_M)
+        schoolAlerts.reset() // positions along the old route no longer apply
+        val url = com.roadpulse.app.data.ServerSettings.backendUrl()
+        if (url.isEmpty()) return
+        schoolsJob = scope.launch {
+            try {
+                val found = com.roadpulse.app.data.PlacesClient(url)
+                    .alongRoute(com.roadpulse.app.data.PlaceCategory.SCHOOL_ZONE, route.shape, corridorM = SCHOOL_CORRIDOR_M)
+                if (_state.value?.route === route) schools = found
+                log?.event(now(), "schools", "count=${found.size}")
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                log?.event(now(), "schools", "failed: ${e.javaClass.simpleName}")
+            }
+        }
+    }
+
+    private fun schoolsAhead(): List<SchoolAhead> {
+        val rr = schoolRoute ?: return emptyList()
+        return schools.mapNotNull { s ->
+            val along = rr.alongOfPoint("school:" + s.id, s.location) ?: return@mapNotNull null
+            val ahead = along - carAlongM
+            if (ahead > 0 && ahead <= SCHOOL_HINT_M) SchoolAhead(s.id, ahead, along) else null
+        }.sortedBy { it.metersAhead }
+    }
+
     private fun camerasAhead(): List<CameraAhead> {
         val rr = routeReports ?: return emptyList()
         return cameras.mapNotNull { c ->
@@ -433,6 +487,8 @@ object NavigationSession {
 
     private const val STOP_PASSED_M = 30.0
     private const val CAMERA_WARN_M = 500.0
+    private const val SCHOOL_CORRIDOR_M = 120.0
+    private const val SCHOOL_HINT_M = 600.0
     private const val PASS_NEAR_M = 80.0
     private const val SPEEDING_ALERT_GAP_MS = 20_000L
     private const val REROUTE_MIN_INTERVAL_MS = 10_000L

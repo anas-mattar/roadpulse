@@ -172,6 +172,11 @@ namespace RoadPulse.Api.Data.Migrations
                         .HasColumnType("character varying(200)")
                         .HasColumnName("name");
 
+                    b.Property<string>("OpeningHours")
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("opening_hours");
+
                     b.Property<bool?>("Paid")
                         .HasColumnType("boolean")
                         .HasColumnName("paid");

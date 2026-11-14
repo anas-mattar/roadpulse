@@ -118,3 +118,26 @@ class PassedReports(private val nearM: Double = 80.0) {
 /** A speed camera on the route ahead. */
 data class CameraAhead(val id: String, val metersAhead: Double, val maxSpeedKph: Int?)
 
+/** A school on the route ahead; [alongM] is its position along the route. */
+data class SchoolAhead(val id: String, val metersAhead: Double, val alongM: Double = 0.0)
+
+/**
+ * Decides when to say "School zone ahead": once per stretch of schools (several schools close
+ * together get one warning), from [warnM] away, and not on fast roads (limit 80 km/h or more:
+ * expressways pass schools without a school zone). Pure Kotlin: unit tested.
+ */
+class SchoolZoneAnnouncer(private val warnM: Double = 300.0, private val groupM: Double = 600.0) {
+    private var lastWarnedAlongM: Double? = null
+
+    fun shouldWarn(school: SchoolAhead, carAlongM: Double, speedLimitKph: Int?): Boolean {
+        if (school.metersAhead > warnM) return false
+        if (speedLimitKph != null && speedLimitKph >= 80) return false
+        val last = lastWarnedAlongM
+        if (last != null && school.alongM - last < groupM && school.alongM >= last) return false
+        lastWarnedAlongM = school.alongM
+        return true
+    }
+
+    fun reset() { lastWarnedAlongM = null }
+}
+

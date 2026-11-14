@@ -89,6 +89,10 @@ data class MapUiState(
     val parkingNearby: List<Place> = emptyList(),
     /** Nearest fixed speed camera ahead while driving. */
     val cameraAhead: com.roadpulse.app.nav.CameraAhead? = null,
+    /** Lanes before the next turn, left to right. */
+    val lanes: List<com.roadpulse.app.data.Lane> = emptyList(),
+    /** Nearest school on the route ahead while driving. */
+    val schoolAhead: com.roadpulse.app.nav.SchoolAhead? = null,
     /** Route options in effect (shown in the preview). */
     val routeOptions: com.roadpulse.app.data.RouteOptions = com.roadpulse.app.data.RouteOptions(),
 )
@@ -134,6 +138,8 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
                             speedLimitKph = nav.speedLimitKph,
                             reportAhead = nav.reportAhead,
                             cameraAhead = nav.cameraAhead,
+                            lanes = nav.lanes,
+                            schoolAhead = nav.schoolAhead,
                             navStatus = VoiceSettings.narrator().let { n ->
                                 when {
                                     nav.rerouting -> n.statusFindingRoute

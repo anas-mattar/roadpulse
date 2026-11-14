@@ -160,6 +160,7 @@ class RoutingClient(private val baseUrl: String) {
                     exitNumber = m.sign?.exitNumber?.firstOrNull()?.text?.trim()?.ifEmpty { null },
                     exitBranch = m.sign?.exitBranch.orEmpty().map { it.text.trim() }.filter(String::isNotEmpty),
                     exitToward = m.sign?.exitToward.orEmpty().map { it.text.trim() }.filter(String::isNotEmpty),
+                    lanes = m.lanes.map { Lane(it.directions, it.valid ?: 0, it.active ?: 0) },
                 )
             }
 
@@ -219,6 +220,8 @@ class RoutingClient(private val baseUrl: String) {
         val language: String = "en-US",
         /** Extra alternative routes to return (0 = only the fastest). Omitted from JSON when 0. */
         val alternates: Int? = null,
+        /** Ask for lane arrows on each maneuver ("turn_lanes"). Servers that do not know it ignore it. */
+        @SerialName("turn_lanes") val turnLanes: Boolean = true,
     )
 
     @Serializable
@@ -257,7 +260,11 @@ class RoutingClient(private val baseUrl: String) {
         @SerialName("bearing_after") val bearingAfter: Int? = null,
         @SerialName("roundabout_exit_count") val roundaboutExitCount: Int? = null,
         val sign: SignDto? = null,
+        val lanes: List<LaneDto> = emptyList(),
     )
+
+    @Serializable
+    private data class LaneDto(val directions: Int = 0, val valid: Int? = null, val active: Int? = null)
 
     @Serializable
     private data class SignDto(

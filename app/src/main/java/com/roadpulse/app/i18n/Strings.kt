@@ -62,6 +62,8 @@ interface AppStrings {
     /** Car park fee, shown in place lists. */
     val paid: String
     val free: String
+    /** "Open 24 hours", "Open · closes 22:00", "Closed · opens 08:00", "Closed". */
+    fun openStatus(status: com.roadpulse.app.data.OpenStatus): String
 
     // Route preview
     val destination: String
@@ -91,6 +93,8 @@ interface AppStrings {
     val muteVoice: String
     val unmuteVoice: String
     val stopNavigation: String
+    /** Button that shows the whole remaining route while driving. */
+    val overview: String
 
     // Reports
     fun reportType(t: ReportType): String
@@ -221,6 +225,11 @@ object EnglishStrings : AppStrings {
     override fun noneWithin10Km(c: PlaceCategory) = "No ${c.label.lowercase()} within 10 km"
     override val paid = "paid"
     override val free = "free"
+    override fun openStatus(status: com.roadpulse.app.data.OpenStatus) = when (status) {
+        com.roadpulse.app.data.OpenStatus.AlwaysOpen -> "Open 24 hours"
+        is com.roadpulse.app.data.OpenStatus.Open -> "Open · closes ${status.closesAt}"
+        is com.roadpulse.app.data.OpenStatus.Closed -> status.opensAt?.let { "Closed · opens $it" } ?: "Closed"
+    }
 
     override val destination = "Destination"
     override fun stop(number: Int, name: String) = "Stop $number: $name"
@@ -248,6 +257,7 @@ object EnglishStrings : AppStrings {
     override val muteVoice = "Mute voice"
     override val unmuteVoice = "Unmute voice"
     override val stopNavigation = "Stop navigation"
+    override val overview = "Overview"
 
     override fun reportType(t: ReportType) = t.label
     override fun reportDetail(t: ReportType, code: String) = com.roadpulse.app.data.ReportDetails.label(t, code)
@@ -375,11 +385,17 @@ object ArabicStrings : AppStrings {
         PlaceCategory.EV_CHARGING -> "شحن كهربائي"
         PlaceCategory.REST_AREA -> "استراحة"
         PlaceCategory.SPEED_CAMERA -> "كاميرا سرعة"
+        PlaceCategory.SCHOOL_ZONE -> "مدرسة"
     }
     override fun categoryNearby(c: PlaceCategory) = "${category(c)} بالقرب منك"
     override fun noneWithin10Km(c: PlaceCategory) = "لا يوجد ${category(c)} ضمن 10 كم"
     override val paid = "مدفوع"
     override val free = "مجاني"
+    override fun openStatus(status: com.roadpulse.app.data.OpenStatus) = when (status) {
+        com.roadpulse.app.data.OpenStatus.AlwaysOpen -> "مفتوح 24 ساعة"
+        is com.roadpulse.app.data.OpenStatus.Open -> "مفتوح · يغلق ${status.closesAt}"
+        is com.roadpulse.app.data.OpenStatus.Closed -> status.opensAt?.let { "مغلق · يفتح $it" } ?: "مغلق"
+    }
 
     override val destination = "الوجهة"
     override fun stop(number: Int, name: String) = "توقف $number: $name"
@@ -412,6 +428,7 @@ object ArabicStrings : AppStrings {
     override val muteVoice = "كتم الصوت"
     override val unmuteVoice = "إلغاء كتم الصوت"
     override val stopNavigation = "إيقاف الملاحة"
+    override val overview = "عرض المسار"
 
     override fun reportType(t: ReportType) = when (t) {
         ReportType.POLICE -> "شرطة"

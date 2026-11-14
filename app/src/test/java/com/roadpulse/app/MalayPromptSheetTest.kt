@@ -89,6 +89,8 @@ class MalayPromptSheetTest {
         }
         rows += listOf("Cameras", "Warning for a fixed speed camera ahead", en.cameraAhead(500, 90), ms.cameraAhead(500, 90))
         rows += listOf("Cameras", "Label of the speed camera hint", en.speedCamera, ms.speedCamera)
+        rows += listOf("Schools", "Warning for a school on the route ahead", en.schoolZoneAhead(300), ms.schoolZoneAhead(300))
+        rows += listOf("Schools", "Label of the school zone hint", en.schoolZone, ms.schoolZone)
         (1..4).forEach { rows += listOf("Words", "Roundabout exit number", "exit $it", ordinal(it)) }
         listOf(0, 45, 90, 135, 180, 225, 270, 315).forEach { rows += listOf("Words", "Compass direction at the start", "$it°", compass(it)) }
 

@@ -7,7 +7,7 @@ using RoadPulse.Api.Data;
 namespace RoadPulse.Api.Modules.Places;
 
 public record PlaceDto(string Id, PlaceCategory Category, string? Name, string? Brand, double Lat, double Lon,
-    bool? Paid, int? MaxSpeedKph, double DistanceM);
+    bool? Paid, int? MaxSpeedKph, double DistanceM, string? OpeningHours = null);
 public record AlongRouteRequest(PlaceCategory Category, List<double[]> Points, double? CorridorM);
 
 /// <summary>
@@ -26,7 +26,7 @@ public static class PlaceEndpoints
         places.MapGet("/nearby", Nearby).WithName("PlacesNearby")
             .WithSummary("Places of one category nearest to a point: category, lat, lon, radiusM (max 50 km), limit (max 50).");
         places.MapPost("/along-route", AlongRoute).WithName("PlacesAlongRoute")
-            .WithSummary("Places of one category within corridorM (default 30, max 100) of a route given as [lat, lon] points.");
+            .WithSummary("Places of one category within corridorM (default 30, max 150; schools are often set back from the road) of a route given as [lat, lon] points.");
         return v1;
     }
 
@@ -62,7 +62,7 @@ public static class PlaceEndpoints
         else if (request.Points.Any(p => p.Length != 2 || p[0] is < -90 or > 90 || p[1] is < -180 or > 180))
             errors["points"] = ["Each point is [lat, lon] within world bounds."];
         var corridor = request.CorridorM ?? 30;
-        if (corridor is <= 0 or > 100) errors["corridorM"] = ["Must be between 1 and 100."];
+        if (corridor is <= 0 or > 150) errors["corridorM"] = ["Must be between 1 and 150."];
         if (errors.Count > 0) return TypedResults.ValidationProblem(errors);
 
         var line = Geo.CreateLineString(request.Points.Select(p => new Coordinate(p[1], p[0])).ToArray());
@@ -74,5 +74,5 @@ public static class PlaceEndpoints
     }
 
     private static PlaceDto ToDto(MapPlace p, double distance) =>
-        new(p.Id, p.Category, p.Name, p.Brand, p.Location.Y, p.Location.X, p.Paid, p.MaxSpeedKph, Math.Round(distance));
+        new(p.Id, p.Category, p.Name, p.Brand, p.Location.Y, p.Location.X, p.Paid, p.MaxSpeedKph, Math.Round(distance), p.OpeningHours);
 }

@@ -54,7 +54,7 @@ public class ReportFlag
 }
 
 /// <summary>Kinds of places drivers search for or are warned about (from OpenStreetMap).</summary>
-public enum PlaceCategory { FUEL, PARKING, FOOD, EV_CHARGING, REST_AREA, SPEED_CAMERA, TOLL_PLAZA }
+public enum PlaceCategory { FUEL, PARKING, FOOD, EV_CHARGING, REST_AREA, SPEED_CAMERA, TOLL_PLAZA, SCHOOL_ZONE }
 
 /// <summary>A place imported from OpenStreetMap (see Modules/Places/PlaceImporter.cs).</summary>
 public class MapPlace
@@ -68,6 +68,8 @@ public class MapPlace
     public bool? Paid { get; set; }
     /// <summary>Speed camera: the enforced limit, when mapped.</summary>
     public int? MaxSpeedKph { get; set; }
+    /** OpenStreetMap opening_hours text, e.g. "Mo-Fr 08:00-18:00" (the app works out "open now"). */
+    public string? OpeningHours { get; set; }
     public required Point Location { get; set; }
 }
 
