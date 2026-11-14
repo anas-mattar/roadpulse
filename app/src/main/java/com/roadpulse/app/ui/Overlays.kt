@@ -2,13 +2,16 @@ package com.roadpulse.app.ui
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -28,6 +31,9 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.VolumeOff
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Work
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Navigation
@@ -47,6 +53,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -54,6 +61,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.roadpulse.app.data.Place
+import com.roadpulse.app.data.SavedPlaces
+import com.roadpulse.app.data.Shortcut
 import com.roadpulse.app.data.Route
 import com.roadpulse.app.nav.Narrator
 import com.roadpulse.app.nav.RouteChoice
@@ -71,6 +80,11 @@ internal const val MAP_CREDITS = "© OpenStreetMap contributors · OpenMapTiles 
 fun ExploreOverlay(
     query: String,
     results: List<Place>,
+    saved: SavedPlaces = SavedPlaces(),
+    settingShortcut: Shortcut? = null,
+    onShortcut: (Shortcut) -> Unit = {},
+    onChangeShortcut: (Shortcut) -> Unit = {},
+    onRecent: (Place) -> Unit = {},
     onQueryChange: (String) -> Unit,
     onClear: () -> Unit,
     onSelect: (Place) -> Unit,
@@ -115,7 +129,34 @@ fun ExploreOverlay(
                         }
                         HorizontalDivider(Modifier.padding(vertical = 8.dp), color = RP.Field)
                     }
-                    SearchField(query, onQueryChange, onClear)
+                    if (settingShortcut != null) {
+                        Text(
+                            "Set ${if (settingShortcut == Shortcut.HOME) "Home" else "Work"}: search for the address and pick it",
+                            fontSize = 13.sp,
+                            color = RP.Indigo,
+                            modifier = Modifier.padding(start = 4.dp, bottom = 8.dp),
+                        )
+                    }
+                    SearchField(
+                        query = query,
+                        onQueryChange = onQueryChange,
+                        onClear = onClear,
+                        placeholder = when (settingShortcut) {
+                            Shortcut.HOME -> "Your home address"
+                            Shortcut.WORK -> "Your work address"
+                            null -> "Where to?"
+                        },
+                        showClear = query.isNotEmpty() || settingShortcut != null,
+                    )
+                    if (query.isEmpty() && results.isEmpty() && settingShortcut == null) {
+                        Row(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            ShortcutChip("Home", Icons.Filled.Home, saved.home, { onShortcut(Shortcut.HOME) }, { onChangeShortcut(Shortcut.HOME) })
+                            ShortcutChip("Work", Icons.Filled.Work, saved.work, { onShortcut(Shortcut.WORK) }, { onChangeShortcut(Shortcut.WORK) })
+                        }
+                        saved.recent.take(3).forEach { place ->
+                            ResultRow(place, icon = Icons.Filled.History) { onRecent(place) }
+                        }
+                    }
                     Text(MAP_CREDITS, fontSize = 9.sp, color = RP.TextSecondary, modifier = Modifier.padding(top = 8.dp, start = 4.dp))
                 }
             }
@@ -124,7 +165,13 @@ fun ExploreOverlay(
 }
 
 @Composable
-private fun SearchField(query: String, onQueryChange: (String) -> Unit, onClear: () -> Unit) {
+private fun SearchField(
+    query: String,
+    onQueryChange: (String) -> Unit,
+    onClear: () -> Unit,
+    placeholder: String = "Where to?",
+    showClear: Boolean = query.isNotEmpty(),
+) {
     Row(
         Modifier.fillMaxWidth().fieldBackground().padding(horizontal = 14.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -133,7 +180,7 @@ private fun SearchField(query: String, onQueryChange: (String) -> Unit, onClear:
         Spacer(Modifier.width(10.dp))
         Box(Modifier.weight(1f)) {
             if (query.isEmpty()) {
-                Text("Where to?", fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = Color.Black)
+                Text(placeholder, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = Color.Black)
             }
             BasicTextField(
                 value = query,
@@ -144,7 +191,7 @@ private fun SearchField(query: String, onQueryChange: (String) -> Unit, onClear:
                 modifier = Modifier.fillMaxWidth(),
             )
         }
-        if (query.isNotEmpty()) {
+        if (showClear) {
             Icon(
                 Icons.Filled.Close,
                 contentDescription = "Clear",
@@ -156,7 +203,7 @@ private fun SearchField(query: String, onQueryChange: (String) -> Unit, onClear:
 }
 
 @Composable
-private fun ResultRow(place: Place, onClick: () -> Unit) {
+private fun ResultRow(place: Place, icon: ImageVector = Icons.Filled.LocationOn, onClick: () -> Unit) {
     Row(
         Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 8.dp, horizontal = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -164,7 +211,7 @@ private fun ResultRow(place: Place, onClick: () -> Unit) {
         Box(
             Modifier.size(36.dp).fieldBackground(),
             contentAlignment = Alignment.Center,
-        ) { Icon(Icons.Filled.LocationOn, contentDescription = null, tint = RP.Indigo, modifier = Modifier.size(18.dp)) }
+        ) { Icon(icon, contentDescription = null, tint = RP.Indigo, modifier = Modifier.size(18.dp)) }
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
             Text(place.name, fontSize = 15.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -390,6 +437,39 @@ private fun RouteCard(
             )
             choice?.via?.let {
                 Text("via $it", fontSize = 12.sp, color = RP.TextSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+        }
+    }
+}
+
+/** Home/Work shortcut: tap to go (or set if empty), long-press to change. */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun RowScope.ShortcutChip(
+    label: String,
+    icon: ImageVector,
+    place: Place?,
+    onClick: () -> Unit,
+    onLongClick: () -> Unit,
+) {
+    Surface(shape = RoundedCornerShape(16.dp), color = RP.Field, modifier = Modifier.weight(1f)) {
+        Row(
+            Modifier
+                .combinedClickable(onClick = onClick, onLongClick = onLongClick)
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(icon, contentDescription = null, tint = RP.Indigo, modifier = Modifier.size(20.dp))
+            Spacer(Modifier.width(8.dp))
+            Column {
+                Text(label, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                Text(
+                    place?.name ?: "Set address",
+                    fontSize = 11.sp,
+                    color = if (place == null) RP.Indigo else RP.TextSecondary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
         }
     }

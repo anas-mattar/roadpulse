@@ -8,6 +8,9 @@ import com.roadpulse.app.data.GeoPoint
 import com.roadpulse.app.data.GeocodingClient
 import com.roadpulse.app.data.InMemoryReportRepository
 import com.roadpulse.app.data.Place
+import com.roadpulse.app.data.PlacesStore
+import com.roadpulse.app.data.SavedPlaces
+import com.roadpulse.app.data.Shortcut
 import com.roadpulse.app.data.Report
 import com.roadpulse.app.data.ReportRepository
 import com.roadpulse.app.data.ReportType
@@ -27,6 +30,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
+import java.io.File
 
 data class MapUiState(
     val query: String = "",
@@ -51,6 +55,10 @@ data class MapUiState(
     /** Short status shown under the instruction while navigating (rerouting, GPS lost, offline). */
     val navStatus: String? = null,
     val reports: List<Report> = emptyList(),
+    /** Home, Work and recent destinations (stored on the device only). */
+    val saved: SavedPlaces = SavedPlaces(),
+    /** Set while the user is choosing the address for Home or Work. */
+    val settingShortcut: Shortcut? = null,
     val message: String? = null,
 )
 
@@ -58,6 +66,7 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
     private val geocoder = GeocodingClient(BuildConfig.GEOCODING_URL)
     private val router = RoutingClient(BuildConfig.ROUTING_URL)
     private val reportRepository: ReportRepository = InMemoryReportRepository()
+    private val placesStore = PlacesStore(File(application.filesDir, "places.json"))
 
     private val _state = MutableStateFlow(MapUiState())
     val state: StateFlow<MapUiState> = _state.asStateFlow()
@@ -65,6 +74,7 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
     private var searchJob: Job? = null
 
     init {
+        _state.update { it.copy(saved = placesStore.load()) }
         viewModelScope.launch {
             reportRepository.reports.collect { reports -> _state.update { it.copy(reports = reports) } }
         }
@@ -97,7 +107,7 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
                                 }
                             },
                         )
-                        ui.navigating -> MapUiState(reports = ui.reports, message = ui.message)
+                        ui.navigating -> MapUiState(reports = ui.reports, message = ui.message, saved = ui.saved)
                         else -> ui
                     }
                 }
@@ -138,7 +148,17 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun onPlaceSelected(place: Place, from: GeoPoint?) {
-        _state.update { it.copy(query = place.name, searchResults = emptyList(), destination = place, route = null) }
+        val shortcut = _state.value.settingShortcut
+        if (shortcut != null) {
+            val saved = placesStore.setShortcut(shortcut, place)
+            val label = if (shortcut == Shortcut.HOME) "Home" else "Work"
+            _state.update {
+                it.copy(saved = saved, settingShortcut = null, query = "", searchResults = emptyList(), message = "$label saved")
+            }
+            return
+        }
+        val saved = placesStore.addRecent(place)
+        _state.update { it.copy(saved = saved, query = place.name, searchResults = emptyList(), destination = place, route = null) }
         if (from == null) {
             _state.update { it.copy(message = "Waiting for your location. Enable GPS and try again.") }
             return
@@ -155,6 +175,25 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
                 }
                 .onFailure { e -> _state.update { it.copy(busy = false, message = "Routing failed: ${e.message}") } }
         }
+    }
+
+    /** Home/Work tapped: route there, or ask for the address if it is not set yet. */
+    fun onShortcut(shortcut: Shortcut, from: GeoPoint?) {
+        val place = when (shortcut) {
+            Shortcut.HOME -> _state.value.saved.home
+            Shortcut.WORK -> _state.value.saved.work
+        }
+        if (place == null) changeShortcut(shortcut) else onPlaceSelected(place, from)
+    }
+
+    /** Starts choosing a (new) address for Home or Work. */
+    fun changeShortcut(shortcut: Shortcut) {
+        _state.update { it.copy(settingShortcut = shortcut, query = "", searchResults = emptyList()) }
+    }
+
+    fun clearSavedPlaces() {
+        val cleared = placesStore.clear()
+        _state.update { it.copy(saved = cleared, message = "Saved places cleared") }
     }
 
     /** Picks one of the route choices in the preview. */
@@ -192,7 +231,7 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
     fun clearRoute() {
         DriveReplay.stop()
         NavigationSession.stop()
-        _state.update { MapUiState(reports = it.reports, message = it.message) }
+        _state.update { MapUiState(reports = it.reports, message = it.message, saved = it.saved) }
     }
 
     fun submitReport(type: ReportType, location: GeoPoint?) {

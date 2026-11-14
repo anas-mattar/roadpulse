@@ -24,6 +24,10 @@ components. "RoadPulse" is a placeholder name; check trademark availability befo
 - Survives interruptions: the active drive is saved and resumes if Android stops the app;
   "GPS signal lost" and "Offline: keeping your current route" states instead of silence.
   See `docs/OFFLINE.md` for exactly what works without network or GPS
+- Home and Work shortcuts and recent destinations in the search panel (tap to go, long-press to
+  change), stored only on the phone; "Clear saved places" in settings
+- Alternative routes: up to three route cards (Fastest, No tolls, Shortest, +N min, via road),
+  selectable by card or by tapping a grey route on the map
 - Report button (police, crash, hazard, traffic jam, road closed); reports appear on the map.
   They are stored in memory on the device only until the backend exists (Phase 2).
 

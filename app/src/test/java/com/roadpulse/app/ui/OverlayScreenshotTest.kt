@@ -13,6 +13,8 @@ import com.roadpulse.app.data.GeoPoint
 import com.roadpulse.app.data.Maneuver
 import com.roadpulse.app.data.Place
 import com.roadpulse.app.data.Route
+import com.roadpulse.app.data.SavedPlaces
+import com.roadpulse.app.data.Shortcut
 import com.roadpulse.app.nav.EnglishNarrator
 import com.roadpulse.app.nav.MalayNarrator
 import org.junit.Rule
@@ -51,15 +53,30 @@ class OverlayScreenshotTest {
 
     @Test
     fun explore() = shot("1_explore", RP.Field) {
-        ExploreOverlay("", emptyList(), {}, {}, {}, {}, {}, {})
+        ExploreOverlay(
+            query = "", results = emptyList(),
+            saved = SavedPlaces(
+                home = Place("Jalan Bangsar 12", "Bangsar", GeoPoint(3.13, 101.67)),
+                recent = listOf(place, Place("KLCC", "Kuala Lumpur", GeoPoint(3.158, 101.712)), Place("Sunway Pyramid", "Subang Jaya", GeoPoint(3.073, 101.607))),
+            ),
+            onQueryChange = {}, onClear = {}, onSelect = {}, onOpenSettings = {}, onRecenter = {}, onReport = {},
+        )
+    }
+
+    @Test
+    fun settingHome() = shot("1c_explore_set_home", RP.Field) {
+        ExploreOverlay(
+            query = "", results = emptyList(), settingShortcut = Shortcut.HOME,
+            onQueryChange = {}, onClear = {}, onSelect = {}, onOpenSettings = {}, onRecenter = {}, onReport = {},
+        )
     }
 
     @Test
     fun exploreWithResults() = shot("1b_explore_search", RP.Field) {
         ExploreOverlay(
-            "M City",
-            listOf(place, Place("M City Kopitiam", "Selayang, Selangor", GeoPoint(3.25, 101.65))),
-            {}, {}, {}, {}, {}, {},
+            query = "M City",
+            results = listOf(place, Place("M City Kopitiam", "Selayang, Selangor", GeoPoint(3.25, 101.65))),
+            onQueryChange = {}, onClear = {}, onSelect = {}, onOpenSettings = {}, onRecenter = {}, onReport = {},
         )
     }
 

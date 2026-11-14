@@ -327,6 +327,11 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                 ScreenMode.EXPLORE -> ExploreOverlay(
                     query = state.query,
                     results = state.searchResults,
+                    saved = state.saved,
+                    settingShortcut = state.settingShortcut,
+                    onShortcut = { viewModel.onShortcut(it, currentLocation()) },
+                    onChangeShortcut = viewModel::changeShortcut,
+                    onRecent = { viewModel.onPlaceSelected(it, currentLocation()) },
                     onQueryChange = { viewModel.onQueryChange(it, searchBias()) },
                     onClear = viewModel::clearRoute,
                     onSelect = { viewModel.onPlaceSelected(it, currentLocation()) },
@@ -366,7 +371,13 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
     }
 
     if (showVoiceSettings) {
-        VoiceSettingsDialog(onDismiss = { showVoiceSettings = false })
+        VoiceSettingsDialog(
+            onDismiss = { showVoiceSettings = false },
+            onClearPlaces = {
+                showVoiceSettings = false
+                viewModel.clearSavedPlaces()
+            },
+        )
     }
 
     if (showSimulateDialog) {
@@ -610,7 +621,7 @@ private fun LocationFix.toAndroidLocation(): android.location.Location =
     }
 
 @Composable
-private fun VoiceSettingsDialog(onDismiss: () -> Unit) {
+private fun VoiceSettingsDialog(onDismiss: () -> Unit, onClearPlaces: () -> Unit) {
     val context = LocalContext.current
     val language by VoiceSettings.language.collectAsStateWithLifecycle()
     val missing by VoiceSettings.missingVoices.collectAsStateWithLifecycle()
@@ -666,6 +677,20 @@ private fun VoiceSettingsDialog(onDismiss: () -> Unit) {
                         RadioButton(selected = mapColors == option, onClick = null)
                         Text(option.label, modifier = Modifier.padding(start = 8.dp))
                     }
+                }
+                Text(
+                    "Privacy",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = RP.TextSecondary,
+                    modifier = Modifier.padding(top = 16.dp),
+                )
+                Text(
+                    "Home, Work and recent places are stored only on this phone.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = RP.TextSecondary,
+                )
+                TextButton(onClick = onClearPlaces, contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)) {
+                    Text("Clear saved places", color = RP.Danger)
                 }
             }
         },
