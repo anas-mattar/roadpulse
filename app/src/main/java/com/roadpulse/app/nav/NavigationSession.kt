@@ -62,7 +62,8 @@ data class NavState(
  */
 object NavigationSession {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
-    private val router by lazy { RoutingClient(BuildConfig.ROUTING_URL) }
+    // Read on each use, so the debug server switch also applies to reroutes.
+    private val router get() = RoutingClient(com.roadpulse.app.data.ServerSettings.routingUrl())
 
     private val _state = MutableStateFlow<NavState?>(null)
     val state: StateFlow<NavState?> = _state.asStateFlow()

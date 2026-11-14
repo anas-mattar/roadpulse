@@ -7,14 +7,17 @@ import kotlinx.coroutines.flow.update
 import java.util.UUID
 
 /**
- * Source of community road reports.
- * Phase 2 replaces [InMemoryReportRepository] with a backend-synced implementation
- * (REST for submit/confirm, WebSocket for live updates in the visible map area).
+ * Source of community road reports: [BackendReportRepository] (server, live updates) or
+ * [InMemoryReportRepository] (kept on this phone only, used when no server is configured).
  */
 interface ReportRepository {
     val reports: StateFlow<List<Report>>
     suspend fun submit(type: ReportType, location: GeoPoint): Report
     suspend fun confirm(reportId: String)
+    /** The part of the map on screen; server-backed repositories load and watch it. */
+    fun watchArea(visible: MapArea) {}
+    /** Stops network activity (called when switching servers or closing the screen). */
+    fun close() {}
 }
 
 class InMemoryReportRepository : ReportRepository {

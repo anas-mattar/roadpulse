@@ -58,4 +58,6 @@ data class Report(
     val location: GeoPoint,
     val createdAtMillis: Long,
     val confirmations: Int = 0,
+    /** When the server will drop it (null for reports kept only on this phone). */
+    val expiresAtMillis: Long? = null,
 )

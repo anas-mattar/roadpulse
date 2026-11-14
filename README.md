@@ -95,6 +95,21 @@ Service URLs live in `gradle.properties` (`roadpulse.mapStyleUrl`, `roadpulse.ro
 development but not for production traffic. `backend/docker-compose.yml` starts your own
 Valhalla routing server and a PostGIS database.
 
+## Using your own server (debug builds)
+
+With the Docker stack running (`backend/`, see `backend/README.md`), debug builds use it by
+default: routing from your Valhalla (`http://10.0.2.2:8002`) and real community reports with live
+updates from the API (`http://10.0.2.2:8080`). `10.0.2.2` is your computer as seen from the
+emulator. Turn it off in Settings > "Use my laptop's server" to go back to public routing with
+reports kept on the phone. Release builds never use these addresses.
+
+End-to-end check of the app's reports code against a running backend (two simulated phones):
+```
+set ROADPULSE_BACKEND_URL=http://localhost:8080
+gradlew testDebugUnitTest --tests com.roadpulse.app.data.LiveBackendTest
+```
+Add `ROADPULSE_MODERATOR_KEY` to also check moderator removals.
+
 ## Layout
 
     app/src/main/java/com/roadpulse/app/

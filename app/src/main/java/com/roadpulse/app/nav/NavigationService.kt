@@ -59,6 +59,7 @@ class NavigationService : Service() {
     override fun onCreate() {
         super.onCreate()
         VoiceSettings.init(this)
+        com.roadpulse.app.data.ServerSettings.init(this)
         voice = VoiceGuide(this)
         deviceLocation = DeviceLocation(this)
         NavigationSession.init(driveStore(this), SystemClock::elapsedRealtime)

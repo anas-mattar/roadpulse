@@ -1,6 +1,10 @@
 # 0002. Hosting: Docker Compose on Linux VPS in Singapore
 
-Date: 2026-11-14 · Status: Accepted
+Date: 2026-11-14 · Status: Accepted (deployment deferred)
+
+> **Update 2026-11-14:** the stack runs only on the developer's laptop for now (Docker Compose:
+> API, PostGIS, Valhalla). No server is rented and nothing is exposed to the internet. The VPS
+> plan below still applies when going online is decided; the same Compose file is used.
 
 ## Context
 

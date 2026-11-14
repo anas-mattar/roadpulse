@@ -6,7 +6,11 @@ import androidx.lifecycle.viewModelScope
 import com.roadpulse.app.BuildConfig
 import com.roadpulse.app.data.GeoPoint
 import com.roadpulse.app.data.GeocodingClient
+import com.roadpulse.app.data.BackendReportRepository
 import com.roadpulse.app.data.InMemoryReportRepository
+import com.roadpulse.app.data.MapArea
+import com.roadpulse.app.data.ReportRejectedException
+import com.roadpulse.app.data.ServerSettings
 import com.roadpulse.app.data.Place
 import com.roadpulse.app.data.PlacesStore
 import com.roadpulse.app.data.SavedPlaces
@@ -65,8 +69,10 @@ data class MapUiState(
 
 class MapViewModel(application: Application) : AndroidViewModel(application) {
     private val geocoder = GeocodingClient(BuildConfig.GEOCODING_URL)
-    private val router = RoutingClient(BuildConfig.ROUTING_URL)
-    private val reportRepository: ReportRepository = InMemoryReportRepository()
+    private val router get() = RoutingClient(ServerSettings.routingUrl())
+    private var reportRepository: ReportRepository = InMemoryReportRepository()
+    private var reportsJob: Job? = null
+    private var lastVisibleArea: MapArea? = null
     private val placesStore = PlacesStore(File(application.filesDir, "places.json"))
 
     private val _state = MutableStateFlow(MapUiState())
@@ -76,8 +82,9 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
 
     init {
         _state.update { it.copy(saved = placesStore.load()) }
+        // Reports come from the server when one is configured, otherwise they stay on this phone.
         viewModelScope.launch {
-            reportRepository.reports.collect { reports -> _state.update { it.copy(reports = reports) } }
+            ServerSettings.useLocal.collect { useReportsSource() }
         }
         // Mirror the active drive (owned by NavigationSession, advanced by NavigationService).
         viewModelScope.launch {
@@ -236,15 +243,51 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
         _state.update { MapUiState(reports = it.reports, message = it.message, saved = it.saved) }
     }
 
+    private fun useReportsSource() {
+        reportsJob?.cancel()
+        reportRepository.close()
+        val url = ServerSettings.backendUrl()
+        reportRepository = if (url.isEmpty()) {
+            InMemoryReportRepository()
+        } else {
+            BackendReportRepository(url, ServerSettings.tokenStore(getApplication(), url), viewModelScope) {
+                if (BuildConfig.DEBUG) android.util.Log.i("RoadPulseLive", it)
+            }
+        }
+        val repo = reportRepository
+        reportsJob = viewModelScope.launch {
+            repo.reports.collect { reports -> _state.update { it.copy(reports = reports) } }
+        }
+        lastVisibleArea?.let(repo::watchArea)
+    }
+
+    /** The map stopped moving: load and watch reports for this area. */
+    fun onMapAreaChanged(visible: MapArea) {
+        lastVisibleArea = visible
+        reportRepository.watchArea(visible)
+    }
+
     fun submitReport(type: ReportType, location: GeoPoint?) {
         if (location == null) {
             _state.update { it.copy(message = "Location unavailable, cannot place report") }
             return
         }
         viewModelScope.launch {
-            reportRepository.submit(type, location)
-            _state.update { it.copy(message = "${type.label} reported. Thanks!") }
+            try {
+                reportRepository.submit(type, location)
+                _state.update { it.copy(message = "${type.label} reported. Thanks!") }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: ReportRejectedException) {
+                _state.update { it.copy(message = e.message) }
+            } catch (e: Exception) {
+                _state.update { it.copy(message = "Could not send report. Check your connection and try again.") }
+            }
         }
+    }
+
+    override fun onCleared() {
+        reportRepository.close()
     }
 
     fun showMessage(text: String) = _state.update { it.copy(message = text) }

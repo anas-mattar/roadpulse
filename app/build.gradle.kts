@@ -21,9 +21,17 @@ android {
         buildConfigField("String", "MAP_STYLE_DARK_URL", prop("roadpulse.mapStyleDarkUrl"))
         buildConfigField("String", "ROUTING_URL", prop("roadpulse.routingUrl"))
         buildConfigField("String", "GEOCODING_URL", prop("roadpulse.geocodingUrl"))
+        buildConfigField("String", "BACKEND_URL", prop("roadpulse.backendUrl"))
+        // The developer's own Docker stack; only debug builds may use it (plain HTTP to 10.0.2.2).
+        buildConfigField("String", "LOCAL_ROUTING_URL", "\"\"")
+        buildConfigField("String", "LOCAL_BACKEND_URL", "\"\"")
     }
 
     buildTypes {
+        debug {
+            buildConfigField("String", "LOCAL_ROUTING_URL", prop("roadpulse.local.routingUrl"))
+            buildConfigField("String", "LOCAL_BACKEND_URL", prop("roadpulse.local.backendUrl"))
+        }
         release {
             isMinifyEnabled = false
         }
@@ -67,6 +75,7 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
 
     testImplementation(libs.junit)
+    testImplementation(libs.okhttp.mockwebserver)
     // Screenshot tests of the map overlays on the JVM (no device needed).
     testImplementation(libs.robolectric)
     testImplementation(libs.roborazzi.core)
@@ -78,6 +87,10 @@ dependencies {
 
 tasks.withType<Test>().configureEach {
     System.getProperty("routingBodyOut")?.let { systemProperty("routingBodyOut", it) }
+    // Optional end-to-end test against a running backend (see LiveBackendTest).
+    System.getenv("ROADPULSE_BACKEND_URL")?.let { environment("ROADPULSE_BACKEND_URL", it) }
+    System.getenv("ROADPULSE_MODERATOR_KEY")?.let { environment("ROADPULSE_MODERATOR_KEY", it) }
+    System.getenv("ROADPULSE_LONG_TEST")?.let { environment("ROADPULSE_LONG_TEST", it) }
     // Screenshot tests write PNGs to app/build/outputs/roborazzi/ on every run.
     systemProperty("roborazzi.test.record", "true")
 }

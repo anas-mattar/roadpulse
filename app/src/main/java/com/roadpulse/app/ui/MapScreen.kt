@@ -72,6 +72,8 @@ import com.roadpulse.app.data.Report
 import com.roadpulse.app.data.ReportType
 import com.roadpulse.app.data.Route
 import com.roadpulse.app.nav.DeviceLocation
+import com.roadpulse.app.data.MapArea
+import com.roadpulse.app.data.ServerSettings
 import com.roadpulse.app.nav.DisplaySettings
 import com.roadpulse.app.nav.MapColors
 import com.roadpulse.app.nav.SunTimes
@@ -262,6 +264,17 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
             if (p == null) FeatureCollection.fromFeatures(emptyList())
             else FeatureCollection.fromFeature(Feature.fromGeometry(Point.fromLngLat(p.lon, p.lat)))
         )
+    }
+    // Tell the reports source which area is on screen whenever the map comes to rest.
+    DisposableEffect(map) {
+        val m = map
+        val listener = MapLibreMap.OnCameraIdleListener {
+            m?.projection?.visibleRegion?.latLngBounds?.let { b ->
+                viewModel.onMapAreaChanged(MapArea(b.longitudeWest, b.latitudeSouth, b.longitudeEast, b.latitudeNorth))
+            }
+        }
+        m?.addOnCameraIdleListener(listener)
+        onDispose { m?.removeOnCameraIdleListener(listener) }
     }
     LaunchedEffect(style, state.reports) {
         style?.getSourceAs<GeoJsonSource>(REPORT_SOURCE)?.setGeoJson(state.reports.toFeatureCollection())
@@ -716,6 +729,25 @@ private fun VoiceSettingsDialog(onDismiss: () -> Unit, onClearPlaces: () -> Unit
                         RadioButton(selected = mapColors == option, onClick = null)
                         Text(option.label, modifier = Modifier.padding(start = 8.dp))
                     }
+                }
+                if (ServerSettings.localAvailable) {
+                    val useLocal by ServerSettings.useLocal.collectAsStateWithLifecycle()
+                    Text(
+                        "Server (debug builds)",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = RP.TextSecondary,
+                        modifier = Modifier.padding(top = 16.dp),
+                    )
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                        Text("Use my laptop's server", modifier = Modifier.weight(1f))
+                        Switch(checked = useLocal, onCheckedChange = ServerSettings::setUseLocal)
+                    }
+                    Text(
+                        if (useLocal) "Routing and live reports from Docker on this computer."
+                        else "Public routing; reports stay on this phone.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = RP.TextSecondary,
+                    )
                 }
                 Text(
                     "Privacy",
