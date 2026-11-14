@@ -407,7 +407,11 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
     }
     // Light map by day; the night style after sunset (or as chosen in settings).
     val mapColors by DisplaySettings.mapColors.collectAsStateWithLifecycle()
-    var isNight by remember { mutableStateOf(false) }
+    // Known before the first style loads, so the app does not open with the day map at night
+    // and switch a moment later.
+    var isNight by remember {
+        mutableStateOf(SunTimes.isNight(DEFAULT_CENTER.latitude, DEFAULT_CENTER.longitude, System.currentTimeMillis()))
+    }
     LaunchedEffect(Unit) {
         while (true) {
             val p = currentLocation() ?: GeoPoint(DEFAULT_CENTER.latitude, DEFAULT_CENTER.longitude)
@@ -694,7 +698,9 @@ private fun MapLibreView(
         val m = map ?: return@LaunchedEffect
         onStyleChanging()
         m.setStyle(Style.Builder().fromUri(styleUrl)) { style ->
-            style.addOverlayLayers()
+            // An exception here would reach the map's native code and close the app: log it instead.
+            runCatching { style.addOverlayLayers() }
+                .onFailure { android.util.Log.e("RoadPulse", "Could not add map layers", it) }
             onStyleLoaded(style)
         }
     }
@@ -703,6 +709,14 @@ private fun MapLibreView(
 }
 
 private fun Style.addOverlayLayers() {
+    // If the location puck's layers are already in this style (they are re-added on a style
+    // switch, sometimes before ours), insert our layers just below them so the puck stays on top.
+    val locationLayer = layers.firstOrNull { l ->
+        (l.id.startsWith("mapbox-location") || l.id.startsWith("maplibre-location")) && l.id.endsWith("layer")
+    }?.id
+    fun add(layer: org.maplibre.android.style.layers.Layer) {
+        if (locationLayer != null) addLayerBelow(layer, locationLayer) else addLayer(layer)
+    }
     addSource(GeoJsonSource(ALT_ROUTE_SOURCE))
     addSource(GeoJsonSource(ROUTE_SOURCE))
     addSource(GeoJsonSource(DEST_SOURCE))
@@ -717,7 +731,7 @@ private fun Style.addOverlayLayers() {
     )
     addSource(GeoJsonSource(MATCHED_SOURCE))
 
-    addLayer(
+    add(
         LineLayer(ALT_ROUTE_LAYER, ALT_ROUTE_SOURCE).withProperties(
             PropertyFactory.lineColor("#9E9C94"),
             PropertyFactory.lineWidth(7f),
@@ -726,7 +740,7 @@ private fun Style.addOverlayLayers() {
             PropertyFactory.lineJoin(Property.LINE_JOIN_ROUND),
         )
     )
-    addLayer(
+    add(
         LineLayer("route-casing", ROUTE_SOURCE).withProperties(
             PropertyFactory.lineColor("#3C3489"),
             PropertyFactory.lineWidth(10f),
@@ -734,7 +748,7 @@ private fun Style.addOverlayLayers() {
             PropertyFactory.lineJoin(Property.LINE_JOIN_ROUND),
         )
     )
-    addLayer(
+    add(
         LineLayer("route-line", ROUTE_SOURCE).withProperties(
             PropertyFactory.lineColor("#7F77DD"),
             PropertyFactory.lineWidth(6f),
@@ -742,7 +756,7 @@ private fun Style.addOverlayLayers() {
             PropertyFactory.lineJoin(Property.LINE_JOIN_ROUND),
         )
     )
-    addLayer(
+    add(
         CircleLayer("destination", DEST_SOURCE).withProperties(
             PropertyFactory.circleRadius(9f),
             PropertyFactory.circleColor("#26215C"),
@@ -751,7 +765,7 @@ private fun Style.addOverlayLayers() {
         )
     )
     // Stops on the way: smaller indigo dots.
-    addLayer(
+    add(
         CircleLayer("stops", STOP_SOURCE).withProperties(
             PropertyFactory.circleRadius(7f),
             PropertyFactory.circleColor("#534AB7"),
@@ -760,7 +774,7 @@ private fun Style.addOverlayLayers() {
         )
     )
     // The parked car: a teal dot with a "P".
-    addLayer(
+    add(
         CircleLayer("parking", PARKING_SOURCE).withProperties(
             PropertyFactory.circleRadius(12f),
             PropertyFactory.circleColor("#0F6E56"),
@@ -768,7 +782,7 @@ private fun Style.addOverlayLayers() {
             PropertyFactory.circleStrokeWidth(3f),
         )
     )
-    addLayer(
+    add(
         SymbolLayer("parking-label", PARKING_SOURCE).withProperties(
             PropertyFactory.textField("P"),
             PropertyFactory.textFont(arrayOf("Noto Sans Regular")),
@@ -778,7 +792,7 @@ private fun Style.addOverlayLayers() {
             PropertyFactory.textIgnorePlacement(true),
         )
     )
-    addLayer(
+    add(
         CircleLayer("matched-position", MATCHED_SOURCE).withProperties(
             PropertyFactory.circleRadius(10f),
             PropertyFactory.circleColor("#534AB7"),
@@ -788,7 +802,7 @@ private fun Style.addOverlayLayers() {
     )
     // Report icons ("report-POLICE" etc., registered by rememberReportMarkers). Reports on the
     // same spot are fanned out with per-feature offsets (ReportLayout); newest drawn on top.
-    addLayer(
+    add(
         SymbolLayer(REPORT_LAYER, REPORT_SOURCE).withProperties(
             PropertyFactory.iconImage(Expression.concat(Expression.literal("report-"), Expression.get("type"))),
             PropertyFactory.iconOffset(Expression.get("offset")),
@@ -799,7 +813,7 @@ private fun Style.addOverlayLayers() {
         ).withFilter(Expression.not(Expression.has("point_count")))
     )
     // Zoomed out: nearby reports become one bubble with their count. Tap it to zoom in.
-    addLayer(
+    add(
         CircleLayer(REPORT_CLUSTER_LAYER, REPORT_SOURCE).withProperties(
             PropertyFactory.circleColor("#534AB7"),
             PropertyFactory.circleRadius(
@@ -810,7 +824,7 @@ private fun Style.addOverlayLayers() {
             PropertyFactory.circleStrokeWidth(3f),
         ).withFilter(Expression.has("point_count"))
     )
-    addLayer(
+    add(
         SymbolLayer(REPORT_CLUSTER_COUNT_LAYER, REPORT_SOURCE).withProperties(
             PropertyFactory.textField(Expression.toString(Expression.get("point_count_abbreviated"))),
             PropertyFactory.textFont(arrayOf("Noto Sans Regular")), // in both the day and night styles
@@ -827,14 +841,10 @@ private fun MapLibreMap.enableLocation(context: Context, style: Style) {
     val component = locationComponent
     if (!component.isLocationComponentActivated) {
         component.activateLocationComponent(
-            LocationComponentActivationOptions.builder(context, style)
-                .useDefaultLocationEngine(false)
-                // Your position is drawn above report icons and bubbles, never hidden by them.
-                .locationComponentOptions(
-                    org.maplibre.android.location.LocationComponentOptions.builder(context)
-                        .layerAbove(REPORT_CLUSTER_COUNT_LAYER).build()
-                )
-                .build()
+            // No layerAbove/layerBelow: after a style switch the location layers can be added back
+            // before ours, and pointing at one of ours would then crash. addOverlayLayers puts our
+            // layers below the location layers instead, so your position always stays on top.
+            LocationComponentActivationOptions.builder(context, style).useDefaultLocationEngine(false).build()
         )
     }
     component.isLocationComponentEnabled = true
