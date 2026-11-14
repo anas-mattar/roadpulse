@@ -5,6 +5,7 @@ import com.roadpulse.app.data.GeoPoint
 import com.roadpulse.app.data.Place
 import com.roadpulse.app.data.Route
 import com.roadpulse.app.data.RoutingClient
+import com.roadpulse.app.data.SpeedLimits
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -51,6 +52,8 @@ data class NavState(
     val thenGapMeters: Double? = null,
     /** Current speed from GPS, if the provider reports it. */
     val speedMps: Double? = null,
+    /** Posted speed limit on the current road, if OpenStreetMap has one. */
+    val speedLimitKph: Int? = null,
 )
 
 /**
@@ -77,6 +80,8 @@ object NavigationSession {
     private var log: NavLog? = null
     private var rerouteJob: Job? = null
     private var watchdogJob: Job? = null
+    private var limitsJob: Job? = null
+    private var speedLimits: SpeedLimits = SpeedLimits.NONE
     private var lastRerouteAttemptMillis = Long.MIN_VALUE / 2
     private val signal = SignalMonitor()
 
@@ -130,6 +135,8 @@ object NavigationSession {
 
     fun stop() {
         rerouteJob?.cancel()
+        limitsJob?.cancel()
+        speedLimits = SpeedLimits.NONE
         watchdogJob?.cancel()
         tracker = null
         store?.clear()
@@ -177,6 +184,7 @@ object NavigationSession {
                 thenType = progress.following?.type,
                 thenGapMeters = progress.followingGapMeters,
                 speedMps = fix.speedMps,
+                speedLimitKph = if (progress.matched) speedLimits.at(progress.segmentIndex) else it.speedLimitKph,
                 distanceToTurnMeters = progress.distanceToTurnMeters,
                 remainingKm = progress.remainingMeters / 1000,
                 remainingSeconds = progress.remainingSeconds,
@@ -188,6 +196,7 @@ object NavigationSession {
 
     private fun applyRoute(route: Route, destination: Place, resumed: Boolean) {
         tracker = RouteTracker(route, resumed, VoiceSettings::narrator)
+        fetchSpeedLimits(route)
         signal.reset(now())
         if (persist) store?.save(route, destination)
         val previous = _state.value
@@ -203,6 +212,23 @@ object NavigationSession {
             upcomingType = route.maneuvers.firstOrNull()?.type,
             speedMps = previous?.speedMps,
         )
+    }
+
+    /** Loads speed limits for [route] in the background; none are shown until they arrive. */
+    private fun fetchSpeedLimits(route: Route) {
+        limitsJob?.cancel()
+        speedLimits = SpeedLimits.NONE
+        limitsJob = scope.launch {
+            try {
+                val limits = router.speedLimits(route)
+                if (_state.value?.route === route) speedLimits = limits
+                log?.event(now(), "speed_limits", if (limits.isEmpty) "none" else "loaded")
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                log?.event(now(), "speed_limits", "failed: ${e.javaClass.simpleName}")
+            }
+        }
     }
 
     private fun speak(text: String?, timeMillis: Long = now()) {

@@ -13,6 +13,8 @@ data class Progress(
     /** Position to display: on the route line when matched, otherwise the raw fix. */
     val displayPosition: GeoPoint,
     val matched: Boolean,
+    /** Route segment (starting shape point) the position was matched to. */
+    val segmentIndex: Int = 0,
     /** The latest fix was too inaccurate to use. */
     val poorSignal: Boolean,
     val upcoming: Maneuver?,
@@ -95,6 +97,7 @@ class RouteTracker(
             offRouteMeters = match.offsetM,
             displayPosition = if (match.onRoute) match.snapped else fix.position,
             matched = match.onRoute,
+            segmentIndex = match.segmentIndex,
             poorSignal = poor,
             upcoming = upcoming,
             distanceToTurnMeters = distanceToTurn,

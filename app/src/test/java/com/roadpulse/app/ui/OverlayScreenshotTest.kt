@@ -97,7 +97,7 @@ class OverlayScreenshotTest {
                 navigating = true, route = route, destination = place,
                 currentInstruction = "Turn right onto Jalan Ampang.", distanceToTurnMeters = 350.0,
                 remainingKm = 7.2, remainingSeconds = 720.0,
-                turnType = 10, thenType = 16, thenGapMeters = 200.0, speedKmh = 57,
+                turnType = 10, thenType = 16, thenGapMeters = 200.0, speedKmh = 57, speedLimitKph = 60,
             ),
             narrator = EnglishNarrator, muted = false, onToggleMute = {}, onReport = {}, onStop = {},
         )
@@ -110,7 +110,7 @@ class OverlayScreenshotTest {
                 navigating = true, route = route, destination = place,
                 currentInstruction = "Masuk ke bulatan dan ambil jalan keluar kedua ke Jalan P18 C1.",
                 distanceToTurnMeters = 120.0, remainingKm = 3.4, remainingSeconds = 400.0,
-                turnType = 26, navStatus = MalayNarrator.statusGpsLost, speedKmh = 32,
+                turnType = 26, navStatus = MalayNarrator.statusGpsLost, speedKmh = 72, speedLimitKph = 60,
             ),
             narrator = MalayNarrator, muted = true, onToggleMute = {}, onReport = {}, onStop = {},
             following = false,

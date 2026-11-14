@@ -352,7 +352,8 @@ fun DrivingOverlay(
 
         Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth()) {
             Row(Modifier.fillMaxWidth().padding(bottom = 10.dp), verticalAlignment = Alignment.Bottom) {
-                state.speedKmh?.let { SpeedRing(speedKmh = it) }
+                state.speedKmh?.let { SpeedRing(speedKmh = it, limitKph = state.speedLimitKph) }
+                state.speedLimitKph?.let { SpeedLimitSign(it, Modifier.padding(start = 8.dp, bottom = 4.dp)) }
                 Spacer(Modifier.weight(1f))
                 Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     if (!following) {

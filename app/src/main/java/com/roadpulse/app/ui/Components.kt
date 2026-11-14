@@ -168,9 +168,25 @@ fun TurnIsland(turnType: Int?, distanceLabel: String?, instruction: String, modi
     }
 }
 
-/** Speed in a ring that fills towards [scaleKmh]. */
+/** True when noticeably above the posted limit (small tolerance for speedometer/GPS noise). */
+fun isSpeeding(speedKmh: Int, limitKph: Int?): Boolean = limitKph != null && speedKmh > limitKph + SPEEDING_TOLERANCE_KMH
+
+private const val SPEEDING_TOLERANCE_KMH = 3
+
+/** Round speed-limit sign (white with a red border). */
 @Composable
-fun SpeedRing(speedKmh: Int, modifier: Modifier = Modifier, scaleKmh: Int = 120) {
+fun SpeedLimitSign(limitKph: Int, modifier: Modifier = Modifier) {
+    Surface(modifier = modifier.size(46.dp), shape = CircleShape, color = Color.White, border = BorderStroke(5.dp, RP.Danger), shadowElevation = 4.dp) {
+        Box(contentAlignment = Alignment.Center) {
+            Text("$limitKph", color = Color(0xFF2C2C2A), fontSize = if (limitKph >= 100) 15.sp else 17.sp, fontWeight = FontWeight.Bold)
+        }
+    }
+}
+
+/** Speed in a ring that fills towards the limit (or [scaleKmh]); red when speeding. */
+@Composable
+fun SpeedRing(speedKmh: Int, modifier: Modifier = Modifier, limitKph: Int? = null, scaleKmh: Int = limitKph ?: 120) {
+    val speeding = isSpeeding(speedKmh, limitKph)
     Box(modifier.size(68.dp), contentAlignment = Alignment.Center) {
         Canvas(Modifier.size(68.dp)) {
             val stroke = 6.dp.toPx()
@@ -179,10 +195,10 @@ fun SpeedRing(speedKmh: Int, modifier: Modifier = Modifier, scaleKmh: Int = 120)
             val arcSize = Size(size.width - stroke, size.height - stroke)
             drawArc(RP.NightPanel, 0f, 360f, false, Offset(inset, inset), arcSize, style = Stroke(stroke))
             val sweep = (speedKmh.coerceIn(0, scaleKmh) / scaleKmh.toFloat()) * 360f
-            drawArc(RP.Teal, -90f, sweep, false, Offset(inset, inset), arcSize, style = Stroke(stroke, cap = StrokeCap.Round))
+            drawArc(if (speeding) RP.Danger else RP.Teal, -90f, sweep, false, Offset(inset, inset), arcSize, style = Stroke(stroke, cap = StrokeCap.Round))
         }
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text("$speedKmh", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.SemiBold, lineHeight = 20.sp)
+            Text("$speedKmh", color = if (speeding) Color(0xFFF09595) else Color.White, fontSize = 20.sp, fontWeight = FontWeight.SemiBold, lineHeight = 20.sp)
             Text("km/h", color = RP.NightText, fontSize = 10.sp, lineHeight = 10.sp)
         }
     }

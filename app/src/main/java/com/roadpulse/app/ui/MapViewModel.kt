@@ -52,6 +52,7 @@ data class MapUiState(
     val thenType: Int? = null,
     val thenGapMeters: Double? = null,
     val speedKmh: Int? = null,
+    val speedLimitKph: Int? = null,
     /** Short status shown under the instruction while navigating (rerouting, GPS lost, offline). */
     val navStatus: String? = null,
     val reports: List<Report> = emptyList(),
@@ -97,6 +98,7 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
                             thenType = nav.thenType,
                             thenGapMeters = nav.thenGapMeters,
                             speedKmh = nav.speedMps?.let { (it * 3.6).roundToInt() },
+                            speedLimitKph = nav.speedLimitKph,
                             navStatus = VoiceSettings.narrator().let { n ->
                                 when {
                                     nav.rerouting -> n.statusFindingRoute

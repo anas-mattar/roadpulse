@@ -24,6 +24,8 @@ components. "RoadPulse" is a placeholder name; check trademark availability befo
 - Survives interruptions: the active drive is saved and resumes if Android stops the app;
   "GPS signal lost" and "Offline: keeping your current route" states instead of silence.
   See `docs/OFFLINE.md` for exactly what works without network or GPS
+- Speed-limit sign next to the speed ring where OpenStreetMap has a limit (80-88% of tested KL
+  routes); the ring scales to the limit and turns red above it
 - Home and Work shortcuts and recent destinations in the search panel (tap to go, long-press to
   change), stored only on the phone; "Clear saved places" in settings
 - Alternative routes: up to three route cards (Fastest, No tolls, Shortest, +N min, via road),

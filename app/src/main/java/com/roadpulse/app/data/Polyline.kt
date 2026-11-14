@@ -1,7 +1,33 @@
 package com.roadpulse.app.data
 
-/** Decoder for Google-style encoded polylines. Valhalla uses precision 6. */
+/** Encoder/decoder for Google-style encoded polylines. Valhalla uses precision 6. */
 object Polyline {
+    fun encode(points: List<GeoPoint>, precision: Int = 6): String {
+        var factor = 1.0
+        repeat(precision) { factor *= 10.0 }
+        val out = StringBuilder()
+        var prevLat = 0L
+        var prevLon = 0L
+        for (p in points) {
+            val lat = Math.round(p.lat * factor)
+            val lon = Math.round(p.lon * factor)
+            encodeValue(lat - prevLat, out)
+            encodeValue(lon - prevLon, out)
+            prevLat = lat
+            prevLon = lon
+        }
+        return out.toString()
+    }
+
+    private fun encodeValue(value: Long, out: StringBuilder) {
+        var v = if (value < 0) (value shl 1).inv() else value shl 1
+        while (v >= 0x20) {
+            out.append(((0x20 or (v and 0x1f).toInt()) + 63).toChar())
+            v = v shr 5
+        }
+        out.append((v.toInt() + 63).toChar())
+    }
+
     fun decode(encoded: String, precision: Int = 6): List<GeoPoint> {
         var factor = 1.0
         repeat(precision) { factor *= 10.0 }

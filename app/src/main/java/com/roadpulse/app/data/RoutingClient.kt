@@ -3,6 +3,9 @@ package com.roadpulse.app.data
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.intOrNull
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -31,6 +34,34 @@ class RoutingClient(private val baseUrl: String) {
     internal fun parseRoutes(body: String): List<Route> {
         val response = Http.json.decodeFromString<RouteResponse>(body)
         return listOf(toRoute(response.trip)) + response.alternates.map { toRoute(it.trip) }
+    }
+
+    /**
+     * Speed limits along [route], matched edge by edge to the route's own shape points.
+     * Returns [SpeedLimits.NONE] when the server has no data; throws on network errors.
+     */
+    suspend fun speedLimits(route: Route): SpeedLimits {
+        if (route.shape.size < 2) return SpeedLimits.NONE
+        val payload = Http.json.encodeToString(TraceRequest(encodedPolyline = Polyline.encode(route.shape)))
+        val request = Request.Builder()
+            .url("$baseUrl/trace_attributes")
+            .header("User-Agent", "RoadPulse/0.1")
+            .post(payload.toRequestBody("application/json".toMediaType()))
+            .build()
+        return parseSpeedLimits(Http.execute(request))
+    }
+
+    /** Parses a trace_attributes response (visible for tests). */
+    internal fun parseSpeedLimits(body: String): SpeedLimits {
+        val edges = Http.json.decodeFromString<TraceResponse>(body).edges
+        return SpeedLimits(
+            edges.mapNotNull { e ->
+                val kph = e.speedLimit?.let { (it as? JsonPrimitive)?.intOrNull } ?: return@mapNotNull null
+                val begin = e.beginShapeIndex ?: return@mapNotNull null
+                val end = e.endShapeIndex ?: return@mapNotNull null
+                if (kph <= 0 || end <= begin) null else SpeedLimitSpan(begin, end, kph)
+            }
+        )
     }
 
     /** Single fastest route (used for rerouting, where speed matters more than choice). */
@@ -93,6 +124,32 @@ class RoutingClient(private val baseUrl: String) {
         const val ROUNDABOUT_ENTER = 26
         const val ROUNDABOUT_EXIT = 27
     }
+
+    @Serializable
+    private data class TraceRequest(
+        @SerialName("encoded_polyline") val encodedPolyline: String,
+        @SerialName("shape_match") val shapeMatch: String = "edge_walk",
+        val costing: String = "auto",
+        val units: String = "kilometers",
+        val filters: TraceFilters = TraceFilters(),
+    )
+
+    @Serializable
+    private data class TraceFilters(
+        val attributes: List<String> = listOf("edge.speed_limit", "edge.begin_shape_index", "edge.end_shape_index"),
+        val action: String = "include",
+    )
+
+    @Serializable
+    private data class TraceResponse(val edges: List<TraceEdge> = emptyList())
+
+    @Serializable
+    private data class TraceEdge(
+        /** A number in km/h, or the string "unlimited", or absent when unknown. */
+        @SerialName("speed_limit") val speedLimit: JsonElement? = null,
+        @SerialName("begin_shape_index") val beginShapeIndex: Int? = null,
+        @SerialName("end_shape_index") val endShapeIndex: Int? = null,
+    )
 
     @Serializable
     private data class RouteRequest(
