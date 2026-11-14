@@ -205,6 +205,39 @@ class OverlayScreenshotTest {
             muted = false, onToggleMute = {}, onReport = {}, onStop = {})
     }
 
+    private val song = com.roadpulse.app.nav.Track("Sejati", "Wings", playing = true, app = "com.spotify.music")
+
+    @Test
+    fun drivingWithMusic() = shot("3f_driving_music", RP.Field) {
+        DrivingOverlay(state = laneState.copy(lanes = emptyList(), schoolAhead = null), narrator = EnglishNarrator, muted = false,
+            onToggleMute = {}, onReport = {}, onStop = {}, track = song)
+    }
+
+    @Test
+    fun drivingWithMusicArabic() = shot("ar_3f_driving_music", RP.Field, arabic = true) {
+        DrivingOverlay(state = laneState.copy(lanes = emptyList(), schoolAhead = null, currentInstruction = "الزم اليسار للبقاء على E10."),
+            narrator = com.roadpulse.app.nav.ArabicNarrator, muted = false, onToggleMute = {}, onReport = {}, onStop = {}, track = song)
+    }
+
+    private val now = 1_794_660_000_000L
+
+    @Test
+    fun exploreWithPlannedDrive() = shot("1g_explore_planned", RP.Field) {
+        ExploreOverlay(
+            query = "", results = emptyList(),
+            saved = SavedPlaces(
+                work = Place("Menara KL", "Kuala Lumpur", GeoPoint(3.15, 101.70)),
+                planned = listOf(com.roadpulse.app.data.PlannedDrive(1, Place("Menara KL", "", GeoPoint(3.15, 101.70)), now + 20 * 3_600_000L, 1500.0)),
+            ),
+            onQueryChange = {}, onClear = {}, onSelect = {}, onOpenSettings = {}, onRecenter = {}, onReport = {}, nowMillis = now,
+        )
+    }
+
+    @Test
+    fun previewWithLeaveLater() = shot("2d_preview_leave_later", RP.Field) {
+        PreviewOverlay(destination = place, route = route, busy = false, onBack = {}, onGo = {}, onSimulate = null, onLeaveLater = {})
+    }
+
     @Test
     fun drivingMalayWithStatus() = shot("3b_driving_malay_gps_lost", RP.NightSurface) {
         DrivingOverlay(

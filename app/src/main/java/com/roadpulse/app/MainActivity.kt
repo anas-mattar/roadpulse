@@ -17,6 +17,25 @@ import com.roadpulse.app.ui.RoadPulseTheme
 import org.maplibre.android.MapLibre
 
 class MainActivity : ComponentActivity() {
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        handleReminder(intent)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        com.roadpulse.app.nav.NowPlaying.refresh(this) // access may have been granted in Settings
+    }
+
+    /** Opened from a "time to leave" reminder: show that drive's route. */
+    private fun handleReminder(intent: android.content.Intent?) {
+        val id = intent?.getLongExtra(com.roadpulse.app.nav.LeaveReminders.EXTRA_PLANNED_ID, -1L) ?: -1L
+        if (id > 0) {
+            com.roadpulse.app.nav.LeaveReminders.openRequest.value = id
+            intent?.removeExtra(com.roadpulse.app.nav.LeaveReminders.EXTRA_PLANNED_ID)
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         MapLibre.getInstance(this)
@@ -24,6 +43,9 @@ class MainActivity : ComponentActivity() {
         DisplaySettings.init(this)
         com.roadpulse.app.data.RouteSettings.init(this)
         com.roadpulse.app.data.ServerSettings.init(this)
+        com.roadpulse.app.nav.NowPlaying.init(this)
+        com.roadpulse.app.nav.LeaveReminders.rescheduleAll(this)
+        handleReminder(intent)
         VoiceProbe.check(this, VoiceSettings.language.value)
         NavigationSession.init(NavigationService.driveStore(this), SystemClock::elapsedRealtime)
         enableEdgeToEdge()

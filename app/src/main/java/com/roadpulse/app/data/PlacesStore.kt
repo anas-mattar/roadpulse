@@ -15,7 +15,27 @@ data class SavedPlaces(
     val favourites: List<Place> = emptyList(),
     /** Where the driver parked, if they marked it. */
     val parking: ParkedCar? = null,
+    /** Drives planned for later, soonest first. */
+    val planned: List<PlannedDrive> = emptyList(),
 )
+
+/**
+ * A drive planned for later: be at [destination] by [arriveByMillis]. [driveSeconds] is the
+ * route's travel time when it was planned (no live traffic yet, so it does not change).
+ */
+@Serializable
+data class PlannedDrive(val id: Long, val destination: Place, val arriveByMillis: Long, val driveSeconds: Double) {
+    /** When to set off: travel time plus a margin for parking and surprises. */
+    val leaveAtMillis: Long get() = arriveByMillis - (driveSeconds * 1000).toLong() - SPARE_MINUTES * 60_000L
+    /** When the reminder appears: a few minutes before it is time to leave. */
+    val remindAtMillis: Long get() = leaveAtMillis - REMIND_EARLY_MINUTES * 60_000L
+    val driveMinutes: Int get() = Math.round(driveSeconds / 60).toInt()
+
+    companion object {
+        const val SPARE_MINUTES = 10
+        const val REMIND_EARLY_MINUTES = 5
+    }
+}
 
 /** A marked parking spot and when it was marked (wall-clock milliseconds). */
 @Serializable
@@ -57,6 +77,14 @@ class PlacesStore(private val file: File, private val maxRecent: Int = 8) {
     }
 
     fun setParking(parked: ParkedCar?): SavedPlaces = update { it.copy(parking = parked) }
+
+    /** Adds a planned drive and drops ones that are over (arrival time more than an hour ago). */
+    fun addPlanned(drive: PlannedDrive, nowMillis: Long): SavedPlaces = update { saved ->
+        saved.copy(planned = (saved.planned.filter { it.id != drive.id && it.arriveByMillis > nowMillis - 3_600_000 } + drive)
+            .sortedBy { it.arriveByMillis })
+    }
+
+    fun removePlanned(id: Long): SavedPlaces = update { saved -> saved.copy(planned = saved.planned.filterNot { it.id == id }) }
 
     fun clear(): SavedPlaces {
         file.delete()

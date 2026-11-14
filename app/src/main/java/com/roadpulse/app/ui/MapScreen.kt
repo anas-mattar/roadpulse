@@ -165,6 +165,9 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
     var showVoiceSettings by remember { mutableStateOf(false) }
     var showSimulateDialog by remember { mutableStateOf(false) }
     var showFlagDialog by remember { mutableStateOf(false) }
+    var showPlanDialog by remember { mutableStateOf(false) }
+    val musicOn by com.roadpulse.app.nav.NowPlaying.enabled.collectAsStateWithLifecycle()
+    val track by com.roadpulse.app.nav.NowPlaying.track.collectAsStateWithLifecycle()
 
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -491,6 +494,8 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                     onCategory = if (state.placesAvailable) ({ c -> viewModel.searchCategory(c, searchBias()) }) else null,
                     categoryTitle = state.categoryTitle,
                     onCloseCategory = viewModel::clearCategory,
+                    onPlanned = { viewModel.openPlanned(it.id, currentLocation()) },
+                    onRemovePlanned = viewModel::removePlanned,
                     onVoiceSearch = if (voiceSearchAvailable) ({
                         voiceSearch.launch(
                             android.content.Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
@@ -522,6 +527,7 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                     optionsSummary = state.routeOptions.summary(strings),
                     parkingNearby = state.parkingNearby,
                     onChooseParking = viewModel::chooseParking,
+                    onLeaveLater = if (state.route != null && state.stops.isEmpty()) ({ showPlanDialog = true }) else null,
                 )
 
                 ScreenMode.DRIVING -> DrivingOverlay(
@@ -533,6 +539,10 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                     onStop = viewModel::clearRoute,
                     following = following,
                     onRecenter = { following = true },
+                    track = if (musicOn) track else null,
+                    onPlayPause = com.roadpulse.app.nav.NowPlaying::playPause,
+                    onNextTrack = com.roadpulse.app.nav.NowPlaying::next,
+                    onPreviousTrack = com.roadpulse.app.nav.NowPlaying::previous,
                     onOverview = {
                         following = false
                         val m = map
@@ -632,6 +642,30 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
             confirmButton = {},
             dismissButton = { TextButton(onClick = { showAbuseDialog = false }) { Text(strings.cancel) } },
         )
+    }
+
+    if (showPlanDialog) {
+        val route = state.route
+        if (route == null) showPlanDialog = false
+        else PlanDriveDialog(
+            driveSeconds = route.timeSeconds,
+            onDismiss = { showPlanDialog = false },
+            onPlan = { arriveBy -> if (viewModel.planDrive(arriveBy)) showPlanDialog = false },
+        )
+    }
+
+    // A "time to leave" reminder was tapped: open that drive's route once a location is known.
+    val openPlanned by com.roadpulse.app.nav.LeaveReminders.openRequest.collectAsStateWithLifecycle()
+    LaunchedEffect(openPlanned) {
+        val id = openPlanned ?: return@LaunchedEffect
+        var from = currentLocation()
+        var tries = 0
+        while (from == null && tries++ < 10) {
+            kotlinx.coroutines.delay(500)
+            from = currentLocation()
+        }
+        com.roadpulse.app.nav.LeaveReminders.openRequest.value = null
+        viewModel.openPlanned(id, from)
     }
 
     if (showVoiceSettings) {
@@ -1008,6 +1042,7 @@ private fun VoiceSettingsDialog(onDismiss: () -> Unit, onClearPlaces: () -> Unit
                     }
                 }
                 RouteAndDisplaySettings()
+                MusicSettings()
                 if (ServerSettings.localAvailable) {
                     val useLocal by ServerSettings.useLocal.collectAsStateWithLifecycle()
                     Text(
@@ -1070,6 +1105,70 @@ private fun VoiceSettingsDialog(onDismiss: () -> Unit, onClearPlaces: () -> Unit
             }
         },
         confirmButton = { TextButton(onClick = onDismiss) { Text(strings.done) } },
+    )
+}
+
+/** Music controls while driving: needs notification access, granted in Android settings. */
+@Composable
+private fun MusicSettings() {
+    val context = LocalContext.current
+    val on by com.roadpulse.app.nav.NowPlaying.enabled.collectAsStateWithLifecycle()
+    val hasAccess = com.roadpulse.app.nav.NowPlaying.hasAccess(context)
+    SettingSwitch(strings.musicControls, on && hasAccess) { want ->
+        com.roadpulse.app.nav.NowPlaying.setEnabled(context, want)
+        if (want && !com.roadpulse.app.nav.NowPlaying.hasAccess(context)) {
+            runCatching {
+                context.startActivity(android.content.Intent(android.provider.Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
+                    .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
+            }
+        }
+    }
+    Text(strings.musicControlsHelp, style = MaterialTheme.typography.bodySmall, color = RP.TextSecondary)
+    if (on && !hasAccess) {
+        Text(strings.musicNeedsAccess, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = 4.dp))
+    }
+}
+
+/**
+ * Plan the previewed drive: arrive-by time (today or tomorrow) and the leave time worked out from
+ * the route's travel time plus a spare margin.
+ */
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@Composable
+private fun PlanDriveDialog(driveSeconds: Double, onDismiss: () -> Unit, onPlan: (Long) -> Unit) {
+    val context = LocalContext.current
+    val now = remember { java.time.LocalDateTime.now() }
+    val suggested = remember { now.plusHours(1).withMinute(0) }
+    val picker = androidx.compose.material3.rememberTimePickerState(
+        initialHour = suggested.hour, initialMinute = suggested.minute,
+        is24Hour = android.text.format.DateFormat.is24HourFormat(context),
+    )
+    var tomorrow by remember { mutableStateOf(false) }
+    val arriveBy = now.toLocalDate().plusDays(if (tomorrow) 1 else 0).atTime(picker.hour, picker.minute)
+    val arriveMillis = arriveBy.atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
+    val plan = com.roadpulse.app.data.PlannedDrive(0, com.roadpulse.app.data.Place("", "", com.roadpulse.app.data.GeoPoint(0.0, 0.0)), arriveMillis, driveSeconds)
+    val leaveAt = android.text.format.DateFormat.getTimeFormat(context).format(java.util.Date(plan.leaveAtMillis))
+    val late = plan.leaveAtMillis < System.currentTimeMillis()
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(strings.planDrive) },
+        text = {
+            Column {
+                Text(strings.arriveBy, style = MaterialTheme.typography.labelLarge, color = RP.TextSecondary)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(vertical = 8.dp)) {
+                    androidx.compose.material3.FilterChip(selected = !tomorrow, onClick = { tomorrow = false }, label = { Text(strings.today) })
+                    androidx.compose.material3.FilterChip(selected = tomorrow, onClick = { tomorrow = true }, label = { Text(strings.tomorrow) })
+                }
+                androidx.compose.material3.TimeInput(state = picker)
+                Text(
+                    if (late) strings.tooLate else strings.leaveAt(leaveAt, plan.driveMinutes, com.roadpulse.app.data.PlannedDrive.SPARE_MINUTES),
+                    color = if (late) MaterialTheme.colorScheme.error else RP.Indigo,
+                    fontSize = 14.sp,
+                )
+            }
+        },
+        confirmButton = { TextButton(enabled = !late, onClick = { onPlan(arriveMillis) }) { Text(strings.setReminder) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(strings.cancel) } },
     )
 }
 

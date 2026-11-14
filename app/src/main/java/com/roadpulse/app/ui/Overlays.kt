@@ -33,6 +33,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.getValue
 import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.SkipNext
+import androidx.compose.material.icons.filled.SkipPrevious
+import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.Route
 import androidx.compose.material.icons.filled.School
 import androidx.compose.material.icons.filled.LocalCafe
@@ -119,6 +124,8 @@ fun ExploreOverlay(
     onCategory: ((com.roadpulse.app.data.PlaceCategory) -> Unit)? = null,
     categoryTitle: String? = null,
     onCloseCategory: () -> Unit = {},
+    onPlanned: (com.roadpulse.app.data.PlannedDrive) -> Unit = {},
+    onRemovePlanned: (com.roadpulse.app.data.PlannedDrive) -> Unit = {},
 ) {
     Box(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(12.dp)) {
         CircleButton(
@@ -217,6 +224,18 @@ fun ExploreOverlay(
                                 )
                                 Icon(Icons.Filled.Close, contentDescription = strings.forgetParking, tint = RP.TextSecondary,
                                     modifier = Modifier.size(18.dp).clickable(onClick = onClearParking))
+                            }
+                        }
+                        saved.planned.filter { it.arriveByMillis > nowMillis }.forEach { drive ->
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Box(Modifier.weight(1f)) {
+                                    ResultRow(
+                                        Place(drive.destination.name, plannedLabel(drive, nowMillis), drive.destination.location),
+                                        icon = Icons.Filled.Schedule,
+                                    ) { onPlanned(drive) }
+                                }
+                                Icon(Icons.Filled.Close, contentDescription = strings.remove(drive.destination.name), tint = RP.TextSecondary,
+                                    modifier = Modifier.size(18.dp).clickable { onRemovePlanned(drive) })
                             }
                         }
                         saved.favourites.forEach { place ->
@@ -324,6 +343,8 @@ fun PreviewOverlay(
     optionsSummary: String? = null,
     parkingNearby: List<Place> = emptyList(),
     onChooseParking: (Place) -> Unit = {},
+    /** Plan this drive for later (arrive-by time and a reminder); null hides the button. */
+    onLeaveLater: (() -> Unit)? = null,
 ) {
     val context = LocalContext.current
     Box(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(12.dp)) {
@@ -406,6 +427,18 @@ fun PreviewOverlay(
                             )
                             Spacer(Modifier.width(10.dp))
                         }
+                        if (onLeaveLater != null) {
+                            CircleButton(
+                                icon = Icons.Filled.Schedule,
+                                description = strings.leaveLater,
+                                onClick = onLeaveLater,
+                                container = Color.White,
+                                content = RP.Indigo,
+                                size = 52.dp,
+                                border = BorderStroke(1.dp, RP.Field),
+                            )
+                            Spacer(Modifier.width(10.dp))
+                        }
                         Button(
                             onClick = onGo,
                             modifier = Modifier.weight(1f).height(52.dp),
@@ -438,6 +471,11 @@ fun DrivingOverlay(
     onRecenter: () -> Unit = {},
     /** Shows the whole remaining route (then Re-center returns to the car). */
     onOverview: () -> Unit = {},
+    /** Music playing in another app (null: nothing playing or music controls off). */
+    track: com.roadpulse.app.nav.Track? = null,
+    onPlayPause: () -> Unit = {},
+    onNextTrack: () -> Unit = {},
+    onPreviousTrack: () -> Unit = {},
     /** Debug builds: passenger issue report for field tests. */
     onFlag: (() -> Unit)? = null,
     showSpeedometer: Boolean = true,
@@ -566,6 +604,7 @@ fun DrivingOverlay(
             val total = state.route?.lengthKm ?: 0.0
             val left = state.remainingKm ?: total
             val seconds = state.remainingSeconds ?: state.route?.timeSeconds ?: 0.0
+            track?.let { MediaBar(it, onPlayPause, onNextTrack, onPreviousTrack, Modifier.padding(bottom = 8.dp)) }
             TripIsland(
                 arrival = formatArrival(context, seconds),
                 remaining = "${formatDuration(seconds)} · ${formatKm(left)}",
@@ -573,6 +612,49 @@ fun DrivingOverlay(
                 onStop = onStop,
                 attribution = MAP_CREDITS,
             )
+        }
+    }
+}
+
+/** "Arrive 08:30" or "Arrive 08:30 tomorrow" for the planned-drive row. */
+@Composable
+private fun plannedLabel(drive: com.roadpulse.app.data.PlannedDrive, nowMillis: Long): String {
+    val time = android.text.format.DateFormat.getTimeFormat(LocalContext.current).format(java.util.Date(drive.arriveByMillis))
+    val zone = java.time.ZoneId.systemDefault()
+    val day = java.time.Instant.ofEpochMilli(drive.arriveByMillis).atZone(zone).toLocalDate()
+    val today = java.time.Instant.ofEpochMilli(nowMillis).atZone(zone).toLocalDate()
+    return strings.plannedFor(time, tomorrow = day.isAfter(today))
+}
+
+/** Compact music controls above the trip card: title, previous, play/pause, next (large touch targets). */
+@Composable
+private fun MediaBar(track: com.roadpulse.app.nav.Track, onPlayPause: () -> Unit, onNext: () -> Unit, onPrevious: () -> Unit, modifier: Modifier = Modifier) {
+    Surface(shape = RoundedCornerShape(20.dp), color = RP.NightSurface, contentColor = Color.White, shadowElevation = 6.dp, modifier = modifier.fillMaxWidth()) {
+        Row(Modifier.padding(start = 14.dp, end = 4.dp, top = 4.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Filled.MusicNote, contentDescription = null, tint = RP.Teal, modifier = Modifier.size(20.dp))
+            Column(Modifier.weight(1f).padding(start = 10.dp)) {
+                Text(track.title, fontSize = 14.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                track.artist?.let { Text(it, fontSize = 12.sp, color = RP.NightText, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+            }
+            // Media buttons keep their usual order in right-to-left layouts too.
+            val previous = strings.previousTrack
+            val playLabel = if (track.playing) strings.pause else strings.play
+            val next = strings.nextTrack
+            androidx.compose.runtime.CompositionLocalProvider(
+                androidx.compose.ui.platform.LocalLayoutDirection provides androidx.compose.ui.unit.LayoutDirection.Ltr,
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    androidx.compose.material3.IconButton(onClick = onPrevious, modifier = Modifier.size(48.dp)) {
+                        Icon(Icons.Filled.SkipPrevious, contentDescription = previous)
+                    }
+                    androidx.compose.material3.IconButton(onClick = onPlayPause, modifier = Modifier.size(48.dp)) {
+                        Icon(if (track.playing) Icons.Filled.Pause else Icons.Filled.PlayArrow, contentDescription = playLabel, modifier = Modifier.size(30.dp))
+                    }
+                    androidx.compose.material3.IconButton(onClick = onNext, modifier = Modifier.size(48.dp)) {
+                        Icon(Icons.Filled.SkipNext, contentDescription = next)
+                    }
+                }
+            }
         }
     }
 }

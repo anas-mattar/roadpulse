@@ -171,6 +171,33 @@ interface AppStrings {
     fun reported(t: ReportType): String
     val couldNotSendReport: String
 
+    // Planned drives
+    val leaveLater: String
+    val planDrive: String
+    val arriveBy: String
+    val today: String
+    val tomorrow: String
+    /** "Leave at 07:55 · 25 min drive + 10 min spare" */
+    fun leaveAt(time: String, driveMinutes: Int, spareMinutes: Int): String
+    val setReminder: String
+    val tooLate: String
+    fun reminderSet(time: String): String
+    /** Explore list row: "Arrive 08:30 tomorrow". */
+    fun plannedFor(time: String, tomorrow: Boolean): String
+    val plannedDrives: String
+    fun timeToLeave(name: String): String
+    fun timeToLeaveText(driveMinutes: Int, arriveBy: String): String
+    val leaveRemindersChannel: String
+
+    // Music
+    val musicControls: String
+    val musicControlsHelp: String
+    val musicNeedsAccess: String
+    val play: String
+    val pause: String
+    val nextTrack: String
+    val previousTrack: String
+
     // Navigation notification
     fun navigatingTo(name: String): String
     val navigation: String
@@ -334,6 +361,29 @@ object EnglishStrings : AppStrings {
     override val locationUnavailableReport = "Location unavailable, cannot place report"
     override fun reported(t: ReportType) = "${t.label} reported. Thanks!"
     override val couldNotSendReport = "Could not send report. Check your connection and try again."
+
+    override val leaveLater = "Leave later"
+    override val planDrive = "Plan this drive"
+    override val arriveBy = "Arrive by"
+    override val today = "Today"
+    override val tomorrow = "Tomorrow"
+    override fun leaveAt(time: String, driveMinutes: Int, spareMinutes: Int) = "Leave at $time · $driveMinutes min drive + $spareMinutes min spare"
+    override val setReminder = "Remind me"
+    override val tooLate = "Too late to arrive by then: choose a later time."
+    override fun reminderSet(time: String) = "Reminder set for $time"
+    override fun plannedFor(time: String, tomorrow: Boolean) = "Arrive $time" + if (tomorrow) " tomorrow" else ""
+    override val plannedDrives = "Planned drives"
+    override fun timeToLeave(name: String) = "Time to leave for $name"
+    override fun timeToLeaveText(driveMinutes: Int, arriveBy: String) = "About $driveMinutes min drive to arrive by $arriveBy. Tap for the route."
+    override val leaveRemindersChannel = "Time to leave reminders"
+
+    override val musicControls = "Music controls while driving"
+    override val musicControlsHelp = "Play, pause and skip in Spotify, YouTube Music and other apps from the driving screen."
+    override val musicNeedsAccess = "Android asks for notification access for this. RoadPulse uses it only to see which music is playing, not to read your notifications."
+    override val play = "Play"
+    override val pause = "Pause"
+    override val nextTrack = "Next track"
+    override val previousTrack = "Previous track"
 
     override fun navigatingTo(name: String) = "Navigating to $name"
     override val navigation = "Navigation"
@@ -543,6 +593,29 @@ object ArabicStrings : AppStrings {
     override val locationUnavailableReport = "الموقع غير متاح، لا يمكن إضافة البلاغ"
     override fun reported(t: ReportType) = "تم الإبلاغ عن ${reportType(t)}. شكرًا!"
     override val couldNotSendReport = "تعذّر إرسال البلاغ. تحقق من الاتصال وحاول مجددًا."
+
+    override val leaveLater = "انطلق لاحقًا"
+    override val planDrive = "خطط لهذه الرحلة"
+    override val arriveBy = "الوصول قبل"
+    override val today = "اليوم"
+    override val tomorrow = "غدًا"
+    override fun leaveAt(time: String, driveMinutes: Int, spareMinutes: Int) = "انطلق الساعة $time · $driveMinutes د قيادة + $spareMinutes د احتياط"
+    override val setReminder = "ذكّرني"
+    override val tooLate = "فات الأوان للوصول في هذا الوقت: اختر وقتًا لاحقًا."
+    override fun reminderSet(time: String) = "تم ضبط التذكير الساعة $time"
+    override fun plannedFor(time: String, tomorrow: Boolean) = "الوصول $time" + if (tomorrow) " غدًا" else ""
+    override val plannedDrives = "رحلات مخطط لها"
+    override fun timeToLeave(name: String) = "حان وقت الانطلاق إلى $name"
+    override fun timeToLeaveText(driveMinutes: Int, arriveBy: String) = "نحو $driveMinutes د قيادة للوصول قبل $arriveBy. اضغط لعرض المسار."
+    override val leaveRemindersChannel = "تذكيرات وقت الانطلاق"
+
+    override val musicControls = "التحكم بالموسيقى أثناء القيادة"
+    override val musicControlsHelp = "شغّل وأوقف وتنقّل بين المقاطع في Spotify وYouTube Music وغيرها من شاشة القيادة."
+    override val musicNeedsAccess = "سيطلب أندرويد إذن الوصول إلى الإشعارات. يستخدمه RoadPulse فقط لمعرفة الموسيقى المشغّلة، ولا يقرأ إشعاراتك."
+    override val play = "تشغيل"
+    override val pause = "إيقاف مؤقت"
+    override val nextTrack = "المقطع التالي"
+    override val previousTrack = "المقطع السابق"
 
     override fun navigatingTo(name: String) = "الملاحة إلى $name"
     override val navigation = "الملاحة"

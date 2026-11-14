@@ -7,6 +7,10 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- "Time to leave" reminders for planned drives: on time when the phone allows exact alarms,
+         and set again after a restart. -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
     <!-- Lets the app find the device's text-to-speech engine (Android 11+). -->
     <queries>
@@ -36,5 +40,28 @@
             android:name=".nav.NavigationService"
             android:exported="false"
             android:foregroundServiceType="location" />
+
+        <receiver
+            android:name=".nav.LeaveReminderReceiver"
+            android:exported="false" />
+        <receiver
+            android:name=".nav.BootReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Music controls while driving: Android shares which music is playing only with apps that
+             have notification access. Off until the driver turns it on in Settings. -->
+        <service
+            android:name=".nav.MediaAccessService"
+            android:exported="false"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
     </application>
 </manifest>

@@ -320,6 +320,7 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun clearSavedPlaces() {
+        placesStore.load().planned.forEach { com.roadpulse.app.nav.LeaveReminders.cancel(getApplication(), it.id) }
         val cleared = placesStore.clear()
         _state.update { it.copy(saved = cleared, message = com.roadpulse.app.i18n.currentStrings().savedPlacesCleared) }
     }
@@ -490,6 +491,37 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
         if (name.isBlank()) return
         val saved = placesStore.addFavourite(name, place)
         _state.update { it.copy(saved = saved, pinned = null, message = com.roadpulse.app.i18n.currentStrings().saved(name.trim())) }
+    }
+
+    /**
+     * Plans the previewed drive for later: arrive by [arriveByMillis]. Saves it and sets the
+     * "time to leave" reminder. Returns false when it is already too late to make it.
+     */
+    fun planDrive(arriveByMillis: Long, nowMillis: Long = System.currentTimeMillis()): Boolean {
+        val destination = _state.value.destination ?: return false
+        val route = _state.value.route ?: return false
+        val drive = com.roadpulse.app.data.PlannedDrive(nowMillis, destination, arriveByMillis, route.timeSeconds)
+        val s = com.roadpulse.app.i18n.currentStrings()
+        if (drive.leaveAtMillis < nowMillis) {
+            _state.update { it.copy(message = s.tooLate) }
+            return false
+        }
+        val saved = placesStore.addPlanned(drive, nowMillis)
+        com.roadpulse.app.nav.LeaveReminders.schedule(getApplication(), drive, nowMillis)
+        val at = java.text.DateFormat.getTimeInstance(java.text.DateFormat.SHORT).format(java.util.Date(drive.remindAtMillis))
+        _state.update { it.copy(saved = saved, message = s.reminderSet(at)) }
+        return true
+    }
+
+    fun removePlanned(drive: com.roadpulse.app.data.PlannedDrive) {
+        com.roadpulse.app.nav.LeaveReminders.cancel(getApplication(), drive.id)
+        _state.update { it.copy(saved = placesStore.removePlanned(drive.id), message = com.roadpulse.app.i18n.currentStrings().removed(drive.destination.name)) }
+    }
+
+    /** Opens the route of a planned drive (its reminder was tapped). */
+    fun openPlanned(id: Long, from: GeoPoint?) {
+        val drive = placesStore.load().planned.firstOrNull { it.id == id } ?: return
+        onPlaceSelected(drive.destination, from)
     }
 
     fun removeFavourite(place: Place) {
