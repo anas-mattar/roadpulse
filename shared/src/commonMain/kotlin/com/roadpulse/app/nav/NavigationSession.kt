@@ -70,6 +70,11 @@ data class NavState(
     val trafficDelaySeconds: Double = 0.0,
     /** A quicker way around jammed roads, offered to the driver. */
     val fasterRoute: FasterRoute? = null,
+    /** Slow and jammed stretches of [route] (from the last traffic check). */
+    val trafficPieces: List<TrafficPiece> = emptyList(),
+    /** Where the next turn is, and the road name after it (drawn on the map). */
+    val upcomingPoint: GeoPoint? = null,
+    val upcomingStreet: String? = null,
 )
 
 /** A route that avoids jammed roads and saves [savedSeconds] compared with staying on the current one. */
@@ -175,7 +180,8 @@ object NavigationSession {
             ahead.minOf { it.lat } - 0.01, ahead.minOf { it.lon } - 0.01, ahead.maxOf { it.lat } + 0.01, ahead.maxOf { it.lon } + 0.01,
         )
         val (delaySeconds, hit) = TrafficDelay.estimate(ahead, lines)
-        _state.update { it?.copy(trafficDelaySeconds = delaySeconds) }
+        val pieces = RouteTraffic.pieces(current.route.shape, lines)
+        _state.update { if (it?.route === current.route) it.copy(trafficDelaySeconds = delaySeconds, trafficPieces = pieces) else it }
         log?.event(now(), "traffic_check", "delay_s=${delaySeconds.toInt()};lines=${hit.size}")
         val position = current.displayPosition ?: return
         if (delaySeconds < FASTER_ROUTE_MIN_SAVING_S || current.fasterRoute != null || now() < fasterRouteSuppressedUntil) return
@@ -198,6 +204,31 @@ object NavigationSession {
         log?.event(now(), "faster_route_taken", "saved_s=${faster.savedSeconds.toInt()}")
         applyRoute(faster.route, current.destination, resumed = false)
         speak(faster.route.maneuvers.firstOrNull()?.let(platform.narrator()::atTurn))
+    }
+
+    /**
+     * Other ways to the destination from where the car is now (via the remaining stops), for
+     * "Routes" during a drive. The first one is usually close to the current route.
+     */
+    suspend fun alternatives(): List<Route> {
+        val current = _state.value ?: return emptyList()
+        val from = current.displayPosition ?: return emptyList()
+        return router.routes(from, current.destination.location, alternates = 2, stops = remainingStops(), options = platform.routeOptions())
+    }
+
+    /** The driver picked another route during the drive. */
+    fun switchRoute(route: Route) {
+        val current = _state.value ?: return
+        log?.event(now(), "route_switched", "km=${route.lengthKm}")
+        applyRoute(route, current.destination, resumed = false)
+        speak(route.maneuvers.firstOrNull()?.let(platform.narrator()::atTurn))
+        // Traffic for the new route comes with the next check.
+        scope.launch { runCatching { checkTraffic() } }
+    }
+
+    /** Seeds the traffic colours of a drive just started from the preview (already fetched there). */
+    fun setTraffic(pieces: List<TrafficPiece>, delaySeconds: Double) {
+        _state.update { it?.copy(trafficPieces = pieces, trafficDelaySeconds = delaySeconds) }
     }
 
     /** The driver kept the current route: no new offer for a while. */
@@ -343,6 +374,8 @@ object NavigationSession {
                 offline = if (progress.matched) false else it.offline,
                 instruction = progress.upcoming?.let { m -> PromptText.tidy(platform.narrator().banner(m)) },
                 upcomingType = progress.upcoming?.type,
+                upcomingPoint = progress.upcoming?.let { m -> it.route.shape.getOrNull(m.beginShapeIndex) },
+                upcomingStreet = progress.upcoming?.streetNames?.firstOrNull(),
                 thenType = progress.following?.type,
                 thenGapMeters = progress.followingGapMeters,
                 speedMps = fix.speedMps,
@@ -381,6 +414,8 @@ object NavigationSession {
             displayPosition = previous?.displayPosition,
             resumed = resumed,
             upcomingType = route.maneuvers.firstOrNull()?.type,
+            upcomingPoint = route.maneuvers.firstOrNull()?.let { m -> route.shape.getOrNull(m.beginShapeIndex) },
+            upcomingStreet = route.maneuvers.firstOrNull()?.streetNames?.firstOrNull(),
             speedMps = previous?.speedMps,
         )
     }

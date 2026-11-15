@@ -69,6 +69,14 @@ final class DriveModel: ObservableObject {
 
     func stopSharing() { controller.stopSharing() }
 
+    /// Other ways from where the car is now (empty when none or no network).
+    func alternatives() async -> [RouteSummary] {
+        (try? await controller.alternatives()) ?? []
+    }
+
+    /// Drive on another route from [alternatives].
+    func useRoute(_ route: RouteSummary) { controller.useRoute(route: route) }
+
     func takeFasterRoute() { controller.takeFasterRoute() }
     func keepRoute() { controller.keepRoute() }
 

@@ -104,6 +104,16 @@ data class MapUiState(
     val fasterRoute: com.roadpulse.app.nav.FasterRoute? = null,
     /** Route options in effect (shown in the preview). */
     val routeOptions: com.roadpulse.app.data.RouteOptions = com.roadpulse.app.data.RouteOptions(),
+    /** Live traffic on each route choice (same order as [routeChoices]); empty while loading or without a server. */
+    val routeTraffic: List<com.roadpulse.app.nav.RouteTrafficInfo> = emptyList(),
+    /** Slow and jammed stretches of the route being driven. */
+    val trafficPieces: List<com.roadpulse.app.nav.TrafficPiece> = emptyList(),
+    /** "Routes" during a drive: other ways from here (null when the list is closed). */
+    val driveAlternatives: List<Route>? = null,
+    val loadingAlternatives: Boolean = false,
+    /** The next turn while driving (map marker and road name). */
+    val upcomingPoint: GeoPoint? = null,
+    val upcomingStreet: String? = null,
 )
 
 class MapViewModel(application: Application) : AndroidViewModel(application) {
@@ -157,6 +167,9 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
                             lanes = nav.lanes,
                             trafficDelaySeconds = nav.trafficDelaySeconds,
                             fasterRoute = nav.fasterRoute,
+                            trafficPieces = nav.trafficPieces,
+                            upcomingPoint = nav.upcomingPoint,
+                            upcomingStreet = nav.upcomingStreet,
                             schoolAhead = nav.schoolAhead,
                             navStatus = VoiceSettings.narrator().let { n ->
                                 when {
@@ -305,6 +318,34 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    /** Traffic bars for the route cards (one traffic request for all choices). */
+    private fun loadRouteTraffic(routes: List<Route>) {
+        val url = ServerSettings.backendUrl()
+        if (url.isEmpty()) return
+        viewModelScope.launch {
+            val info = com.roadpulse.app.nav.RouteTraffic.forRoutes(url, routes)
+            _state.update { if (it.routeChoices === routes) it.copy(routeTraffic = info) else it }
+        }
+    }
+
+    /** "Routes" during a drive: loads other ways from the car's position. */
+    fun loadAlternatives() {
+        if (!_state.value.navigating || _state.value.loadingAlternatives) return
+        _state.update { it.copy(loadingAlternatives = true, driveAlternatives = emptyList()) }
+        viewModelScope.launch {
+            val routes = runCatching { NavigationSession.alternatives() }.getOrDefault(emptyList())
+            _state.update { it.copy(loadingAlternatives = false, driveAlternatives = routes) }
+        }
+    }
+
+    fun closeAlternatives() = _state.update { it.copy(driveAlternatives = null, loadingAlternatives = false) }
+
+    /** The driver picked another route during the drive. */
+    fun switchRoute(route: Route) {
+        _state.update { it.copy(driveAlternatives = null) }
+        NavigationSession.switchRoute(route)
+    }
+
     /** Where the current preview was planned from (to re-plan after a stop or option change). */
     private var lastOrigin: GeoPoint? = null
 
@@ -316,8 +357,12 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
             _state.update { it.copy(busy = true) }
             runCatching { router.routes(from, to, stops = stops, options = com.roadpulse.app.data.RouteSettings.options.value) }
                 .onSuccess { routes ->
-                    _state.update { it.copy(route = routes.first(), routeChoices = routes, selectedRoute = 0, tollEstimates = emptyList(), busy = false) }
+                    _state.update {
+                        it.copy(route = routes.first(), routeChoices = routes, selectedRoute = 0, tollEstimates = emptyList(),
+                            routeTraffic = emptyList(), busy = false)
+                    }
                     estimateTolls(routes)
+                    loadRouteTraffic(routes)
                 }
                 .onFailure { e -> _state.update { it.copy(busy = false, message = com.roadpulse.app.i18n.currentStrings().routingFailed(e.message)) } }
         }
@@ -354,6 +399,7 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
         val route = _state.value.route ?: return
         val destination = _state.value.destination ?: return
         NavigationSession.start(route, destination)
+        seedTraffic()
         runCatching { NavigationService.start(getApplication()) }
             .onFailure { e ->
                 NavigationSession.stop()
@@ -366,6 +412,7 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
         if (!BuildConfig.DEBUG) return
         if (_state.value.route == null || _state.value.destination == null) return
         NavigationSession.start(_state.value.route!!, _state.value.destination!!, persistDrive = false)
+        seedTraffic()
         DriveReplay.start(config) // before the service starts, so it uses simulated fixes
         runCatching { NavigationService.start(getApplication()) }
             .onFailure { e ->
@@ -373,6 +420,12 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
                 NavigationSession.stop()
                 _state.update { it.copy(message = "Could not start simulation: ${e.message}") }
             }
+    }
+
+    /** The drive starts with the traffic already fetched for the chosen route card. */
+    private fun seedTraffic() {
+        val info = _state.value.routeTraffic.getOrNull(_state.value.selectedRoute) ?: return
+        NavigationSession.setTraffic(info.pieces, info.delaySeconds)
     }
 
     fun clearRoute() {

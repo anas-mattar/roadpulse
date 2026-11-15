@@ -42,6 +42,10 @@ struct MapView: UIViewRepresentable {
     var overviewToken = 0
     var overviewShape: [GeoPoint] = []
     var onLongPress: (Double, Double) -> Void = { _, _ in }
+    /** Slow and jammed stretches drawn on the route line itself. */
+    var routeTraffic: [TrafficPolyline] = []
+    /** The next turn while driving: where it is, and the road name after it (in [SearchResult.name]). */
+    var turn: SearchResult? = nil
 
     static let kualaLumpur = CLLocationCoordinate2D(latitude: 3.139, longitude: 101.6869)
     static let indigo = UIColor(red: 0.33, green: 0.29, blue: 0.72, alpha: 1)
@@ -161,6 +165,9 @@ struct MapView: UIViewRepresentable {
             }
             map.allowsRotating = !view.northUp
             map.compassView.isHidden = !view.showCompass
+            // Compass top left, below the turn card while driving.
+            map.compassViewPosition = .topLeft
+            map.compassViewMargins = CGPoint(x: 20, y: view.drive == nil ? 90 : 230)
             if view.northUp && view.drive == nil && map.direction != 0 { map.resetNorth() }
             if view.recenterToken != lastRecenter {
                 lastRecenter = view.recenterToken
@@ -176,11 +183,17 @@ struct MapView: UIViewRepresentable {
             updateMarkers(view, on: map)
             guard styleLoaded, let style = map.style else { return }
             updateTraffic(view.traffic, style: style)
-
             if let drive = view.drive {
                 applyDrive(drive, to: map, style: style)
-                return
+            } else {
+                applyPreview(view, to: map, style: style)
             }
+            updateRouteTraffic(view.routeTraffic, style: style)
+            updateTurn(view.turn, style: style)
+        }
+
+        /// Route choices (selected one in indigo), the destination pin, and fitting them on screen.
+        private func applyPreview(_ view: MapView, to map: MLNMapView, style: MLNStyle) {
             if let pin = carPin {
                 map.removeAnnotation(pin)
                 carPin = nil
@@ -330,9 +343,68 @@ struct MapView: UIViewRepresentable {
         }
 
         private func removeRouteLayers(_ style: MLNStyle) {
-            for id in ["route-main", "route-alt"] {
+            // Traffic colours and the turn label sit on top of the route: redrawn after it.
+            for id in ["route-traffic-jam", "route-traffic-slow", "turn-street", "turn-point", "route-main", "route-alt"] {
+                if let layer = style.layer(withIdentifier: id) { style.removeLayer(layer) }
+            }
+            for id in ["route-traffic-jam", "route-traffic-slow", "turn", "route-main", "route-alt"] {
+                if let source = style.source(withIdentifier: id) { style.removeSource(source) }
+            }
+            routeTrafficKey = ""
+            turnKey = ""
+        }
+
+        private var routeTrafficKey = ""
+        private var turnKey = ""
+
+        /// Amber (slow) and red (jammed) stretches on top of the route line.
+        private func updateRouteTraffic(_ lines: [TrafficPolyline], style: MLNStyle) {
+            let key = lines.map { "\($0.level)\($0.points.count)\($0.points.first?.lat ?? 0)" }.joined(separator: "|")
+            if key == routeTrafficKey && style.layer(withIdentifier: "route-main") != nil { return }
+            routeTrafficKey = key
+            for id in ["route-traffic-jam", "route-traffic-slow"] {
                 if let layer = style.layer(withIdentifier: id) { style.removeLayer(layer) }
                 if let source = style.source(withIdentifier: id) { style.removeSource(source) }
+            }
+            addLine(to: style, id: "route-traffic-slow", lines: lines.filter { $0.level != "JAM" }.map { polyline($0.points) },
+                    color: UIColor(hex: "#F59F00"), width: 6)
+            addLine(to: style, id: "route-traffic-jam", lines: lines.filter { $0.level == "JAM" }.map { polyline($0.points) },
+                    color: UIColor(hex: "#D20F39"), width: 6)
+        }
+
+        /// The next turn: a white dot on the route and the road name in an indigo label above it.
+        private func updateTurn(_ turn: SearchResult?, style: MLNStyle) {
+            let key = turn.map { "\($0.lat),\($0.lon),\($0.name)" } ?? ""
+            if key == turnKey { return }
+            turnKey = key
+            for id in ["turn-street", "turn-point"] {
+                if let layer = style.layer(withIdentifier: id) { style.removeLayer(layer) }
+            }
+            if let source = style.source(withIdentifier: "turn") { style.removeSource(source) }
+            guard let turn = turn else { return }
+            let feature = MLNPointFeature()
+            feature.coordinate = CLLocationCoordinate2D(latitude: turn.lat, longitude: turn.lon)
+            feature.attributes = ["street": turn.name]
+            let source = MLNShapeSource(identifier: "turn", features: [feature], options: nil)
+            style.addSource(source)
+            let dot = MLNCircleStyleLayer(identifier: "turn-point", source: source)
+            dot.circleRadius = NSExpression(forConstantValue: 7)
+            dot.circleColor = NSExpression(forConstantValue: UIColor.white)
+            dot.circleStrokeColor = NSExpression(forConstantValue: UIColor(hex: "#3C3489"))
+            dot.circleStrokeWidth = NSExpression(forConstantValue: 3)
+            style.addLayer(dot)
+            if !turn.name.isEmpty {
+                let label = MLNSymbolStyleLayer(identifier: "turn-street", source: source)
+                label.text = NSExpression(forKeyPath: "street")
+                label.textFontSize = NSExpression(forConstantValue: 14)
+                label.textColor = NSExpression(forConstantValue: UIColor.white)
+                label.textHaloColor = NSExpression(forConstantValue: UIColor(hex: "#3C3489"))
+                label.textHaloWidth = NSExpression(forConstantValue: 4)
+                label.textAnchor = NSExpression(forConstantValue: "bottom")
+                label.textOffset = NSExpression(forConstantValue: NSValue(cgVector: CGVector(dx: 0, dy: -1.1)))
+                label.textAllowsOverlap = NSExpression(forConstantValue: true)
+                label.textIgnoresPlacement = NSExpression(forConstantValue: true)
+                style.addLayer(label)
             }
         }
 

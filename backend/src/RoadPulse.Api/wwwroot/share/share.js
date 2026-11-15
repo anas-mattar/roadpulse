@@ -4,6 +4,9 @@
   var id = location.pathname.split("/").pop();
   var el = function (x) { return document.getElementById(x); };
   var timer = null;
+  // A random token for this open page only (not stored anywhere), so the driver can see how many
+  // people are watching. Reloading the page makes a new one.
+  var viewer = Math.random().toString(36).slice(2, 12) + Math.random().toString(36).slice(2, 12);
 
   function time(iso) {
     return new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
@@ -42,7 +45,7 @@
     el("actions").hidden = false;
   }
   function load() {
-    fetch("/v1/shares/" + encodeURIComponent(id), { cache: "no-store" })
+    fetch("/v1/shares/" + encodeURIComponent(id) + "?v=" + viewer, { cache: "no-store" })
       .then(function (r) {
         if (r.status === 404) { ended("This drive is no longer being shared."); return null; }
         if (!r.ok) throw new Error(r.status);

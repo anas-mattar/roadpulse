@@ -6,12 +6,10 @@ struct ProfileView: View {
     @ObservedObject var model: SearchModel
     let language: GuidanceLanguage
     let strings: AppStrings
-    let onClose: () -> Void
     @State private var nickname = ""
 
     var body: some View {
-        NavigationStack {
-            Form {
+        Form {
                 if !model.hasServer {
                     Text(strings.profileNeedsServer).foregroundColor(.secondary)
                 } else if let p = model.profile {
@@ -37,11 +35,7 @@ struct ProfileView: View {
                     ProgressView()
                 }
             }
-            .navigationTitle(strings.profile)
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) { Button(strings.done, action: onClose) }
-            }
-        }
+        .navigationTitle(strings.profile)
         .environment(\.layoutDirection, strings.rtl ? .rightToLeft : .leftToRight)
         .task {
             await model.loadProfile(language: language)

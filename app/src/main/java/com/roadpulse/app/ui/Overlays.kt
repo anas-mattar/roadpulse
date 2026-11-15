@@ -58,6 +58,7 @@ import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Work
 import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Navigation
 import androidx.compose.material.icons.filled.PlayArrow
@@ -134,8 +135,8 @@ fun ExploreOverlay(
     Box(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(12.dp)) {
         Column(Modifier.align(Alignment.TopEnd), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             CircleButton(
-                icon = Icons.Filled.Settings,
-                description = strings.settingsButton,
+                icon = Icons.Filled.Menu,
+                description = strings.menu,
                 onClick = onOpenSettings,
                 content = RP.TextSecondary,
             )
@@ -353,8 +354,13 @@ fun PreviewOverlay(
     onChooseParking: (Place) -> Unit = {},
     /** Plan this drive for later (arrive-by time and a reminder); null hides the button. */
     onLeaveLater: (() -> Unit)? = null,
+    /** Live traffic per choice (traffic bar and delay on the cards). */
+    traffic: List<com.roadpulse.app.nav.RouteTrafficInfo> = emptyList(),
+    /** Go with route [index] (from the list view). */
+    onGoRoute: (Int) -> Unit = {},
 ) {
     val context = LocalContext.current
+    var listMode by remember { mutableStateOf(false) }
     Box(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(12.dp)) {
         CircleButton(
             icon = Icons.AutoMirrored.Filled.ArrowBack,
@@ -363,8 +369,17 @@ fun PreviewOverlay(
             modifier = Modifier.align(Alignment.TopStart),
             content = Color.Black,
         )
+        if (choices.size > 1) {
+            MapListSwitch(listMode, { listMode = it }, Modifier.align(Alignment.TopCenter))
+        }
 
-        Island(Modifier.align(Alignment.BottomCenter).fillMaxWidth()) {
+        if (listMode && choices.size > 1) {
+            RouteList(
+                choices = choices, traffic = traffic, tolls = tolls, selected = selected,
+                onSelect = onSelectRoute, onGo = onGoRoute,
+                modifier = Modifier.align(Alignment.TopCenter).padding(top = 60.dp),
+            )
+        } else Island(Modifier.align(Alignment.BottomCenter).fillMaxWidth()) {
             Column(Modifier.padding(16.dp)) {
                 Text(destination?.name ?: strings.destination, fontSize = 18.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 if (!destination?.description.isNullOrBlank()) {
@@ -415,8 +430,9 @@ fun PreviewOverlay(
                                 choice = labels.getOrNull(i),
                                 selected = i == selected,
                                 single = cards.size == 1,
-                                arrival = formatArrival(context, r.timeSeconds),
+                                arrival = formatArrival(context, r.timeSeconds + (traffic.getOrNull(i)?.delaySeconds ?: 0.0)),
                                 toll = com.roadpulse.app.data.TollClient.label(r.hasToll, tolls.getOrNull(i), strings),
+                                traffic = traffic.getOrNull(i),
                                 onClick = { onSelectRoute(i) },
                             )
                         }
@@ -488,16 +504,24 @@ fun DrivingOverlay(
     onShare: (() -> Unit)? = null,
     /** A live link is active: shows "Sharing live" with a stop action. */
     sharing: Boolean = false,
+    /** People with the share page open. */
+    shareViewers: Int = 0,
+    /** Tap on "Sharing live": the shared-drive panel (watchers, stop sharing). */
     onStopSharing: () -> Unit = {},
     onTakeFasterRoute: () -> Unit = {},
     onKeepRoute: () -> Unit = {},
     /** Debug builds: passenger issue report for field tests. */
     onFlag: (() -> Unit)? = null,
+    /** Drive sheet: other routes from here, pick one, close the list. */
+    onLoadRoutes: () -> Unit = {},
+    onPickRoute: (Route) -> Unit = {},
+    onCloseRoutes: () -> Unit = {},
     showSpeedometer: Boolean = true,
     limitDisplay: com.roadpulse.app.nav.LimitDisplay = com.roadpulse.app.nav.LimitDisplay.ALWAYS,
     speedingMarginKmh: Int = DEFAULT_SPEEDING_MARGIN_KMH,
 ) {
     val context = LocalContext.current
+    var sheetOpen by remember { mutableStateOf(false) }
     Box(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(10.dp)) {
         Column(Modifier.align(Alignment.TopCenter).fillMaxWidth()) {
             TurnIsland(
@@ -553,7 +577,7 @@ fun DrivingOverlay(
                             Row(Modifier.padding(horizontal = 12.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                                 Icon(Icons.Filled.Share, contentDescription = null, modifier = Modifier.size(16.dp))
                                 Spacer(Modifier.width(6.dp))
-                                Text(strings.sharingLive + " · " + strings.stopSharing, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                                Text(strings.sharingLive + " · " + strings.viewers(shareViewers), fontSize = 13.sp, fontWeight = FontWeight.Medium)
                             }
                         }
                     }
@@ -643,6 +667,21 @@ fun DrivingOverlay(
                 progress = if (total > 0) (1 - left / total).toFloat() else 0f,
                 onStop = onStop,
                 attribution = MAP_CREDITS,
+                trafficPieces = state.trafficPieces,
+                onToggle = {
+                    sheetOpen = !sheetOpen
+                    if (!sheetOpen) onCloseRoutes()
+                },
+                expandedContent = if (sheetOpen) ({
+                    DriveSheet(
+                        state = state,
+                        onRoutes = onLoadRoutes,
+                        onShare = if (onShare != null && !sharing) ({ sheetOpen = false; onShare() }) else null,
+                        onStop = onStop,
+                        onPickRoute = { sheetOpen = false; onPickRoute(it) },
+                        onCloseRoutes = onCloseRoutes,
+                    )
+                }) else null,
             )
         }
     }
@@ -729,6 +768,7 @@ private fun RouteCard(
     single: Boolean,
     arrival: String,
     toll: String? = null,
+    traffic: com.roadpulse.app.nav.RouteTrafficInfo? = null,
     onClick: () -> Unit,
 ) {
     Surface(
@@ -747,7 +787,7 @@ private fun RouteCard(
                 ) { Text(tag, fontSize = 11.sp, fontWeight = FontWeight.Medium, modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)) }
             }
             Text(
-                formatDuration(route.timeSeconds),
+                formatDuration(route.timeSeconds + (traffic?.delaySeconds ?: 0.0)),
                 fontSize = 24.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = if (selected) RP.IndigoDeep else Color.Black,
@@ -765,6 +805,7 @@ private fun RouteCard(
             toll?.let {
                 Text(it, fontSize = 12.sp, fontWeight = FontWeight.Medium, color = RP.AmberDark, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
+            if (traffic != null) TrafficBar(traffic.pieces, Modifier.padding(top = 6.dp), track = Color.White)
         }
     }
 }

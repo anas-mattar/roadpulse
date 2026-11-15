@@ -68,8 +68,22 @@ class DriveSnapshot(
     val stillThereId: String?,
     val stillThereQuestion: String?,
     val stillThereColorHex: String?,
-    /** The drive is shared with a live link. */
+    /** The drive is shared with a live link, and how many people have the page open. */
     val sharing: Boolean,
+    val shareViewers: Int,
+    /** Slow and jammed stretches (fractions of the route) and their lines on the map. */
+    val trafficPieces: List<com.roadpulse.app.nav.TrafficPiece>,
+    val trafficLines: List<TrafficPolyline>,
+    /** How far along the route the car is, 0..1. */
+    val progress: Double,
+    /** The next turn on the map (when [hasUpcoming]) and the road name after it. */
+    val hasUpcoming: Boolean,
+    val upcomingLat: Double,
+    val upcomingLon: Double,
+    val upcomingStreet: String,
+    /** Where to, and "via …" for the route being driven. */
+    val destinationName: String,
+    val via: String?,
 )
 
 /** Reports sent from this phone (no "still there?" about your own reports). */
@@ -98,6 +112,10 @@ class DriveController(var routingUrl: String) {
     private var stillThere: Report? = null
     private var stillThereJob: Job? = null
     private val askedAbout = mutableSetOf<String>()
+    private var linesFor: List<com.roadpulse.app.nav.TrafficPiece>? = null
+    private var linesCache: List<TrafficPolyline> = emptyList()
+    private var viaFor: com.roadpulse.app.data.Route? = null
+    private var viaCache: String? = null
 
     /** Vehicle and roads to avoid, for rerouting and added stops. */
     var routeOptions: RouteOptions = RouteOptions()
@@ -166,6 +184,8 @@ class DriveController(var routingUrl: String) {
         lastBearing = -1.0
         NavigationSession.platform = platform
         NavigationSession.start(route.route, Place(destinationName, "", GeoPoint(destLat, destLon)), persistDrive = false)
+        // Traffic already fetched for the route card, until the drive's own first check.
+        if (route.trafficPieces.isNotEmpty()) NavigationSession.setTraffic(route.trafficPieces, route.trafficDelayMinutes * 60.0)
     }
 
     /** Like [start], but the car drives the route by itself at [speedKmh] (for trying it at a desk). */
@@ -214,6 +234,13 @@ class DriveController(var routingUrl: String) {
         val from = NavigationSession.state.value?.displayPosition ?: lastPosition ?: return false
         return NavigationSession.addStop(GeoPoint(lat, lon), from)
     }
+
+    /** Other ways from where the car is now ("Routes" in the drive sheet). */
+    @Throws(Exception::class, CancellationException::class)
+    suspend fun alternatives(): List<RouteSummary> = summarize(NavigationSession.alternatives(), language)
+
+    /** Drive on another route from [alternatives]. */
+    fun useRoute(route: RouteSummary) = NavigationSession.switchRoute(route.route)
 
     /** The part of the route still ahead (for the overview). */
     fun remainingShape(): List<GeoPoint> {
@@ -334,7 +361,33 @@ class DriveController(var routingUrl: String) {
             stillThereQuestion = stillThere?.let { stringsFor(language).stillThereQuestion(it.type) },
             stillThereColorHex = stillThere?.type?.colorHex,
             sharing = ShareSession.link.value != null,
+            shareViewers = ShareSession.viewers.value,
+            trafficPieces = s.trafficPieces,
+            trafficLines = trafficLines(s),
+            progress = if (s.route.lengthKm > 0) (1 - s.remainingKm / s.route.lengthKm).coerceIn(0.0, 1.0) else 0.0,
+            hasUpcoming = s.upcomingPoint != null,
+            upcomingLat = s.upcomingPoint?.lat ?: 0.0,
+            upcomingLon = s.upcomingPoint?.lon ?: 0.0,
+            upcomingStreet = s.upcomingStreet.orEmpty(),
+            destinationName = s.destination.name,
+            via = via(s.route),
         )
+    }
+
+    private fun trafficLines(s: NavState): List<TrafficPolyline> {
+        if (linesFor !== s.trafficPieces) {
+            linesFor = s.trafficPieces
+            linesCache = trafficLinesFor(s.route.shape, s.trafficPieces)
+        }
+        return linesCache
+    }
+
+    private fun via(route: com.roadpulse.app.data.Route): String? {
+        if (viaFor !== route) {
+            viaFor = route
+            viaCache = com.roadpulse.app.nav.RouteChoices.describe(listOf(route), stringsFor(language)).firstOrNull()?.via
+        }
+        return viaCache
     }
 
     private companion object {

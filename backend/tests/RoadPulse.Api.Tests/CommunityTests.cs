@@ -153,7 +153,12 @@ public class CommunityApiTests
         var stranger = await DeviceClient(api);
         var upd = new { lat = 3.15, lon = 101.70, etaUnixMs = 0L, state = "ARRIVED" };
         Assert.Equal(HttpStatusCode.NotFound, (await stranger.PutAsJsonAsync($"/v1/shares/{share.Id}", upd)).StatusCode);
-        Assert.Equal(HttpStatusCode.NoContent, (await me.PutAsJsonAsync($"/v1/shares/{share.Id}", upd)).StatusCode);
+        // The open page counts as one viewer (its random token), shown to the driver on update.
+        await viewer.GetAsync($"/v1/shares/{share.Id}?v=page-token-123");
+        await viewer.GetAsync($"/v1/shares/{share.Id}?v=page-token-123");
+        var updated = await me.PutAsJsonAsync($"/v1/shares/{share.Id}", upd);
+        Assert.Equal(HttpStatusCode.OK, updated.StatusCode);
+        Assert.Equal(1, (await updated.Content.ReadFromJsonAsync<UpdateShareResponse>(Json))!.Viewers);
         Assert.Equal(ShareState.ARRIVED, (await viewer.GetFromJsonAsync<ShareView>($"/v1/shares/{share.Id}", Json))!.State);
 
         // Ends 30 minutes after arrival.

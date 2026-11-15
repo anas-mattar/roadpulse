@@ -1,5 +1,15 @@
 package com.roadpulse.app.ui
 
+import androidx.compose.material.icons.filled.Map
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
+import androidx.compose.material.icons.filled.Route
+import androidx.compose.material.icons.filled.DirectionsCar
+import androidx.compose.material.icons.filled.ReportProblem
+import androidx.compose.material.icons.filled.Speed
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Dns
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import com.roadpulse.app.i18n.strings
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.unit.sp
@@ -66,6 +76,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
@@ -136,6 +147,8 @@ private val FLAG_CATEGORIES = listOf(
 )
 private const val ALT_ROUTE_SOURCE = "alt-route-source"
 private const val TRAFFIC_SOURCE = "traffic-source"
+private const val ROUTE_TRAFFIC_SOURCE = "route-traffic-source"
+private const val TURN_SOURCE = "turn-source"
 private const val ALT_ROUTE_LAYER = "alt-route-line"
 private const val DEST_SOURCE = "destination-source"
 private const val STOP_SOURCE = "stop-source"
@@ -166,11 +179,17 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
     val effectiveLanguage by VoiceSettings.effectiveLanguage.collectAsStateWithLifecycle()
     val narrator = narratorFor(effectiveLanguage)
     var showVoiceSettings by remember { mutableStateOf(false) }
+    var showMenu by remember { mutableStateOf(false) }
+    var showPlannedList by remember { mutableStateOf(false) }
+    var showHelp by remember { mutableStateOf(false) }
     var showSimulateDialog by remember { mutableStateOf(false) }
     var showFlagDialog by remember { mutableStateOf(false) }
     var showPlanDialog by remember { mutableStateOf(false) }
     var showProfile by remember { mutableStateOf(false) }
     val shareLink by com.roadpulse.app.nav.ShareSession.link.collectAsStateWithLifecycle()
+    val shareViewers by com.roadpulse.app.nav.ShareSession.viewers.collectAsStateWithLifecycle()
+    var showSharePreview by remember { mutableStateOf(false) }
+    var showSharedPanel by remember { mutableStateOf(false) }
     val uiScope = androidx.compose.runtime.rememberCoroutineScope()
     val s = strings
     val musicOn by com.roadpulse.app.nav.NowPlaying.enabled.collectAsStateWithLifecycle()
@@ -255,6 +274,29 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
     LaunchedEffect(style, state.route) {
         style?.getSourceAs<GeoJsonSource>(ROUTE_SOURCE)?.setGeoJson(state.route.toFeatureCollection())
     }
+    // Traffic colours on the route line itself: the drive's stretches, or the selected choice's in the preview.
+    val routePieces = if (state.navigating) state.trafficPieces else state.routeTraffic.getOrNull(state.selectedRoute)?.pieces.orEmpty()
+    LaunchedEffect(style, state.route, routePieces) {
+        val shape = state.route?.shape.orEmpty()
+        style?.getSourceAs<GeoJsonSource>(ROUTE_TRAFFIC_SOURCE)?.setGeoJson(
+            FeatureCollection.fromFeatures(
+                com.roadpulse.app.nav.RouteTraffic.polylines(shape, routePieces).map { (level, pts) ->
+                    Feature.fromGeometry(LineString.fromLngLats(pts.map { Point.fromLngLat(it.lon, it.lat) }))
+                        .apply { addStringProperty("level", level) }
+                }
+            )
+        )
+    }
+    // The next turn while driving: a marker where it is and the road name after it.
+    LaunchedEffect(style, state.navigating, state.upcomingPoint, state.upcomingStreet) {
+        val p = state.upcomingPoint
+        style?.getSourceAs<GeoJsonSource>(TURN_SOURCE)?.setGeoJson(
+            FeatureCollection.fromFeatures(
+                if (!state.navigating || p == null) emptyList()
+                else listOf(Feature.fromGeometry(Point.fromLngLat(p.lon, p.lat)).apply { addStringProperty("street", state.upcomingStreet.orEmpty()) })
+            )
+        )
+    }
     // Other route choices in grey (preview only); tapping one selects it.
     LaunchedEffect(style, state.routeChoices, state.selectedRoute, state.navigating) {
         val alternatives = if (state.navigating) emptyList() else
@@ -337,11 +379,14 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
     val northUp by DisplaySettings.northUp.collectAsStateWithLifecycle()
     val showCompass by DisplaySettings.showCompass.collectAsStateWithLifecycle()
     val flatDriving by DisplaySettings.flatDriving.collectAsStateWithLifecycle()
-    LaunchedEffect(map, northUp, showCompass) {
+    LaunchedEffect(map, northUp, showCompass, state.navigating) {
         val m = map ?: return@LaunchedEffect
         m.uiSettings.isRotateGesturesEnabled = !northUp
         m.uiSettings.isCompassEnabled = showCompass
-        m.uiSettings.setCompassMargins(0, 220, 36, 0)
+        // Top left, below the turn card while driving (the buttons on the right stay free).
+        val px = context.resources.displayMetrics.density
+        m.uiSettings.compassGravity = android.view.Gravity.TOP or android.view.Gravity.START
+        m.uiSettings.setCompassMargins((20 * px).toInt(), ((if (state.navigating) 230 else 90) * px).toInt(), 0, 0)
         if (northUp && m.cameraPosition.bearing != 0.0) {
             m.animateCamera(CameraUpdateFactory.newCameraPosition(CameraPosition.Builder(m.cameraPosition).bearing(0.0).build()))
         }
@@ -483,7 +528,7 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                     onQueryChange = { viewModel.onQueryChange(it, searchBias()) },
                     onClear = viewModel::clearRoute,
                     onSelect = { viewModel.onPlaceSelected(it, currentLocation()) },
-                    onOpenSettings = { showVoiceSettings = true },
+                    onOpenSettings = { showMenu = true },
                     onRecenter = {
                         currentLocation()?.let { p ->
                             map?.animateCamera(CameraUpdateFactory.newLatLngZoom(LatLng(p.lat, p.lon), 15.0))
@@ -503,7 +548,7 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                     onCloseCategory = viewModel::clearCategory,
                     onPlanned = { viewModel.openPlanned(it.id, currentLocation()) },
                     onRemovePlanned = viewModel::removePlanned,
-                    onOpenProfile = if (state.placesAvailable) ({ viewModel.loadProfile(); showProfile = true }) else null,
+                    onOpenProfile = null,
                     onVoiceSearch = if (voiceSearchAvailable) ({
                         voiceSearch.launch(
                             android.content.Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
@@ -536,6 +581,11 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                     parkingNearby = state.parkingNearby,
                     onChooseParking = viewModel::chooseParking,
                     onLeaveLater = if (state.route != null && state.stops.isEmpty()) ({ showPlanDialog = true }) else null,
+                    traffic = state.routeTraffic,
+                    onGoRoute = { i ->
+                        viewModel.selectRoute(i)
+                        viewModel.startNavigation()
+                    },
                 )
 
                 ScreenMode.DRIVING -> DrivingOverlay(
@@ -545,27 +595,19 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                     onToggleMute = { VoiceSettings.setMuted(!voiceMuted) },
                     onReport = { showReportDialog = true },
                     onStop = viewModel::clearRoute,
+                    onLoadRoutes = viewModel::loadAlternatives,
+                    onPickRoute = viewModel::switchRoute,
+                    onCloseRoutes = viewModel::closeAlternatives,
                     following = following,
                     onRecenter = { following = true },
                     track = if (musicOn) track else null,
                     onPlayPause = com.roadpulse.app.nav.NowPlaying::playPause,
                     onNextTrack = com.roadpulse.app.nav.NowPlaying::next,
                     onPreviousTrack = com.roadpulse.app.nav.NowPlaying::previous,
-                    onShare = if (state.placesAvailable) ({
-                        uiScope.launch {
-                            runCatching { com.roadpulse.app.nav.ShareSession.start(context, state.profile?.nickname) }
-                                .onSuccess { link ->
-                                    val eta = formatArrivalText(context, state.remainingSeconds ?: 0.0)
-                                    val text = s.shareText(state.destination?.name.orEmpty(), eta, link.url)
-                                    val send = android.content.Intent(android.content.Intent.ACTION_SEND).setType("text/plain")
-                                        .putExtra(android.content.Intent.EXTRA_TEXT, text)
-                                    context.startActivity(android.content.Intent.createChooser(send, s.shareDrive))
-                                }
-                                .onFailure { viewModel.showMessage(s.shareFailed) }
-                        }
-                    }) else null,
+                    onShare = if (state.placesAvailable) ({ showSharePreview = true }) else null,
                     sharing = shareLink != null,
-                    onStopSharing = com.roadpulse.app.nav.ShareSession::stop,
+                    shareViewers = shareViewers,
+                    onStopSharing = { showSharedPanel = true },
                     onTakeFasterRoute = com.roadpulse.app.nav.NavigationSession::acceptFasterRoute,
                     onKeepRoute = com.roadpulse.app.nav.NavigationSession::declineFasterRoute,
                     onOverview = {
@@ -683,6 +725,65 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
         style?.getSourceAs<GeoJsonSource>(TRAFFIC_SOURCE)?.setGeoJson(FeatureCollection.fromFeatures(features))
     }
 
+    // Share my drive: what the link shows, then the share sheet with the message.
+    fun sendShareLink(url: String) {
+        val eta = formatArrivalText(context, (state.remainingSeconds ?: 0.0) + state.trafficDelaySeconds)
+        val text = s.shareText(state.destination?.name.orEmpty(), eta, url)
+        val send = android.content.Intent(android.content.Intent.ACTION_SEND).setType("text/plain")
+            .putExtra(android.content.Intent.EXTRA_TEXT, text)
+        context.startActivity(android.content.Intent.createChooser(send, s.shareDrive))
+    }
+    if (showSharePreview) {
+        val eta = formatArrivalText(context, (state.remainingSeconds ?: 0.0) + state.trafficDelaySeconds)
+        AlertDialog(
+            onDismissRequest = { showSharePreview = false },
+            title = { Text(s.shareYourDrive) },
+            text = {
+                Column {
+                    Text(s.shareTo(state.destination?.name.orEmpty()), fontWeight = FontWeight.Medium)
+                    Text(eta, fontSize = 22.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(vertical = 6.dp))
+                    Text(s.shareExplain, fontSize = 14.sp, color = RP.TextSecondary)
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    showSharePreview = false
+                    uiScope.launch {
+                        runCatching { com.roadpulse.app.nav.ShareSession.start(context, state.profile?.nickname) }
+                            .onSuccess { link -> sendShareLink(link.url) }
+                            .onFailure { viewModel.showMessage(s.shareFailed) }
+                    }
+                }) { Text(s.shareDrive) }
+            },
+            dismissButton = { TextButton(onClick = { showSharePreview = false }) { Text(s.cancel) } },
+        )
+    }
+    if (showSharedPanel) {
+        val link = shareLink
+        if (link == null) showSharedPanel = false
+        else AlertDialog(
+            onDismissRequest = { showSharedPanel = false },
+            title = { Text(s.sharedDrive) },
+            text = {
+                Column {
+                    Text(s.viewers(shareViewers), fontWeight = FontWeight.Medium)
+                    Text(s.shareTo(state.destination?.name.orEmpty()), fontSize = 14.sp, color = RP.TextSecondary)
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showSharedPanel = false; com.roadpulse.app.nav.ShareSession.stop() }) {
+                    Text(s.stopSharing, color = RP.Danger)
+                }
+            },
+            dismissButton = {
+                Row {
+                    TextButton(onClick = { showSharedPanel = false; sendShareLink(link.url) }) { Text(s.shareDrive) }
+                    TextButton(onClick = { showSharedPanel = false }) { Text(s.close) }
+                }
+            },
+        )
+    }
+
     if (showPlanDialog) {
         val route = state.route
         if (route == null) showPlanDialog = false
@@ -706,6 +807,26 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
         com.roadpulse.app.nav.LeaveReminders.openRequest.value = null
         viewModel.openPlanned(id, from)
     }
+
+    if (showMenu) {
+        MenuPanel(
+            profile = state.profile,
+            onProfile = if (state.placesAvailable) ({ showMenu = false; viewModel.loadProfile(); showProfile = true }) else null,
+            onPlanned = { showMenu = false; showPlannedList = true },
+            onSettings = { showMenu = false; showVoiceSettings = true },
+            onHelp = { showMenu = false; showHelp = true },
+            onDismiss = { showMenu = false },
+        )
+    }
+    if (showPlannedList) {
+        PlannedDrivesDialog(
+            planned = state.saved.planned,
+            onOpen = { drive -> showPlannedList = false; viewModel.onPlaceSelected(drive.destination, currentLocation()) },
+            onRemove = viewModel::removePlanned,
+            onDismiss = { showPlannedList = false },
+        )
+    }
+    if (showHelp) HelpDialog(version = BuildConfig.VERSION_NAME, onDismiss = { showHelp = false })
 
     if (showVoiceSettings) {
         VoiceSettingsDialog(
@@ -847,6 +968,8 @@ private fun Style.addOverlayLayers() {
     addSource(GeoJsonSource(TRAFFIC_SOURCE))
     addSource(GeoJsonSource(ALT_ROUTE_SOURCE))
     addSource(GeoJsonSource(ROUTE_SOURCE))
+    addSource(GeoJsonSource(ROUTE_TRAFFIC_SOURCE))
+    addSource(GeoJsonSource(TURN_SOURCE))
     addSource(GeoJsonSource(DEST_SOURCE))
     addSource(GeoJsonSource(STOP_SOURCE))
     addSource(GeoJsonSource(PARKING_SOURCE))
@@ -898,6 +1021,45 @@ private fun Style.addOverlayLayers() {
             PropertyFactory.lineWidth(6f),
             PropertyFactory.lineCap(Property.LINE_CAP_ROUND),
             PropertyFactory.lineJoin(Property.LINE_JOIN_ROUND),
+        )
+    )
+    // Slow (amber) and jammed (red) stretches drawn on top of the route line.
+    add(
+        LineLayer("route-traffic", ROUTE_TRAFFIC_SOURCE).withProperties(
+            PropertyFactory.lineColor(
+                org.maplibre.android.style.expressions.Expression.match(
+                    org.maplibre.android.style.expressions.Expression.get("level"),
+                    org.maplibre.android.style.expressions.Expression.literal("JAM"),
+                    org.maplibre.android.style.expressions.Expression.color(android.graphics.Color.parseColor("#D20F39")),
+                    org.maplibre.android.style.expressions.Expression.color(android.graphics.Color.parseColor("#F59F00")),
+                )
+            ),
+            PropertyFactory.lineWidth(6f),
+            PropertyFactory.lineCap(Property.LINE_CAP_ROUND),
+            PropertyFactory.lineJoin(Property.LINE_JOIN_ROUND),
+        )
+    )
+    // Next turn: a white dot on the route and the road name in an indigo label above it.
+    add(
+        CircleLayer("turn-point", TURN_SOURCE).withProperties(
+            PropertyFactory.circleRadius(7f),
+            PropertyFactory.circleColor("#FFFFFF"),
+            PropertyFactory.circleStrokeColor("#3C3489"),
+            PropertyFactory.circleStrokeWidth(3f),
+        )
+    )
+    add(
+        SymbolLayer("turn-street", TURN_SOURCE).withProperties(
+            PropertyFactory.textField(Expression.get("street")),
+            PropertyFactory.textFont(arrayOf("Noto Sans Regular")),
+            PropertyFactory.textSize(14f),
+            PropertyFactory.textColor("#FFFFFF"),
+            PropertyFactory.textHaloColor("#3C3489"),
+            PropertyFactory.textHaloWidth(4f),
+            PropertyFactory.textAnchor(Property.TEXT_ANCHOR_BOTTOM),
+            PropertyFactory.textOffset(arrayOf(0f, -1.1f)),
+            PropertyFactory.textAllowOverlap(true),
+            PropertyFactory.textIgnorePlacement(true),
         )
     )
     add(
@@ -1075,126 +1237,147 @@ private fun VoiceSettingsDialog(onDismiss: () -> Unit, onClearPlaces: () -> Unit
     val missing by VoiceSettings.missingVoices.collectAsStateWithLifecycle()
     val muted by VoiceSettings.muted.collectAsStateWithLifecycle()
     val mapColors by DisplaySettings.mapColors.collectAsStateWithLifecycle()
+    // Grouped like other navigation apps: a list of sections, each opening its own page.
+    var page by remember { mutableStateOf<String?>(null) }
+    val pages = buildList {
+        add(Triple("general", strings.general, Icons.Filled.Settings))
+        add(Triple("map", strings.mapDisplay, Icons.Filled.Map))
+        add(Triple("voice", strings.voiceAndSound, Icons.AutoMirrored.Filled.VolumeUp))
+        add(Triple("navigation", strings.navigationSettings, Icons.Filled.Route))
+        add(Triple("vehicle", strings.vehicleDetails, Icons.Filled.DirectionsCar))
+        add(Triple("alerts", strings.alertsAndReports, Icons.Filled.ReportProblem))
+        add(Triple("speed", strings.speedometer, Icons.Filled.Speed))
+        add(Triple("privacy", strings.privacy, Icons.Filled.Lock))
+        if (ServerSettings.localAvailable) add(Triple("server", "Server (debug builds)", Icons.Filled.Dns))
+    }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(strings.settings) },
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (page != null) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = strings.back,
+                        modifier = Modifier.padding(end = 12.dp).clickable { page = null })
+                }
+                Text(pages.firstOrNull { it.first == page }?.second ?: strings.settings)
+            }
+        },
         text = {
             Column(Modifier.verticalScroll(androidx.compose.foundation.rememberScrollState())) {
-                Text(strings.language, style = MaterialTheme.typography.labelLarge, color = RP.TextSecondary)
-                GuidanceLanguage.entries.forEach { option ->
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable {
-                                VoiceSettings.setLanguage(option)
-                                VoiceProbe.check(context, option)
-                            },
-                    ) {
-                        RadioButton(selected = language == option, onClick = null)
-                        Text(option.label, modifier = Modifier.padding(start = 8.dp))
+                when (page) {
+                    null -> pages.forEach { (id, label, icon) ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth().clickable { page = id }.padding(vertical = 12.dp),
+                        ) {
+                            Icon(icon, contentDescription = null, tint = RP.Indigo, modifier = Modifier.size(22.dp))
+                            Text(label, fontSize = 16.sp, modifier = Modifier.padding(start = 14.dp).weight(1f))
+                            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = RP.TextSecondary)
+                        }
                     }
-                }
-                if (language in missing) {
-                    Text(
-                        strings.noVoiceInstalled(language.label),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.padding(top = 8.dp),
-                    )
-                }
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
-                ) {
-                    Text(strings.muteVoiceSetting, modifier = Modifier.weight(1f))
-                    Switch(checked = muted, onCheckedChange = VoiceSettings::setMuted)
-                }
-                Text(
-                    strings.mapColours,
-                    style = MaterialTheme.typography.labelLarge,
-                    color = RP.TextSecondary,
-                    modifier = Modifier.padding(top = 16.dp),
-                )
-                MapColors.entries.forEach { option ->
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.fillMaxWidth().clickable { DisplaySettings.setMapColors(option) },
-                    ) {
-                        RadioButton(selected = mapColors == option, onClick = null)
-                        Text(strings.mapColors(option), modifier = Modifier.padding(start = 8.dp))
-                    }
-                }
-                RouteAndDisplaySettings()
-                MusicSettings()
-                TrafficSettings()
-                if (ServerSettings.localAvailable) {
-                    val useLocal by ServerSettings.useLocal.collectAsStateWithLifecycle()
-                    Text(
-                        "Server (debug builds)",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = RP.TextSecondary,
-                        modifier = Modifier.padding(top = 16.dp),
-                    )
-                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                        Text("Use my laptop's server", modifier = Modifier.weight(1f))
-                        Switch(checked = useLocal, onCheckedChange = ServerSettings::setUseLocal)
-                    }
-                    Text(
-                        if (useLocal) "Routing and live reports from Docker on this computer."
-                        else "Public routing; reports stay on this phone.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = RP.TextSecondary,
-                    )
-                    if (useLocal) {
-                        val link by ServerSettings.link.collectAsStateWithLifecycle()
-                        Text("Laptop reached from", fontSize = 13.sp, color = RP.TextSecondary, modifier = Modifier.padding(top = 8.dp))
-                        ServerSettings.LaptopLink.entries.forEach { option ->
+                    "general" -> {
+                        Text(strings.language, style = MaterialTheme.typography.labelLarge, color = RP.TextSecondary)
+                        GuidanceLanguage.entries.forEach { option ->
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.fillMaxWidth().clickable { ServerSettings.setLink(option) },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        VoiceSettings.setLanguage(option)
+                                        VoiceProbe.check(context, option)
+                                    },
                             ) {
-                                RadioButton(selected = link == option, onClick = null)
+                                RadioButton(selected = language == option, onClick = null)
                                 Text(option.label, modifier = Modifier.padding(start = 8.dp))
                             }
                         }
-                    }
-                    if (ServerSettings.localMapsAvailable) {
-                        val useLocalMaps by ServerSettings.useLocalMaps.collectAsStateWithLifecycle()
-                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
-                            Text("Maps from my laptop", modifier = Modifier.weight(1f))
-                            Switch(checked = useLocalMaps, onCheckedChange = ServerSettings::setUseLocalMaps)
+                        if (language in missing) {
+                            Text(
+                                strings.noVoiceInstalled(language.label),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.padding(top = 8.dp),
+                            )
                         }
-                        Text(
-                            if (useLocalMaps) "Map tiles from this computer (works without internet). Needs setup-offline-maps.ps1."
-                            else "Map tiles from OpenFreeMap (internet).",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = RP.TextSecondary,
-                        )
+                    }
+                    "map" -> {
+                        Text(strings.mapColours, style = MaterialTheme.typography.labelLarge, color = RP.TextSecondary)
+                        MapColors.entries.forEach { option ->
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.fillMaxWidth().clickable { DisplaySettings.setMapColors(option) },
+                            ) {
+                                RadioButton(selected = mapColors == option, onClick = null)
+                                Text(strings.mapColors(option), modifier = Modifier.padding(start = 8.dp))
+                            }
+                        }
+                        MapDisplaySettings()
+                    }
+                    "voice" -> {
+                        SettingSwitch(strings.muteVoiceSetting, muted, VoiceSettings::setMuted)
+                        MusicSettings()
+                    }
+                    "navigation" -> NavigationSettings()
+                    "vehicle" -> VehicleSettings()
+                    "alerts" -> TrafficSettings()
+                    "speed" -> SpeedometerSettings()
+                    "server" -> ServerDebugSettings()
+                    "privacy" -> {
+                        Text(strings.privacyText, style = MaterialTheme.typography.bodySmall, color = RP.TextSecondary)
+                        val noPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)
+                        TextButton(onClick = { showPolicy = true }, contentPadding = noPadding) { Text(strings.privacyPolicy) }
+                        TextButton(onClick = onExportData, contentPadding = noPadding) { Text(strings.exportData) }
+                        TextButton(onClick = onClearPlaces, contentPadding = noPadding) {
+                            Text(strings.clearSavedPlaces, color = RP.Danger)
+                        }
+                        TextButton(onClick = { confirmDelete = true }, contentPadding = noPadding) { Text(strings.deleteData, color = RP.Danger) }
                     }
                 }
-                Text(
-                    strings.privacy,
-                    style = MaterialTheme.typography.labelLarge,
-                    color = RP.TextSecondary,
-                    modifier = Modifier.padding(top = 16.dp),
-                )
-                Text(
-                    strings.privacyText,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = RP.TextSecondary,
-                )
-                val noPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)
-                TextButton(onClick = { showPolicy = true }, contentPadding = noPadding) { Text(strings.privacyPolicy) }
-                TextButton(onClick = onExportData, contentPadding = noPadding) { Text(strings.exportData) }
-                TextButton(onClick = onClearPlaces, contentPadding = noPadding) {
-                    Text(strings.clearSavedPlaces, color = RP.Danger)
-                }
-                TextButton(onClick = { confirmDelete = true }, contentPadding = noPadding) { Text(strings.deleteData, color = RP.Danger) }
             }
         },
         confirmButton = { TextButton(onClick = onDismiss) { Text(strings.done) } },
     )
+}
+
+/** Debug builds: use the RoadPulse servers on this laptop. */
+@Composable
+private fun ServerDebugSettings() {
+    val useLocal by ServerSettings.useLocal.collectAsStateWithLifecycle()
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+        Text("Use my laptop's server", modifier = Modifier.weight(1f))
+        Switch(checked = useLocal, onCheckedChange = ServerSettings::setUseLocal)
+    }
+    Text(
+        if (useLocal) "Routing and live reports from Docker on this computer."
+        else "Public routing; reports stay on this phone.",
+        style = MaterialTheme.typography.bodySmall,
+        color = RP.TextSecondary,
+    )
+    if (useLocal) {
+        val link by ServerSettings.link.collectAsStateWithLifecycle()
+        Text("Laptop reached from", fontSize = 13.sp, color = RP.TextSecondary, modifier = Modifier.padding(top = 8.dp))
+        ServerSettings.LaptopLink.entries.forEach { option ->
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth().clickable { ServerSettings.setLink(option) },
+            ) {
+                RadioButton(selected = link == option, onClick = null)
+                Text(option.label, modifier = Modifier.padding(start = 8.dp))
+            }
+        }
+    }
+    if (ServerSettings.localMapsAvailable) {
+        val useLocalMaps by ServerSettings.useLocalMaps.collectAsStateWithLifecycle()
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
+            Text("Maps from my laptop", modifier = Modifier.weight(1f))
+            Switch(checked = useLocalMaps, onCheckedChange = ServerSettings::setUseLocalMaps)
+        }
+        Text(
+            if (useLocalMaps) "Map tiles from this computer (works without internet). Needs setup-offline-maps.ps1."
+            else "Map tiles from OpenFreeMap (internet).",
+            style = MaterialTheme.typography.bodySmall,
+            color = RP.TextSecondary,
+        )
+    }
 }
 
 /** Opt-in to send anonymous speed samples for live traffic (ADR 0004). Off by default. */
@@ -1295,34 +1478,38 @@ private fun PlanDriveDialog(driveSeconds: Double, onDismiss: () -> Unit, onPlan:
     )
 }
 
-/** Settings sections: route options, driving display (speed) and map view. */
+/** Roads to avoid. */
 @Composable
-private fun RouteAndDisplaySettings() {
+private fun NavigationSettings() {
     val options by com.roadpulse.app.data.RouteSettings.options.collectAsStateWithLifecycle()
-    val showSpeedometer by DisplaySettings.showSpeedometer.collectAsStateWithLifecycle()
-    val limitDisplay by DisplaySettings.limitDisplay.collectAsStateWithLifecycle()
-    val margin by DisplaySettings.speedingMarginKmh.collectAsStateWithLifecycle()
-    val sound by DisplaySettings.speedingSound.collectAsStateWithLifecycle()
-    val northUp by DisplaySettings.northUp.collectAsStateWithLifecycle()
-    val compass by DisplaySettings.showCompass.collectAsStateWithLifecycle()
-    val flat by DisplaySettings.flatDriving.collectAsStateWithLifecycle()
-
-    SettingsHeader(strings.route)
-    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        com.roadpulse.app.data.Vehicle.entries.forEach { v ->
-            androidx.compose.material3.FilterChip(
-                selected = options.vehicle == v,
-                onClick = { com.roadpulse.app.data.RouteSettings.update { it.copy(vehicle = v) } },
-                label = { Text(strings.vehicle(v)) },
-            )
-        }
-    }
     SettingSwitch(strings.avoidTolls, options.avoidTolls) { on -> com.roadpulse.app.data.RouteSettings.update { it.copy(avoidTolls = on) } }
     SettingSwitch(strings.avoidHighways, options.avoidHighways) { on -> com.roadpulse.app.data.RouteSettings.update { it.copy(avoidHighways = on) } }
     SettingSwitch(strings.avoidFerries, options.avoidFerries) { on -> com.roadpulse.app.data.RouteSettings.update { it.copy(avoidFerries = on) } }
     SettingSwitch(strings.allowUnpaved, options.allowUnpaved) { on -> com.roadpulse.app.data.RouteSettings.update { it.copy(allowUnpaved = on) } }
+}
 
-    SettingsHeader(strings.speed)
+/** Car, motorcycle or taxi (routes and toll prices). */
+@Composable
+private fun VehicleSettings() {
+    val options by com.roadpulse.app.data.RouteSettings.options.collectAsStateWithLifecycle()
+    com.roadpulse.app.data.Vehicle.entries.forEach { v ->
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth().clickable { com.roadpulse.app.data.RouteSettings.update { it.copy(vehicle = v) } },
+        ) {
+            RadioButton(selected = options.vehicle == v, onClick = null)
+            Text(strings.vehicle(v), modifier = Modifier.padding(start = 8.dp))
+        }
+    }
+}
+
+/** Speedometer, speed limit sign and the speeding warning. */
+@Composable
+private fun SpeedometerSettings() {
+    val showSpeedometer by DisplaySettings.showSpeedometer.collectAsStateWithLifecycle()
+    val limitDisplay by DisplaySettings.limitDisplay.collectAsStateWithLifecycle()
+    val margin by DisplaySettings.speedingMarginKmh.collectAsStateWithLifecycle()
+    val sound by DisplaySettings.speedingSound.collectAsStateWithLifecycle()
     SettingSwitch(strings.showSpeedometer, showSpeedometer) { DisplaySettings.set(DisplaySettings.showSpeedometer, "show_speedometer", it) }
     Text(strings.showSpeedLimit, fontSize = 14.sp, modifier = Modifier.padding(top = 6.dp))
     com.roadpulse.app.nav.LimitDisplay.entries.forEach { option ->
@@ -1345,7 +1532,14 @@ private fun RouteAndDisplaySettings() {
         }
     }
     SettingSwitch(strings.soundWhenSpeeding, sound) { DisplaySettings.set(DisplaySettings.speedingSound, "speeding_sound", it) }
+}
 
+/** North up, compass, flat or tilted driving map. */
+@Composable
+private fun MapDisplaySettings() {
+    val northUp by DisplaySettings.northUp.collectAsStateWithLifecycle()
+    val compass by DisplaySettings.showCompass.collectAsStateWithLifecycle()
+    val flat by DisplaySettings.flatDriving.collectAsStateWithLifecycle()
     SettingsHeader(strings.mapView)
     SettingSwitch(strings.northUp, northUp) { DisplaySettings.set(DisplaySettings.northUp, "north_up", it) }
     SettingSwitch(strings.showCompass, compass) { DisplaySettings.set(DisplaySettings.showCompass, "show_compass", it) }

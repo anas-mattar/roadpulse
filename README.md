@@ -31,8 +31,15 @@ components. "RoadPulse" is a placeholder name; check trademark availability befo
 - Music controls while driving (play/pause/next for Spotify, YouTube Music...), opt-in in Settings;
   needs Android notification access, used only to see which music is playing
 - Profile with points, levels and badges for reporting (anonymous, optional nickname)
-- Share my drive: a live link with arrival time and position (works on the laptop now; for
-  everyone once the server is online)
+- Share my drive: a preview of what the link shows, then a live link with arrival time and
+  position; the driver sees how many people are watching (works on the laptop now; for everyone
+  once the server is online)
+- Route choices on the map or as a list (arrival time with traffic, traffic bar, toll, Go); while
+  driving, pull up the trip card for the route with traffic, other routes, share and stop
+- Driving map: traffic colours on the route line, the next turn and its road name on the map,
+  compass top left
+- Menu: profile, planned drives, settings grouped in pages (General, Map display, Voice and sound,
+  Navigation, Vehicle, Alerts and reports, Speedometer, Privacy), help and feedback
 - Live traffic (opt-in, anonymous, ADR 0004): slow and jammed roads on the map
 - Privacy: policy, export and delete my data (server and phone), consent before live traffic,
   retention limits

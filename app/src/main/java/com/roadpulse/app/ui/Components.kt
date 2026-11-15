@@ -4,6 +4,7 @@ import com.roadpulse.app.i18n.strings
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -259,10 +260,23 @@ fun TripIsland(
     onStop: () -> Unit,
     modifier: Modifier = Modifier,
     attribution: String,
+    /** Slow and jammed stretches, drawn on the progress bar. */
+    trafficPieces: List<com.roadpulse.app.nav.TrafficPiece> = emptyList(),
+    /** Tap (or the handle) opens and closes the drive sheet. */
+    onToggle: (() -> Unit)? = null,
+    /** The opened drive sheet, shown under the arrival time. */
+    expandedContent: (@Composable () -> Unit)? = null,
 ) {
     Island(modifier = modifier.fillMaxWidth(), color = RP.NightPanel, contentColor = Color.White) {
         Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+            if (onToggle != null) {
+                SheetHandle(Modifier.align(Alignment.CenterHorizontally).clickable(onClick = onToggle))
+            }
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier.fillMaxWidth().then(if (onToggle != null) Modifier.clickable(onClick = onToggle) else Modifier),
+            ) {
                 Column {
                     Text(arrival, fontSize = 26.sp, fontWeight = FontWeight.SemiBold, lineHeight = 28.sp)
                     Text(remaining, color = RP.NightText, fontSize = 13.sp)
@@ -276,15 +290,11 @@ fun TripIsland(
                     size = 44.dp,
                 )
             }
-            LinearProgressIndicator(
-                progress = { progress.coerceIn(0f, 1f) },
-                modifier = Modifier.fillMaxWidth().padding(top = 10.dp).height(5.dp),
-                color = RP.Teal,
-                trackColor = RP.NightButton,
-                strokeCap = StrokeCap.Round,
-                gapSize = 0.dp,
-                drawStopIndicator = {},
-            )
+            if (expandedContent != null) {
+                expandedContent()
+            } else {
+                TrafficBar(trafficPieces, Modifier.padding(top = 10.dp), progress = progress, track = RP.NightButton)
+            }
             Text(attribution, color = RP.NightText, fontSize = 9.sp, modifier = Modifier.padding(top = 6.dp))
         }
     }

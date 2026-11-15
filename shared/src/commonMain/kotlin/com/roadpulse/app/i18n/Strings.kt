@@ -252,6 +252,35 @@ interface AppStrings {
     fun inMeters(meters: Int): String
     val notificationStop: String
     val notificationChannel: String
+
+    // Route list and drive sheet
+    val mapTab: String
+    val listTab: String
+    val goShort: String
+    val currentRoute: String
+    val otherRoutes: String
+    val noOtherRoutes: String
+
+    // Share drive
+    val shareYourDrive: String
+    val shareExplain: String
+    fun shareTo(destination: String): String
+    val sharedDrive: String
+    fun viewers(count: Int): String
+
+    // Settings groups and menu
+    val general: String
+    val mapDisplay: String
+    val voiceAndSound: String
+    val navigationSettings: String
+    val vehicleDetails: String
+    val alertsAndReports: String
+    val speedometer: String
+    val menu: String
+    val helpAndFeedback: String
+    val helpTopics: List<Pair<String, String>>
+    val sendFeedback: String
+    fun version(v: String): String
 }
 
 /** Screen language for a chosen app language. */
@@ -462,7 +491,7 @@ object EnglishStrings : AppStrings {
     override val profileNeedsServer = "Your profile needs the RoadPulse server. Turn on \"Use my laptop's server\" in Settings."
 
     override val shareDrive = "Share drive"
-    override fun shareText(destination: String, eta: String, url: String) = "I'm driving to $destination, arriving around $eta. Follow live: $url"
+    override fun shareText(destination: String, eta: String, url: String) = "I'll arrive at $eta at $destination. Follow my drive live: $url"
     override val sharingLive = "Sharing live"
     override val stopSharing = "Stop sharing"
     override val shareFailed = "Could not share the drive. Check the connection to the server."
@@ -483,7 +512,7 @@ object EnglishStrings : AppStrings {
         "Draft for testing: to be reviewed for Malaysia's Personal Data Protection Act before public release.",
         "On your phone only: Home, Work, recent and saved places, planned drives, where you parked, and your settings.",
         "Sent to the RoadPulse server: an anonymous device id (no name, email or phone number), the reports, votes and flags you make, and your nickname if you set one. Reports are public on the map without a name.",
-        "Share my drive, only when you tap Share: destination, arrival time and position, for anyone with the link, until you stop, 30 minutes after arrival, or 12 hours.",
+        "Share my drive, only when you tap Share: destination, arrival time and position, for anyone with the link, until you stop, 30 minutes after arrival, or 12 hours. You see how many people have the link open; they are counted with a random number made up by each open page, nothing about them is kept.",
         "Live traffic, only if you turn it on: speed and position in 2-minute pieces with no device id, nothing from the first and last 500 m of a trip. Only average road speeds are kept.",
         "Kept for: reports 90 days after they expire; road speed averages 12 months (no driver information).",
         "Your choices: export or delete your data below, and turn live traffic off at any time.",
@@ -501,6 +530,42 @@ object EnglishStrings : AppStrings {
     override fun inMeters(meters: Int) = "In $meters m: "
     override val notificationStop = "Stop"
     override val notificationChannel = "Shown while RoadPulse is guiding a drive"
+
+    override val mapTab = "Map"
+    override val listTab = "List"
+    override val goShort = "Go"
+    override val currentRoute = "Current"
+    override val otherRoutes = "Routes"
+    override val noOtherRoutes = "No other routes found from here."
+
+    override val shareYourDrive = "Share your drive"
+    override val shareExplain = "Anyone with the link can follow your drive on a map until you arrive or stop sharing."
+    override fun shareTo(destination: String) = "To $destination"
+    override val sharedDrive = "Shared drive"
+    override fun viewers(count: Int) = when (count) {
+        0 -> "No one watching yet"
+        1 -> "1 person watching"
+        else -> "$count people watching"
+    }
+
+    override val general = "General"
+    override val mapDisplay = "Map display"
+    override val voiceAndSound = "Voice and sound"
+    override val navigationSettings = "Navigation"
+    override val vehicleDetails = "Vehicle details"
+    override val alertsAndReports = "Alerts and reports"
+    override val speedometer = "Speedometer"
+    override val menu = "Menu"
+    override val helpAndFeedback = "Help and feedback"
+    override val helpTopics = listOf(
+        "Report something on the road" to "Tap the yellow button, choose what you see, and add details if you like. It is sent at your position.",
+        "Add a stop" to "Press and hold the map where you want to stop, then tap Add a stop.",
+        "Plan a drive for later" to "Choose a destination, tap the clock and pick when you want to arrive. You get a reminder when it is time to leave.",
+        "Share your drive" to "While driving, tap Share. Anyone with the link can follow you until you arrive.",
+        "Reports, traffic and places" to "These need the RoadPulse server. On iPhone, turn on the laptop server in Settings and use the same Wi-Fi.",
+    )
+    override val sendFeedback = "Send feedback by email"
+    override fun version(v: String) = "Version $v"
 }
 
 /** Modern Standard Arabic. Review sheet: docs/ARABIC_SCREENS.md. */
@@ -757,7 +822,7 @@ object ArabicStrings : AppStrings {
     override val profileNeedsServer = "يحتاج ملفك الشخصي إلى خادم RoadPulse. فعّل \"Use my laptop's server\" في الإعدادات."
 
     override val shareDrive = "شارك الرحلة"
-    override fun shareText(destination: String, eta: String, url: String) = "أنا في طريقي إلى $destination، وأصل نحو الساعة $eta. تابعني مباشرة: $url"
+    override fun shareText(destination: String, eta: String, url: String) = "سأصل الساعة $eta إلى $destination. تابع رحلتي مباشرة: $url"
     override val sharingLive = "المشاركة مباشرة"
     override val stopSharing = "إيقاف المشاركة"
     override val shareFailed = "تعذّرت مشاركة الرحلة. تحقق من الاتصال بالخادم."
@@ -778,7 +843,7 @@ object ArabicStrings : AppStrings {
         "مسودة للاختبار: تحتاج إلى مراجعة وفق قانون حماية البيانات الشخصية الماليزي قبل الإطلاق العام.",
         "على هاتفك فقط: المنزل والعمل والأماكن الأخيرة والمحفوظة، والرحلات المخطط لها، ومكان ركن سيارتك، وإعداداتك.",
         "يُرسل إلى خادم RoadPulse: معرّف جهاز مجهول (بلا اسم أو بريد أو رقم هاتف)، والبلاغات والتصويتات والإبلاغات التي تقوم بها، واسمك المستعار إن عيّنته. تظهر البلاغات على الخريطة بلا اسم.",
-        "مشاركة الرحلة، فقط عند الضغط على مشاركة: الوجهة ووقت الوصول والموقع لمن لديه الرابط، حتى تتوقف أو بعد 30 دقيقة من الوصول أو 12 ساعة.",
+        "مشاركة الرحلة، فقط عند الضغط على مشاركة: الوجهة ووقت الوصول والموقع لمن لديه الرابط، حتى تتوقف أو بعد 30 دقيقة من الوصول أو 12 ساعة. ترى عدد من يفتحون الرابط؛ يُحسبون برقم عشوائي تنشئه كل صفحة مفتوحة، ولا يُحفظ عنهم شيء.",
         "حركة المرور، فقط إذا فعّلتها: السرعة والموقع على شكل أجزاء مدتها دقيقتان بلا معرّف جهاز، ولا شيء من أول وآخر 500 م من الرحلة. يُحتفظ بمتوسط سرعات الطرق فقط.",
         "مدة الحفظ: البلاغات 90 يومًا بعد انتهائها، ومتوسط سرعات الطرق 12 شهرًا (بلا معلومات عن السائقين).",
         "خياراتك: صدّر بياناتك أو احذفها أدناه، وأوقف مشاركة حركة المرور في أي وقت.",
@@ -796,4 +861,42 @@ object ArabicStrings : AppStrings {
     override fun inMeters(meters: Int) = "بعد $meters م: "
     override val notificationStop = "إيقاف"
     override val notificationChannel = "يظهر أثناء إرشاد RoadPulse لرحلتك"
+
+    override val mapTab = "خريطة"
+    override val listTab = "قائمة"
+    override val goShort = "انطلق"
+    override val currentRoute = "الحالي"
+    override val otherRoutes = "المسارات"
+    override val noOtherRoutes = "لا توجد مسارات أخرى من هنا."
+
+    override val shareYourDrive = "شارك رحلتك"
+    override val shareExplain = "يمكن لأي شخص لديه الرابط متابعة رحلتك على الخريطة حتى تصل أو توقف المشاركة."
+    override fun shareTo(destination: String) = "إلى $destination"
+    override val sharedDrive = "رحلة مُشارَكة"
+    override fun viewers(count: Int) = when (count) {
+        0 -> "لا أحد يتابع بعد"
+        1 -> "شخص واحد يتابع"
+        2 -> "شخصان يتابعان"
+        in 3..10 -> "$count أشخاص يتابعون"
+        else -> "$count شخصًا يتابعون"
+    }
+
+    override val general = "عام"
+    override val mapDisplay = "عرض الخريطة"
+    override val voiceAndSound = "الصوت"
+    override val navigationSettings = "الملاحة"
+    override val vehicleDetails = "تفاصيل المركبة"
+    override val alertsAndReports = "التنبيهات والبلاغات"
+    override val speedometer = "عداد السرعة"
+    override val menu = "القائمة"
+    override val helpAndFeedback = "المساعدة والملاحظات"
+    override val helpTopics = listOf(
+        "الإبلاغ عن شيء على الطريق" to "اضغط الزر الأصفر واختر ما تراه، وأضف التفاصيل إن أردت. يُرسل البلاغ عند موقعك.",
+        "إضافة محطة توقف" to "اضغط مطولًا على الخريطة حيث تريد التوقف، ثم اختر إضافة محطة.",
+        "التخطيط لرحلة لاحقة" to "اختر الوجهة، واضغط الساعة وحدد وقت الوصول. ستصلك تذكرة عندما يحين وقت الانطلاق.",
+        "مشاركة رحلتك" to "أثناء القيادة اضغط مشاركة. يمكن لأي شخص لديه الرابط متابعتك حتى تصل.",
+        "البلاغات والازدحام والأماكن" to "تحتاج إلى خادم RoadPulse. على iPhone فعّل خادم الحاسوب في الإعدادات واستخدم شبكة Wi-Fi نفسها.",
+    )
+    override val sendFeedback = "أرسل ملاحظاتك بالبريد"
+    override fun version(v: String) = "الإصدار $v"
 }

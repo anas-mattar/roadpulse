@@ -72,8 +72,10 @@ class ShareClient(private val api: DeviceApi) {
         return Http.json.decodeFromString(ShareLink.serializer(), api.call("POST", "/v1/shares", Http.json.encodeToString(Start.serializer(), body)))
     }
 
-    suspend fun update(id: String, position: GeoPoint, etaMillis: Long, state: String) {
-        api.call("PUT", "/v1/shares/$id", Http.json.encodeToString(Update.serializer(), Update(position.lat, position.lon, etaMillis, state)))
+    /** Sends the position; returns how many people have the share page open (0 if unknown). */
+    suspend fun update(id: String, position: GeoPoint, etaMillis: Long, state: String): Int {
+        val body = api.call("PUT", "/v1/shares/$id", Http.json.encodeToString(Update.serializer(), Update(position.lat, position.lon, etaMillis, state)))
+        return runCatching { Http.json.decodeFromString(Viewers.serializer(), body).viewers }.getOrDefault(0)
     }
 
     suspend fun stop(id: String) {
@@ -85,6 +87,7 @@ class ShareClient(private val api: DeviceApi) {
         val etaUnixMs: Long, val name: String?,
     )
     @Serializable private data class Update(val lat: Double, val lon: Double, val etaUnixMs: Long, val state: String)
+    @Serializable private data class Viewers(val viewers: Int = 0)
 }
 
 // ---------------------------------------------------------------- Live traffic

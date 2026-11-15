@@ -40,7 +40,28 @@ class RouteSummary(
     val route: Route,
     /** "Toll ~RM 6.80", "Toll road"…, or null for a toll-free route. */
     val tollLabel: String?,
-)
+    /** Live traffic: slow and jammed stretches (fractions of the route), their lines on the map, and the extra minutes. */
+    val trafficPieces: List<com.roadpulse.app.nav.TrafficPiece> = emptyList(),
+    val trafficLines: List<TrafficPolyline> = emptyList(),
+    val trafficDelayMinutes: Int = 0,
+) {
+    /** Minutes including live traffic. */
+    val minutesWithTraffic: Int get() = minutes + trafficDelayMinutes
+}
+
+/** Route summaries from routes (no toll estimate), e.g. for "Routes" during a drive. */
+internal fun summarize(routes: List<Route>, language: GuidanceLanguage): List<RouteSummary> {
+    val strings = stringsFor(language)
+    val choices = RouteChoices.describe(routes, strings)
+    return routes.mapIndexed { i, r ->
+        RouteSummary(choices[i].tag, choices[i].via, mathRound(r.timeSeconds / 60).toInt(), r.lengthKm, r.hasToll,
+            r.shape, r, TollClient.label(r.hasToll, null, strings))
+    }
+}
+
+/** The coloured stretches of [shape] as map lines. */
+internal fun trafficLinesFor(shape: List<GeoPoint>, pieces: List<com.roadpulse.app.nav.TrafficPiece>): List<TrafficPolyline> =
+    com.roadpulse.app.nav.RouteTraffic.polylines(shape, pieces).map { (level, pts) -> TrafficPolyline(level, pts) }
 
 /** A community report on the map. [typeName] is a [ReportType] name; [label] is in the app language. */
 class ReportPin(
@@ -100,12 +121,17 @@ class RoadPulseApi(geocodingUrl: String, routingUrl: String, private val backend
             stops = stops.map { GeoPoint(it.lat, it.lon) }, options = options)
         val strings = stringsFor(language)
         val choices = RouteChoices.describe(routes, strings)
+        val traffic = com.roadpulse.app.nav.RouteTraffic.forRoutes(backendUrl, routes)
         return routes.mapIndexed { i, r ->
             val toll = if (r.hasToll && hasServer) {
                 runCatching { TollClient(backendUrl).estimate(r.shape, options.vehicle) }.getOrNull()
             } else null
+            val info = traffic.getOrNull(i)
             RouteSummary(choices[i].tag, choices[i].via, mathRound(r.timeSeconds / 60).toInt(), r.lengthKm, r.hasToll,
-                r.shape, r, TollClient.label(r.hasToll, toll, strings))
+                r.shape, r, TollClient.label(r.hasToll, toll, strings),
+                trafficPieces = info?.pieces.orEmpty(),
+                trafficLines = trafficLinesFor(r.shape, info?.pieces.orEmpty()),
+                trafficDelayMinutes = mathRound((info?.delaySeconds ?: 0.0) / 60).toInt())
         }
     }
 

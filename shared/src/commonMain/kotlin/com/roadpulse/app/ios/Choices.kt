@@ -44,6 +44,9 @@ object Choices {
         else -> SunTimes.isNight(lat, lon, nowMillis)
     }
 
+    /** Help and feedback: (title, text) pairs in the app language. */
+    fun helpTopics(language: GuidanceLanguage): List<List<String>> = stringsFor(language).helpTopics.map { listOf(it.first, it.second) }
+
     /** Whether the speed limit sign shows, for a [LimitDisplay] name. */
     fun showLimit(limitDisplayName: String, speeding: Boolean): Boolean = when (limitDisplayName) {
         LimitDisplay.NEVER.name -> false

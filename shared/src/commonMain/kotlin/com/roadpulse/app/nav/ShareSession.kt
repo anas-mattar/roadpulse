@@ -26,6 +26,9 @@ object ShareSession {
     private val _link = MutableStateFlow<ShareLink?>(null)
     /** The active link, or null when the drive is not shared. */
     val link: StateFlow<ShareLink?> = _link.asStateFlow()
+    private val _viewers = MutableStateFlow(0)
+    /** People with the share page open right now (from the last update). */
+    val viewers: StateFlow<Int> = _viewers.asStateFlow()
     private var client: ShareClient? = null
     private var job: Job? = null
 
@@ -59,7 +62,7 @@ object ShareSession {
             arrived = arrived || s.remainingKm < 0.05
             if (wallClockMillis() - lastSent >= UPDATE_MS) {
                 lastSent = wallClockMillis()
-                s.displayPosition?.let { p -> runCatching { c.update(link.id, p, eta(s.remainingSeconds), "DRIVING") } }
+                s.displayPosition?.let { p -> runCatching { c.update(link.id, p, eta(s.remainingSeconds), "DRIVING") }.onSuccess { _viewers.value = it } }
             }
         }
     }
@@ -81,6 +84,7 @@ object ShareSession {
 
     private fun finish() {
         _link.value = null
+        _viewers.value = 0
         client = null
         job = null
         lastPosition = null
@@ -89,5 +93,5 @@ object ShareSession {
 
     private fun eta(remainingSeconds: Double) = wallClockMillis() + (remainingSeconds * 1000).toLong()
 
-    private const val UPDATE_MS = 30_000L
+    private const val UPDATE_MS = 20_000L
 }

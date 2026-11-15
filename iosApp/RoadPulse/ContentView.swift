@@ -16,7 +16,14 @@ struct ContentView: View {
     @State var recenterToken = 0
     @State var showSettings = false
     @State var showReport = false
-    @State var showProfile = false
+    /// Route choices as a list (true) or on the map (false).
+    @State var listMode = false
+    /// Drive sheet pulled up, and "Routes" in it.
+    @State var sheetOpen = false
+    @State var alternatives: [RouteSummary]?
+    @State var showSharePreview = false
+    @State var showSharedPanel = false
+    @State var shareUrl: String?
     @State var showLeaveLater = false
     @State var askFavouriteName = false
     @State var favouriteName = ""
@@ -41,6 +48,18 @@ struct ContentView: View {
         if let s = drive.snapshot, s.hasPosition { return CLLocationCoordinate2D(latitude: s.lat, longitude: s.lon) }
         return location.coordinate ?? MapView.kualaLumpur
     }
+    /// Traffic colours on the route line: the drive's, or the selected route card's.
+    var routeTraffic: [TrafficPolyline] {
+        if let s = drive.snapshot { return s.trafficLines }
+        return model.selected < model.routes.count ? model.routes[model.selected].trafficLines : []
+    }
+
+    /// The next turn on the map while driving (the road name travels in `name`).
+    var turnMarker: SearchResult? {
+        guard let s = drive.snapshot, s.hasUpcoming else { return nil }
+        return SearchResult(name: s.upcomingStreet, detail: "", lat: s.upcomingLat, lon: s.upcomingLon)
+    }
+
     /// Night map after sunset (or as chosen in Settings).
     var darkMap: Bool {
         _ = minuteTick
@@ -62,7 +81,9 @@ struct ContentView: View {
                     onLongPress: { lat, lon in
                         selectedReport = nil
                         Task { await model.pin(lat: lat, lon: lon, language: language, strings: strings) }
-                    })
+                    },
+                    routeTraffic: routeTraffic,
+                    turn: turnMarker)
                 .ignoresSafeArea()
 
             Group {
@@ -101,7 +122,13 @@ struct ContentView: View {
             // Keep the screen on and the GPS running in the background while navigating.
             UIApplication.shared.isIdleTimerDisabled = driving
             location.setNavigating(driving)
-            if !driving { model.clear() }
+            if !driving {
+                model.clear()
+                sheetOpen = false
+                alternatives = nil
+                shareUrl = nil
+            }
+            listMode = false
         }
         .onReceive(notifications.$openPlannedId) { id in
             guard let id = id else { return }
@@ -124,9 +151,8 @@ struct ContentView: View {
                 }
             }, onCancel: { showReport = false })
         }
-        .sheet(isPresented: $showProfile) {
-            ProfileView(model: model, language: language, strings: strings, onClose: { showProfile = false })
-        }
+        .sheet(isPresented: $showSharePreview) { sharePreview }
+        .sheet(isPresented: $showSharedPanel) { sharedPanel }
         .sheet(isPresented: $showLeaveLater) { leaveLaterSheet }
         .sheet(item: $shareItem) { item in ActivityView(items: item.items) }
         .alert(strings.savePlace, isPresented: $askFavouriteName) {

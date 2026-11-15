@@ -67,7 +67,7 @@ object TrafficDelay {
         return sqrt(dx * dx + dy * dy)
     }
 
-    private fun distanceToLine(p: GeoPoint, line: List<GeoPoint>): Double {
+    fun distanceToLine(p: GeoPoint, line: List<GeoPoint>): Double {
         val k = cos(toRadians(p.lat))
         var best = Double.MAX_VALUE
         for (i in 0 until line.size - 1) {

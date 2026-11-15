@@ -80,5 +80,8 @@ on the same Wi-Fi could reach these ports; use `-Remove` on networks you do not 
    speed-limit options, press and hold the map (drive here, add a stop, parked here, save),
    stops on the preview and during a drive, route overview, and search by voice (Apple speech
    recognition, asks for the microphone the first time).
-8. Not possible the same way on iPhone: music controls for other apps (iOS only allows Apple
+8. **Done in code (both apps):** route list view with traffic bars, drive sheet with other routes,
+   traffic colours on the route line, next-turn label, share preview and viewer count, menu and
+   grouped settings.
+9. Not possible the same way on iPhone: music controls for other apps (iOS only allows Apple
    Music control), and background limits differ. These will be adapted, not copied.

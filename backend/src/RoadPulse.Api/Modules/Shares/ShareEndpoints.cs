@@ -10,6 +10,8 @@ public enum ShareState { DRIVING, ARRIVED, STOPPED }
 public record CreateShareRequest(string Destination, double DestLat, double DestLon, double Lat, double Lon, long EtaUnixMs, string? Name);
 public record UpdateShareRequest(double Lat, double Lon, long EtaUnixMs, ShareState State);
 public record CreateShareResponse(string Id, string Url, DateTimeOffset ExpiresAt);
+/// <summary>Returned to the driver on each update: how many people have the page open now.</summary>
+public record UpdateShareResponse(int Viewers);
 /// <summary>What the person with the link sees. Nothing about the device.</summary>
 public record ShareView(string? Name, string Destination, double DestLat, double DestLon, double Lat, double Lon,
     DateTimeOffset Eta, DateTimeOffset UpdatedAt, ShareState State);
@@ -29,6 +31,33 @@ public sealed class Share
     public DateTimeOffset UpdatedAt { get; set; }
     public DateTimeOffset ExpiresAt { get; set; }
     public ShareState State { get; set; }
+
+    /// <summary>
+    /// Open share pages: a random token each page makes up when it loads (no cookie, nothing
+    /// about the viewer) and when it last asked. Kept in memory with the share.
+    /// </summary>
+    private readonly ConcurrentDictionary<string, DateTimeOffset> _viewers = new();
+    public static readonly TimeSpan ViewerWindow = TimeSpan.FromSeconds(45);
+    public const int MaxViewers = 50;
+
+    public void SawViewer(string token, DateTimeOffset now)
+    {
+        if (_viewers.Count >= MaxViewers && !_viewers.ContainsKey(token)) Prune(now);
+        if (_viewers.Count < MaxViewers || _viewers.ContainsKey(token)) _viewers[token] = now;
+    }
+
+    /// <summary>Pages that asked within the last 45 seconds (they ask every 15).</summary>
+    public int ViewerCount(DateTimeOffset now)
+    {
+        Prune(now);
+        return _viewers.Count;
+    }
+
+    private void Prune(DateTimeOffset now)
+    {
+        foreach (var (token, seen) in _viewers)
+            if (now - seen > ViewerWindow) _viewers.TryRemove(token, out _);
+    }
 }
 
 /// <summary>
@@ -152,7 +181,7 @@ public static class ShareEndpoints
         return TypedResults.Created($"/v1/shares/{share.Id}", new CreateShareResponse(share.Id, $"{baseUrl}/s/{share.Id}", share.ExpiresAt));
     }
 
-    private static Results<NoContent, NotFound, ValidationProblem> Update(string id, UpdateShareRequest r, HttpContext http, ShareStore store)
+    private static Results<Ok<UpdateShareResponse>, NotFound, ValidationProblem> Update(string id, UpdateShareRequest r, HttpContext http, ShareStore store)
     {
         var share = store.Get(id);
         if (share is null || share.DeviceId != http.User.DeviceId()) return TypedResults.NotFound();
@@ -166,7 +195,7 @@ public static class ShareEndpoints
             share.ExpiresAt = Min(share.ExpiresAt, now + ShareStore.AfterArrival);
         share.State = r.State;
         if (r.State == ShareState.STOPPED) store.Remove(id);
-        return TypedResults.NoContent();
+        return TypedResults.Ok(new UpdateShareResponse(share.ViewerCount(now)));
     }
 
     private static Results<NoContent, NotFound> Stop(string id, HttpContext http, ShareStore store)
@@ -177,10 +206,14 @@ public static class ShareEndpoints
         return TypedResults.NoContent();
     }
 
-    private static Results<Ok<ShareView>, NotFound> View(string id, ShareStore store) =>
-        store.Get(id) is { } s
-            ? TypedResults.Ok(new ShareView(s.Name, s.Destination, s.DestLat, s.DestLon, s.Lat, s.Lon, s.Eta, s.UpdatedAt, s.State))
-            : TypedResults.NotFound();
+    /// <summary>[v] is the page's random viewer token (counted, never stored beyond 45 seconds).</summary>
+    private static Results<Ok<ShareView>, NotFound> View(string id, string? v, ShareStore store)
+    {
+        if (store.Get(id) is not { } s) return TypedResults.NotFound();
+        if (v is { Length: >= 8 and <= 32 } && v.All(c => char.IsAsciiLetterOrDigit(c) || c is '-' or '_'))
+            s.SawViewer(v, store.Now);
+        return TypedResults.Ok(new ShareView(s.Name, s.Destination, s.DestLat, s.DestLon, s.Lat, s.Lon, s.Eta, s.UpdatedAt, s.State));
+    }
 
     private static DateTimeOffset Min(DateTimeOffset a, DateTimeOffset b) => a < b ? a : b;
 }

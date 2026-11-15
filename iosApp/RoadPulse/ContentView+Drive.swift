@@ -19,7 +19,7 @@ extension ContentView {
                         overviewToken += 1
                     }
                     if model.hasServer && !s.sharing {
-                        circleButton("square.and.arrow.up", label: strings.shareDrive) { shareDrive(s) }
+                        circleButton("square.and.arrow.up", label: strings.shareDrive) { showSharePreview = true }
                     }
                 }
             }
@@ -71,8 +71,8 @@ extension ContentView {
     func alerts(_ s: DriveSnapshot) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             if s.sharing {
-                Button { drive.stopSharing() } label: {
-                    pill(strings.sharingLive, icon: "dot.radiowaves.left.and.right", trailing: strings.stopSharing,
+                Button { showSharedPanel = true } label: {
+                    pill(strings.sharingLive, icon: "dot.radiowaves.left.and.right", trailing: strings.viewers(count: s.shareViewers),
                          background: Color(red: 0.06, green: 0.43, blue: 0.34))
                 }
             }
@@ -178,19 +178,32 @@ extension ContentView {
         }
     }
 
+    /// Arrival time and what is left; tap (or the handle) to pull up the drive sheet.
     func tripCard(_ s: DriveSnapshot) -> some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(arrival(s), style: .time).font(.system(size: 26, weight: .semibold))
-                Text(tripLine(s)).font(.subheadline).opacity(0.8)
+        VStack(spacing: 8) {
+            Capsule().fill(Color.white.opacity(0.4)).frame(width: 40, height: 4)
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(arrival(s), style: .time).font(.system(size: 26, weight: .semibold))
+                    Text(tripLine(s)).font(.subheadline).opacity(0.8)
+                }
+                Spacer()
+                if !sheetOpen {
+                    Button { drive.stop() } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 20, weight: .bold)).foregroundColor(.white)
+                            .frame(width: 52, height: 52).background(Color.red).clipShape(Circle())
+                    }
+                    .accessibilityLabel(strings.stopNavigation)
+                }
             }
-            Spacer()
-            Button { drive.stop() } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 20, weight: .bold)).foregroundColor(.white)
-                    .frame(width: 52, height: 52).background(Color.red).clipShape(Circle())
+            .contentShape(Rectangle())
+            .onTapGesture { toggleSheet() }
+            if sheetOpen {
+                driveSheet(s)
+            } else {
+                TrafficBarView(pieces: s.trafficPieces, progress: s.progress, track: Color(white: 0.35))
             }
-            .accessibilityLabel(strings.stopNavigation)
         }
         .foregroundColor(.white)
         .padding(16)
@@ -199,19 +212,178 @@ extension ContentView {
         .shadow(radius: 5)
     }
 
-    /// Starts a live link and opens the share sheet with "I'm driving to …, arriving around …".
-    func shareDrive(_ s: DriveSnapshot) {
+    func toggleSheet() {
+        withAnimation(.easeInOut(duration: 0.2)) {
+            sheetOpen.toggle()
+            if !sheetOpen { alternatives = nil }
+        }
+    }
+
+    /// The drive sheet: where to, the route with traffic and progress, Routes / Share / Stop.
+    func driveSheet(_ s: DriveSnapshot) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(strings.shareTo(destination: s.destinationName)).font(.footnote).opacity(0.7).lineLimit(1)
+            if let via = s.via {
+                Text(strings.via(road: via)).font(.headline).lineLimit(2)
+            }
+            TrafficBarView(pieces: s.trafficPieces, progress: s.progress, track: Color(white: 0.35))
+            if let list = alternatives {
+                alternativesList(list)
+            } else {
+                HStack(spacing: 8) {
+                    sheetButton(strings.otherRoutes, icon: "arrow.triangle.branch", color: Color(white: 0.35)) { loadAlternatives() }
+                    if model.hasServer && !s.sharing {
+                        sheetButton(strings.shareDrive, icon: "square.and.arrow.up", color: Color(white: 0.35)) {
+                            sheetOpen = false
+                            showSharePreview = true
+                        }
+                    }
+                    sheetButton(strings.notificationStop, icon: "xmark", color: .red) { drive.stop() }
+                }
+            }
+        }
+    }
+
+    func sheetButton(_ label: String, icon: String, color: Color, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            VStack(spacing: 4) {
+                Image(systemName: icon).font(.system(size: 20, weight: .semibold))
+                Text(label).font(.caption).lineLimit(1)
+            }
+            .foregroundColor(.white)
+            .frame(maxWidth: .infinity).padding(.vertical, 10)
+            .background(color).clipShape(RoundedRectangle(cornerRadius: 16))
+        }
+    }
+
+    func loadAlternatives() {
+        alternatives = []
+        Task { alternatives = await drive.alternatives() }
+    }
+
+    func alternativesList(_ list: [RouteSummary]) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text(strings.otherRoutes).font(.headline)
+                Spacer()
+                Button { alternatives = nil } label: { Image(systemName: "xmark").foregroundColor(.white) }
+                    .accessibilityLabel(strings.close)
+            }
+            if list.isEmpty {
+                ProgressView().tint(.white)
+            }
+            ForEach(Array(list.enumerated()), id: \.offset) { _, route in
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(strings.duration(minutes: route.minutes)).font(.headline)
+                        Text(alternativeLine(route)).font(.caption).opacity(0.75).lineLimit(1)
+                    }
+                    Spacer()
+                    Button {
+                        sheetOpen = false
+                        alternatives = nil
+                        drive.useRoute(route)
+                    } label: {
+                        Text(strings.goShort).bold().padding(.horizontal, 16).padding(.vertical, 8)
+                            .background(indigo).foregroundColor(.white).clipShape(Capsule())
+                    }
+                }
+                .padding(10)
+                .background(Color(white: 0.3)).clipShape(RoundedRectangle(cornerRadius: 14))
+            }
+        }
+    }
+
+    func alternativeLine(_ route: RouteSummary) -> String {
+        var parts = [strings.distance(km: route.km)]
+        if let via = route.via { parts.append(strings.via(road: via)) }
+        return parts.joined(separator: " · ")
+    }
+
+    // MARK: Share my drive
+
+    /// Before sharing: who can see it, where to and when you arrive.
+    var sharePreview: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text(strings.shareYourDrive).font(.title2).bold()
+            if let s = drive.snapshot {
+                Text(strings.shareTo(destination: s.destinationName)).font(.subheadline).foregroundColor(.secondary)
+                Text(arrival(s), style: .time).font(.system(size: 34, weight: .semibold))
+            }
+            Text(strings.shareExplain).font(.subheadline).foregroundColor(.secondary)
+            Spacer(minLength: 0)
+            HStack(spacing: 10) {
+                Button { showSharePreview = false } label: {
+                    Text(strings.cancel).frame(maxWidth: .infinity).frame(height: 50)
+                        .background(Color(.secondarySystemBackground)).foregroundColor(indigo).clipShape(Capsule())
+                }
+                Button {
+                    showSharePreview = false
+                    startSharing()
+                } label: {
+                    Text(strings.shareDrive).bold().frame(maxWidth: .infinity).frame(height: 50)
+                        .background(indigo).foregroundColor(.white).clipShape(Capsule())
+                }
+            }
+        }
+        .padding(20)
+        .presentationDetents([.medium])
+        .environment(\.layoutDirection, strings.rtl ? .rightToLeft : .leftToRight)
+    }
+
+    /// While sharing: how many people are watching, share the link again, or stop.
+    var sharedPanel: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text(strings.sharedDrive).font(.title2).bold()
+            if let s = drive.snapshot {
+                Label(strings.viewers(count: s.shareViewers), systemImage: "eye").font(.headline)
+                Text(strings.shareTo(destination: s.destinationName)).font(.subheadline).foregroundColor(.secondary)
+            }
+            Spacer(minLength: 0)
+            HStack(spacing: 10) {
+                Button {
+                    showSharedPanel = false
+                    drive.stopSharing()
+                } label: {
+                    Text(strings.stopSharing).frame(maxWidth: .infinity).frame(height: 50)
+                        .background(Color(.secondarySystemBackground)).foregroundColor(.red).clipShape(Capsule())
+                }
+                Button {
+                    showSharedPanel = false
+                    if let url = shareUrl {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { sendShareText(url) }
+                    }
+                } label: {
+                    Text(strings.shareDrive).bold().frame(maxWidth: .infinity).frame(height: 50)
+                        .background(indigo).foregroundColor(.white).clipShape(Capsule())
+                }
+            }
+        }
+        .padding(20)
+        .presentationDetents([.medium])
+        .environment(\.layoutDirection, strings.rtl ? .rightToLeft : .leftToRight)
+    }
+
+    /// Starts a live link, then opens the share sheet with "I'll arrive at … at …".
+    func startSharing() {
         let nickname = model.profile?.nickname ?? ""
-        let eta = arrival(s).formatted(date: .omitted, time: .shortened)
-        let destination = drive.destinationName
         Task {
             do {
                 let url = try await drive.startSharing(name: nickname.isEmpty ? nil : nickname)
-                shareItem = ShareItem(items: [strings.shareText(destination: destination, eta: eta, url: url)])
+                shareUrl = url
+                // Let the preview sheet close before the share sheet opens.
+                try? await Task.sleep(nanoseconds: 600_000_000)
+                sendShareText(url)
             } catch {
                 model.message = strings.shareFailed
             }
         }
+    }
+
+    func sendShareText(_ url: String) {
+        guard let s = drive.snapshot else { return }
+        let eta = arrival(s).formatted(date: .omitted, time: .shortened)
+        shareItem = ShareItem(items: [strings.shareText(destination: s.destinationName, eta: eta, url: url)])
     }
 
     func laneOpacity(_ lane: LaneArrow) -> Double {

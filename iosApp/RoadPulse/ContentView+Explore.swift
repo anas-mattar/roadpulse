@@ -7,11 +7,16 @@ extension ContentView {
     var exploreOverlay: some View {
         VStack(spacing: 10) {
             HStack {
-                if model.hasServer {
-                    circleButton("person.crop.circle", label: strings.profile) { showProfile = true }
-                }
+                circleButton("line.3.horizontal", label: strings.menu) { showSettings = true }
                 Spacer()
-                circleButton("gearshape.fill", label: strings.settings) { showSettings = true }
+                if model.destination != nil && model.routes.count > 1 {
+                    MapListSwitch(list: $listMode, strings: strings, indigo: indigo)
+                    Spacer()
+                    Color.clear.frame(width: 44, height: 44)
+                }
+            }
+            if listMode && model.destination != nil && model.routes.count > 1 {
+                routeList
             }
             Spacer()
             HStack(alignment: .bottom) {
@@ -19,7 +24,9 @@ extension ContentView {
                 Spacer()
                 circleButton("location.fill", label: strings.showMyLocation) { recenterToken += 1 }
             }
-            if let pin = selectedReport {
+            if listMode && model.destination != nil && model.routes.count > 1 {
+                EmptyView()
+            } else if let pin = selectedReport {
                 reportCard(pin)
             } else if let point = model.pinned {
                 pinnedCard(point, driving: false)
@@ -445,7 +452,7 @@ extension ContentView {
                 .background(isSelected ? indigo : Color(.systemBackground))
                 .foregroundColor(isSelected ? .white : .secondary)
                 .clipShape(RoundedRectangle(cornerRadius: 8))
-            Text(strings.duration(minutes: route.minutes)).font(.title2).bold()
+            Text(strings.duration(minutes: route.minutesWithTraffic)).font(.title2).bold()
             Text(strings.distance(km: route.km)).font(.footnote).foregroundColor(.secondary)
             if let via = route.via {
                 Text(strings.via(road: via)).font(.caption).foregroundColor(.secondary).lineLimit(1)
@@ -453,12 +460,32 @@ extension ContentView {
             if let toll = route.tollLabel {
                 Text(toll).font(.caption).bold().foregroundColor(.orange).lineLimit(1)
             }
+            TrafficBarView(pieces: route.trafficPieces, track: Color(.systemBackground)).padding(.top, 4)
         }
         .padding(.horizontal, 14).padding(.vertical, 10)
         .frame(width: 160, alignment: .leading)
         .background(isSelected ? indigo.opacity(0.12) : Color(.secondarySystemBackground))
         .overlay(RoundedRectangle(cornerRadius: 18).stroke(isSelected ? indigo : Color.clear, lineWidth: 1.5))
         .clipShape(RoundedRectangle(cornerRadius: 18))
+    }
+
+    /// Route choices as large cards with arrival time, traffic bar, toll and Go.
+    var routeList: some View {
+        ScrollView {
+            VStack(spacing: 10) {
+                ForEach(Array(model.routes.enumerated()), id: \.offset) { index, route in
+                    RouteListCard(route: route, selected: index == model.selected, strings: strings, indigo: indigo,
+                                  onSelect: { model.selected = index },
+                                  onGo: {
+                                      if let place = model.destination {
+                                          model.selected = index
+                                          drive.start(route: route, to: place, simulated: false)
+                                      }
+                                  })
+                }
+            }
+            .padding(.vertical, 4)
+        }
     }
 
     // MARK: Leave later
