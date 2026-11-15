@@ -44,6 +44,18 @@ class DriveSnapshot(
     val bearingDeg: Double,
     val lanes: List<LaneArrow>,
     val routeShape: List<GeoPoint>,
+    /** Hints on the route ahead (text in the guidance language), or null. Distances in metres, -1 when none. */
+    val cameraLabel: String?,
+    val cameraAheadM: Double,
+    val schoolLabel: String?,
+    val schoolAheadM: Double,
+    val reportLabel: String?,
+    val reportColorHex: String?,
+    val reportAheadM: Double,
+    /** Extra minutes from live traffic on the route ahead (0 when none or unknown). */
+    val trafficDelayMinutes: Int,
+    /** A faster route around heavy traffic: minutes it saves, or 0 when none is offered. */
+    val fasterRouteSavesMinutes: Int,
 )
 
 /**
@@ -51,7 +63,9 @@ class DriveSnapshot(
  * ([NavigationSession], the same one Android uses), feeds it GPS fixes, and reports state and
  * the sentences to speak. Call everything from the main thread.
  */
-class DriveController(private val routingUrl: String) {
+class DriveController(var routingUrl: String) {
+    /** The RoadPulse server for cameras, schools, reports and traffic; empty for none. */
+    var backendUrl: String = ""
     /** Language of the instructions on screen and spoken. */
     var language: GuidanceLanguage = GuidanceLanguage.EN
     private var simulated = false
@@ -64,7 +78,7 @@ class DriveController(private val routingUrl: String) {
     private val platform = object : DrivePlatform {
         override fun narrator(): Narrator = narratorFor(language)
         override fun routingUrl(): String = this@DriveController.routingUrl
-        override fun backendUrl(): String = ""
+        override fun backendUrl(): String = this@DriveController.backendUrl
         override fun routeOptions() = RouteOptions()
         override fun isSimulated(): Boolean = simulated
     }
@@ -131,6 +145,10 @@ class DriveController(private val routingUrl: String) {
         NavigationSession.stop()
     }
 
+    /** The driver took the offered faster route, or kept the current one. */
+    fun takeFasterRoute() = NavigationSession.acceptFasterRoute()
+    fun keepRoute() = NavigationSession.declineFasterRoute()
+
     /** A GPS fix from the phone. Pass -1 for values the phone does not report. Ignored while simulating. */
     fun onLocation(lat: Double, lon: Double, accuracyM: Double, bearingDeg: Double, speedMps: Double) {
         if (simulated) return
@@ -179,6 +197,15 @@ class DriveController(private val routingUrl: String) {
                 s.lanes.map { LaneArrow(TurnIcon.forLane(it.arrow).name, it.recommended, it.usable) }
             } else emptyList(),
             routeShape = s.route.shape,
+            cameraLabel = s.cameraAhead?.let { c -> n.speedCamera + (c.maxSpeedKph?.let { " $it" } ?: "") },
+            cameraAheadM = s.cameraAhead?.metersAhead ?: -1.0,
+            schoolLabel = s.schoolAhead?.let { n.schoolZone },
+            schoolAheadM = s.schoolAhead?.metersAhead ?: -1.0,
+            reportLabel = s.reportAhead?.let { n.reportName(it.report.type) },
+            reportColorHex = s.reportAhead?.report?.type?.colorHex,
+            reportAheadM = s.reportAhead?.metersAhead ?: -1.0,
+            trafficDelayMinutes = mathRound(s.trafficDelaySeconds / 60).toInt(),
+            fasterRouteSavesMinutes = s.fasterRoute?.let { mathRound(it.savedSeconds / 60).toInt() } ?: 0,
         )
     }
 }

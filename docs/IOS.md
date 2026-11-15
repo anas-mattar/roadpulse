@@ -1,8 +1,10 @@
 # RoadPulse on iPhone
 
-Status (15 November 2026): **step 4 of the iPhone app**: map, search, route choices, and turn-by-turn
-navigation with voice (plus a simulated drive). Steps 1-3 built green on GitHub; the app has not
-been run on a phone yet.
+Status (15 November 2026): **step 5 of the iPhone app**: map, search, route choices, turn-by-turn
+navigation with voice (plus a simulated drive), and, with the laptop's servers over Wi-Fi: reports
+(send, see, vote), places by category with opening hours, toll prices, traffic colours, camera,
+school and report alerts while driving, and the faster-route offer. Steps 1-4 built green on
+GitHub; the app has not been run on a phone yet.
 
 ## How the two apps share code
 
@@ -34,10 +36,24 @@ Developer Program (USD 99 per year) removes these limits and allows TestFlight.
 
 ## Reaching the laptop's servers from an iPhone
 
-The Android USB trick (`connect-phone.bat`) does not exist for iPhone. The iPhone must reach the
-laptop over Wi-Fi (same network, the laptop's address such as `http://192.168.1.20:8080`, and
-Windows Firewall allowing ports 8002, 8080 and 8090 on the private network), or the servers must
-be online. This is a change from "nothing opened to Wi-Fi" and will be an explicit setting.
+The Android USB trick (`connect-phone.bat`) does not exist for iPhone, so the iPhone uses Wi-Fi.
+Without this, the iPhone app uses public routing and search only (no reports, places, tolls or
+traffic).
+
+1. Laptop and iPhone on the same Wi-Fi, set to **Private** in Windows.
+2. Start the servers as usual (`docker compose up -d` in `backend`).
+3. Once, in PowerShell as administrator:
+   `powershell -ExecutionPolicy Bypass -File backend\open-iphone-access.ps1`.
+   It opens ports 8002, 8080 and 8090 for private networks only and prints the laptop address.
+   `-Remove` closes them again.
+4. iPhone app > Settings (gear) > **Use my laptop's server**, type the address (e.g. `192.168.1.20`),
+   then **Test connection**. iOS asks once to allow "local network": tap Allow.
+5. Optional **Maps from my laptop**: start the tile server open to Wi-Fi with
+   `$env:TILES_BIND="0.0.0.0"; docker compose --profile maps up -d` (otherwise it stays on
+   `127.0.0.1`).
+
+The connection is plain HTTP inside your home network (allowed only for local addresses). Anyone
+on the same Wi-Fi could reach these ports; use `-Remove` on networks you do not trust.
 
 ## Plan (each step ends with a green build and something to try)
 
@@ -49,7 +65,10 @@ be online. This is a change from "nothing opened to Wi-Fi" and will be an explic
 3. **Done in code:** map, search and route preview (MapLibre, CoreLocation); the drive session is
    in `shared` and both apps use it; iPhone turn-by-turn with voice, lanes, speed, rerouting,
    background location, and a simulated drive (play button).
-4. iPhone: reports, places, tolls, lanes, schools, cameras, traffic layer.
-5. iPhone: settings, Arabic layout, saved places, planned drives, profile, share, privacy.
-6. Not possible the same way on iPhone: music controls for other apps (iOS only allows Apple
+4. **Done in code:** lanes and the drive screen on iPhone.
+5. **Done in code:** laptop server over Wi-Fi (setting + firewall script); reports (send, vote,
+   map pins), places by category, tolls on route cards, traffic layer, camera/school/report
+   alerts, traffic delay and faster route.
+6. iPhone: saved places, planned drives, profile, share, privacy, report details, "still there?" while driving.
+7. Not possible the same way on iPhone: music controls for other apps (iOS only allows Apple
    Music control), and background limits differ. These will be adapted, not copied.

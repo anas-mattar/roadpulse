@@ -34,6 +34,10 @@ targets:
         NSLocationWhenInUseUsageDescription: RoadPulse shows where you are on the map, plans routes from your position and guides you while you drive.
         # Keep guiding (position and voice) when the screen is off or another app is in front.
         UIBackgroundModes: [location, audio]
+        # The laptop's servers are plain HTTP on the home network (Settings > Use my laptop's server).
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
+        NSLocalNetworkUsageDescription: RoadPulse connects to the RoadPulse server on your laptop over your Wi-Fi.
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.roadpulse.app

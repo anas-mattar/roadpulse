@@ -18,55 +18,7 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.IOException
-import java.time.OffsetDateTime
 import java.util.UUID
-
-/** Report as sent by the backend (REST and live updates). */
-@Serializable
-data class ReportDto(
-    val id: String,
-    val type: ReportType,
-    val lat: Double,
-    val lon: Double,
-    val headingDeg: Int? = null,
-    val createdAt: String,
-    val expiresAt: String,
-    val confirmations: Int = 0,
-    val dismissals: Int = 0,
-    val subtype: String? = null,
-) {
-    fun toReport() = Report(
-        id = id,
-        type = type,
-        location = GeoPoint(lat, lon),
-        createdAtMillis = OffsetDateTime.parse(createdAt).toInstant().toEpochMilli(),
-        confirmations = confirmations,
-        dismissals = dismissals,
-        subtype = subtype,
-        expiresAtMillis = OffsetDateTime.parse(expiresAt).toInstant().toEpochMilli(),
-    )
-}
-
-@Serializable
-private data class CreateReportBody(
-    val type: ReportType,
-    val lat: Double,
-    val lon: Double,
-    val subtype: String? = null,
-    val durationMinutes: Int? = null,
-)
-
-@Serializable
-private data class CreateReportResult(val report: ReportDto, val merged: Boolean)
-
-@Serializable
-private data class Registration(val deviceId: String, val token: String)
-
-@Serializable
-private data class VoteBody(val stillThere: Boolean)
-
-@Serializable
-private data class FlagBody(val reason: FlagReason)
 
 /** Thrown when the server refuses an action with a message worth showing (for example 409). */
 class ReportRejectedException(message: String) : Exception(message)

@@ -1,6 +1,5 @@
 package com.roadpulse.app.data
 
-import java.util.Locale
 import kotlin.math.max
 import kotlin.math.min
 
@@ -32,7 +31,7 @@ data class MapArea(val minLon: Double, val minLat: Double, val maxLon: Double, v
     private fun withinWorld() = MapArea(max(minLon, -180.0), max(minLat, -90.0), min(maxLon, 180.0), min(maxLat, 90.0))
 
     /** "minLon,minLat,maxLon,maxLat" for GET /v1/reports. */
-    fun bboxParam(): String = String.format(Locale.ROOT, "%.6f,%.6f,%.6f,%.6f", minLon, minLat, maxLon, maxLat)
+    fun bboxParam(): String = listOf(minLon, minLat, maxLon, maxLat).joinToString(",") { sixDecimals(it) }
 
     companion object {
         /** Server limit is 0.5° per side; stay a little under it. */
@@ -45,4 +44,12 @@ data class MapArea(val minLon: Double, val minLat: Double, val maxLon: Double, v
         fun needsNewSubscription(current: MapArea?, visible: MapArea): Boolean =
             current == null || !current.contains(visible.clampedTo(MAX_DEGREES))
     }
+}
+
+/** "101.686900": six decimals with a dot. */
+internal fun sixDecimals(x: Double): String {
+    val micro = com.roadpulse.app.util.mathRound(x * 1_000_000)
+    val sign = if (micro < 0) "-" else ""
+    val abs = if (micro < 0) -micro else micro
+    return "$sign${abs / 1_000_000}.${(abs % 1_000_000).toString().padStart(6, '0')}"
 }

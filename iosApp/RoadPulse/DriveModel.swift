@@ -15,7 +15,7 @@ final class DriveModel: ObservableObject {
         }
     }
 
-    private let controller = DriveController(routingUrl: "https://valhalla1.openstreetmap.de")
+    private let controller = DriveController(routingUrl: AppConfig.publicRouting)
     private let speech = Speech()
     private var voiceTag = "en-US"
 
@@ -32,6 +32,15 @@ final class DriveModel: ObservableObject {
             onArrived: {}
         )
     }
+
+    /// Servers for rerouting, and for cameras, schools, reports and traffic (empty: none).
+    func configure(routingUrl: String, backendUrl: String) {
+        controller.routingUrl = routingUrl
+        controller.backendUrl = backendUrl
+    }
+
+    func takeFasterRoute() { controller.takeFasterRoute() }
+    func keepRoute() { controller.keepRoute() }
 
     /// Instructions follow the app language when the phone has a voice for it; otherwise English
     /// (spoken text and voice must match).

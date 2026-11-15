@@ -67,5 +67,7 @@ services:
     volumes:
       - ./maps:/data:ro
     ports:
-      - "127.0.0.1:8090:8080" # this computer only; the emulator reaches it as 10.0.2.2:8090
+      # This computer only by default (the emulator reaches it as 10.0.2.2:8090). For "Maps from my
+      # laptop" on an iPhone, start with TILES_BIND=0.0.0.0 (see docs/IOS.md).
+      - "${TILES_BIND:-127.0.0.1}:8090:8080"
 
