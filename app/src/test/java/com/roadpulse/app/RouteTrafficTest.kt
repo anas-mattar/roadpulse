@@ -57,3 +57,37 @@ class SearchRankingTest {
         assertEquals(fromService, com.roadpulse.app.data.GeocodingClient.rankByDistance(fromService, null))
     }
 }
+
+/** Overture categories turned into clear kinds, wrong ones corrected or hidden, duplicates merged. */
+class OvertureCategoriesTest {
+    private fun kind(category: String?, name: String) = com.roadpulse.app.data.OvertureCategories.kind(category, name)
+
+    @Test
+    fun categoriesBecomeShortKinds() {
+        assertEquals(com.roadpulse.app.data.CommunityPlaceKind.MALL, kind("shopping_mall", "M-City Jalan Ampang"))
+        assertEquals(com.roadpulse.app.data.CommunityPlaceKind.CLINIC, kind("dental_clinic", "Klinik Gigi"))
+        assertEquals(com.roadpulse.app.data.CommunityPlaceKind.FUEL, kind("fueling_station", "Petronas Ampang"))
+        assertEquals(com.roadpulse.app.data.CommunityPlaceKind.HOTEL, kind("holiday_rental_home", "M City @ Jalan Ampang"))
+    }
+
+    @Test
+    fun wrongOrMissingCategoriesUseTheNameOrShowNothing() {
+        // Overture says "historic site" for a condo: the name says residence.
+        assertEquals(com.roadpulse.app.data.CommunityPlaceKind.RESIDENCE, kind("historic_site", "M City SOHO Residence"))
+        assertEquals(com.roadpulse.app.data.CommunityPlaceKind.CLINIC, kind(null, "M City Dental Clinic (Veneer, Bridge)"))
+        assertEquals(com.roadpulse.app.data.CommunityPlaceKind.OFFICE, kind(null, "Starza Corporation Sdn Bhd"))
+        // Nothing to go on: no kind rather than a wrong one.
+        assertEquals(null, kind("historic_site", "M city"))
+        assertEquals(null, kind("some_unknown_thing", "Lobby 2"))
+    }
+
+    @Test
+    fun theSamePlaceFromTwoSourcesIsShownOnce() {
+        fun p(name: String, lat: Double, lon: Double) = com.roadpulse.app.data.Place(name, "", GeoPoint(lat, lon))
+        val s = com.roadpulse.app.data.PlaceSearch
+        assertTrue(s.sameSpot(p("M-City", 3.1590, 101.7472), p("m city", 3.1595, 101.7472)))          // ~55 m, same name
+        assertTrue(s.sameSpot(p("Crowne Plaza KL City Centre", 3.163, 101.7138), p("Crowne Plaza KL City Centre, an IHG Hotel", 3.1631, 101.7138)))
+        assertTrue(!s.sameSpot(p("M City", 3.159, 101.7472), p("M City", 3.17, 101.7472)))             // 1.2 km apart
+        assertTrue(!s.sameSpot(p("Klinik A", 3.159, 101.7472), p("Klinik B", 3.159, 101.7472)))         // different places
+    }
+}

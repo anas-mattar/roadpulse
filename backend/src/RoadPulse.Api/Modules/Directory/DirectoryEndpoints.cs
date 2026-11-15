@@ -21,6 +21,7 @@ public static class DirectoryEndpoints
 {
     private static readonly GeometryFactory Geo = NtsGeometryServices.Instance.CreateGeometryFactory(srid: 4326);
     public const double SearchRadiusM = 100_000;
+    public const float LowConfidence = 0.5f;
 
     public static RouteGroupBuilder MapDirectoryEndpoints(this RouteGroupBuilder v1)
     {
@@ -42,10 +43,13 @@ public static class DirectoryEndpoints
         if (errors.Count > 0) return TypedResults.ValidationProblem(errors);
 
         var here = Geo.CreatePoint(new Coordinate(lon!.Value, lat!.Value));
+        // Names starting with the text first; then nearest, where a place Overture is unsure about
+        // (confidence under 0.5) counts as three times as far away.
         var rows = await db.DirectoryPlaces.AsNoTracking()
             .Where(p => p.SearchKey.Contains(key) && p.Location.IsWithinDistance(here, SearchRadiusM))
             .Select(p => new { Place = p, Starts = p.SearchKey.StartsWith(key), Distance = p.Location.Distance(here) })
-            .OrderByDescending(x => x.Starts).ThenBy(x => x.Distance)
+            .OrderByDescending(x => x.Starts)
+            .ThenBy(x => x.Place.Confidence < LowConfidence ? x.Distance * 3 : x.Distance)
             .Take(take)
             .ToListAsync();
         return TypedResults.Ok(rows.Select(x => new DirectoryPlaceDto(
@@ -78,8 +82,61 @@ public static class DirectoryImporter
         };
     }
 
+    /// <summary>
+    /// Removes duplicates: the same name (ignoring spaces, dashes, case) within 150 m, or one name
+    /// that starts with the other within 40 m ("Crowne Plaza KL" / "Crowne Plaza KL, an IHG Hotel").
+    /// The most confident record is kept; it takes a category from a duplicate if it has none.
+    /// </summary>
+    public static List<Row> Dedupe(IEnumerable<Row> rows)
+    {
+        const double cell = 0.002; // about 220 m
+        var kept = new List<(Row Row, string Key)>();
+        var grid = new Dictionary<(int, int), List<int>>();
+        foreach (var r in rows.OrderByDescending(r => r.Confidence ?? 0f))
+        {
+            var key = CommunityPlaceEndpoints.Key(r.Name);
+            var cx = (int)Math.Floor(r.Lon / cell);
+            var cy = (int)Math.Floor(r.Lat / cell);
+            var duplicateOf = -1;
+            for (var dx = -1; dx <= 1 && duplicateOf < 0; dx++)
+                for (var dy = -1; dy <= 1 && duplicateOf < 0; dy++)
+                    if (grid.TryGetValue((cx + dx, cy + dy), out var near))
+                        foreach (var i in near)
+                        {
+                            var (k, kKey) = kept[i];
+                            var m = Metres(r.Lat, r.Lon, k.Lat, k.Lon);
+                            var same = kKey == key && m <= 150;
+                            var prefix = m <= 40 && Math.Min(kKey.Length, key.Length) >= 6 && (kKey.StartsWith(key) || key.StartsWith(kKey));
+                            if (same || prefix) { duplicateOf = i; break; }
+                        }
+            if (duplicateOf >= 0)
+            {
+                if (kept[duplicateOf].Row.Category is null && r.Category is not null)
+                    kept[duplicateOf] = (kept[duplicateOf].Row with { Category = r.Category }, kept[duplicateOf].Key);
+                continue;
+            }
+            kept.Add((r, key));
+            if (!grid.TryGetValue((cx, cy), out var list)) grid[(cx, cy)] = list = [];
+            list.Add(kept.Count - 1);
+        }
+        return kept.Select(k => k.Row).ToList();
+    }
+
+    private static double Metres(double lat1, double lon1, double lat2, double lon2)
+    {
+        var k = Math.Cos(lat1 * Math.PI / 180);
+        var dx = (lon2 - lon1) * k * 111_320;
+        var dy = (lat2 - lat1) * 110_540;
+        return Math.Sqrt(dx * dx + dy * dy);
+    }
+
     public static async Task<int> ImportAsync(RoadPulseDb db, string path, ILogger log, CancellationToken ct = default)
     {
+        var seenIds = new HashSet<string>();
+        var parsed = File.ReadLines(path).Select(Parse).Where(r => r is not null && seenIds.Add(r.Id)).Select(r => r!).ToList();
+        var rows = Dedupe(parsed);
+        log.LogInformation("Read {Read} places, {Kept} after removing duplicates", parsed.Count, rows.Count);
+
         await db.Database.OpenConnectionAsync(ct);
         var conn = (NpgsqlConnection)db.Database.GetDbConnection();
         await using var tx = await conn.BeginTransactionAsync(ct);
@@ -89,14 +146,11 @@ public static class DirectoryImporter
             await cmd.ExecuteNonQueryAsync(ct);
 
         var count = 0;
-        var seen = new HashSet<string>();
         await using (var copy = await conn.BeginBinaryImportAsync(
             "COPY overture_import (id, name, category, address, search_key, lat, lon, confidence) FROM STDIN (FORMAT BINARY)", ct))
         {
-            foreach (var line in File.ReadLines(path))
+            foreach (var r in rows)
             {
-                var r = Parse(line);
-                if (r is null || !seen.Add(r.Id)) continue;
                 await copy.StartRowAsync(ct);
                 await copy.WriteAsync(r.Id, NpgsqlDbType.Text, ct);
                 await copy.WriteAsync(r.Name, NpgsqlDbType.Text, ct);
@@ -107,7 +161,7 @@ public static class DirectoryImporter
                 await copy.WriteAsync(r.Lat, NpgsqlDbType.Double, ct);
                 await copy.WriteAsync(r.Lon, NpgsqlDbType.Double, ct);
                 if (r.Confidence is { } c) await copy.WriteAsync(c, NpgsqlDbType.Real, ct); else await copy.WriteNullAsync(ct);
-                if (++count % 100_000 == 0) log.LogInformation("Read {Count} places", count);
+                count++;
             }
             await copy.CompleteAsync(ct);
         }

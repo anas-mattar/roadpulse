@@ -38,7 +38,7 @@ components. "RoadPulse" is a placeholder name; check trademark availability befo
   driving, pull up the trip card for the route with traffic, other routes, share and stop
 - Driving map: traffic colours on the route line, the next turn and its road name on the map,
   compass top left
-- Search also covers about 880,000 shops, clinics, offices and condos from Overture Maps (open
+- Search also covers about 1.1 million shops, clinics, offices and condos from Overture Maps (open
   data, loaded on the laptop with `backend/setup-overture-places.ps1`, refreshed monthly by the map
   update); nearby results first with the distance on each; "Add a missing place" (press and hold the
   map) for shops, clinics, entrances… search does not know: the driver finds it at once, everyone

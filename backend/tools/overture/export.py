@@ -33,7 +33,8 @@ def main() -> None:
     p.add_argument("out")
     p.add_argument("--release")
     p.add_argument("--bbox", default=DEFAULT_BBOX)
-    p.add_argument("--min-confidence", type=float, default=0.5)
+    # Low-confidence places are kept (some real shops have 0.3) but ranked lower by the search.
+    p.add_argument("--min-confidence", type=float, default=0.25)
     a = p.parse_args()
     release = a.release or latest_release()
     w, s, e, n = (float(x) for x in a.bbox.split(","))

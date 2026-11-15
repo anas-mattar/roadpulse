@@ -125,3 +125,33 @@ public class DirectoryPlacesTests
         Assert.Equal(HttpStatusCode.BadRequest, (await c.GetAsync("/v1/places/search?q=m&lat=3.16&lon=101.72")).StatusCode);
     }
 }
+
+public class DirectoryDedupeTests
+{
+    private static RoadPulse.Api.Modules.Directory.DirectoryImporter.Row R(string id, string name, double lat, double lon, float conf, string? cat = null) =>
+        new(id, name, cat, null, lat, lon, conf);
+
+    [Fact]
+    public void SameNameNearbyOrNameWithASuffixIsKeptOnceTheMostConfident()
+    {
+        var rows = RoadPulse.Api.Modules.Directory.DirectoryImporter.Dedupe([
+            R("1", "M-City Jalan Ampang", 3.1593, 101.7472, 0.6f),
+            R("2", "m city jalan ampang", 3.1596, 101.7473, 0.9f, "shopping_mall"),   // same name, ~35 m: duplicate
+            R("3", "Crowne Plaza Kuala Lumpur City Centre", 3.16309, 101.71386, 0.8f, "hotel"),
+            R("4", "Crowne Plaza Kuala Lumpur City Centre, an IHG Hotel", 3.16309, 101.71386, 0.7f),
+            R("5", "M-City Jalan Ampang", 3.20, 101.7472, 0.5f),                       // same name 4.5 km away: another place
+            R("6", "Klinik A", 3.1593, 101.7472, 0.5f),
+        ]);
+        Assert.Equal(["2", "3", "5", "6"], rows.Select(r => r.Id).Order().ToList());
+    }
+
+    [Fact]
+    public void TheKeptRecordTakesACategoryFromItsDuplicate()
+    {
+        var rows = RoadPulse.Api.Modules.Directory.DirectoryImporter.Dedupe([
+            R("1", "Sky Gym", 3.1, 101.7, 0.9f),
+            R("2", "Sky Gym", 3.1, 101.7, 0.4f, "gym"),
+        ]);
+        Assert.Equal("gym", Assert.Single(rows).Category);
+    }
+}

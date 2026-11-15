@@ -116,7 +116,10 @@ public class DirectoryPlace
 }
 
 /// <summary>What kind of place a driver added (shown as an icon and in search).</summary>
-public enum CommunityPlaceKind { SHOP, FOOD, CAFE, CLINIC, OFFICE, HOTEL, RESIDENCE, BUILDING, ENTRANCE, PARKING, OTHER }
+public enum CommunityPlaceKind
+{
+    SHOP, MALL, FOOD, CAFE, CLINIC, HOSPITAL, OFFICE, HOTEL, RESIDENCE, BUILDING, ENTRANCE, PARKING, FUEL, SCHOOL, WORSHIP, BANK, GYM, OTHER,
+}
 
 /// <summary>Pending: only its creator sees it. Approved: in everyone's search. Rejected: hidden.</summary>
 public enum CommunityPlaceStatus { Pending, Approved, Rejected }

@@ -136,8 +136,9 @@
       actions);
   }
 
-  const KINDS = { SHOP: "Shop", FOOD: "Food", CAFE: "Cafe", CLINIC: "Clinic", OFFICE: "Office", HOTEL: "Hotel",
-    RESIDENCE: "Residence", BUILDING: "Building", ENTRANCE: "Entrance", PARKING: "Parking", OTHER: "Other" };
+  const KINDS = { SHOP: "Shop", MALL: "Shopping mall", FOOD: "Food", CAFE: "Cafe", CLINIC: "Clinic", HOSPITAL: "Hospital",
+    OFFICE: "Office", HOTEL: "Hotel", RESIDENCE: "Residence", BUILDING: "Building", ENTRANCE: "Entrance", PARKING: "Parking",
+    FUEL: "Petrol station", SCHOOL: "School", WORSHIP: "Place of worship", BANK: "Bank", GYM: "Gym", OTHER: "Other" };
 
   function placeItem(item) {
     const p = item.place;

@@ -121,9 +121,9 @@ class IosApiTest {
         // Drivers' place, then Overture places, then OpenStreetMap; "M City" from both sources once; the USA last.
         assertEquals(listOf("M City Lobby 2", "M City Dental Clinic", "M City", "MCITy"), hits.map { it.name })
         assertEquals("Entrance · Added by drivers · Side gate", hits[0].detail)
-        assertEquals("Dental clinic · Jalan Ampang", hits[1].detail)
+        assertEquals("Clinic · Jalan Ampang", hits[1].detail)
         assertTrue(api.addPlace("Klinik Sara", "CLINIC", 3.1, 101.6, ""))
-        assertEquals("CLINIC", api.placeKinds(GuidanceLanguage.EN)[3][0])
+        assertTrue(api.placeKinds(GuidanceLanguage.EN).any { it == listOf("CLINIC", "Clinic") })
         s.shutdown()
     }
 
