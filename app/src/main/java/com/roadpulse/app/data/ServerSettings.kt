@@ -105,9 +105,3 @@ object ServerSettings {
     private const val KEY_MAPS = "use_local_maps"
     private const val KEY_LINK = "laptop_link"
 }
-
-/** Keeps the anonymous device token (ADR 0006). It identifies the install, not the person. */
-interface DeviceTokenStore {
-    fun load(): String?
-    fun save(token: String?)
-}

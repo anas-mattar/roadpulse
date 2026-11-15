@@ -1,0 +1,40 @@
+# Builds the iPhone app on GitHub's Mac machines and saves an unsigned .ipa file.
+# To use it: copy this file to .github/workflows/ios-build.yml and push.
+# Then on GitHub: Actions > "iOS build" > Run workflow; download "RoadPulse-unsigned-ipa" when it is green.
+name: iOS build
+on:
+  workflow_dispatch:
+  push:
+    paths: ["iosApp/**", "shared/**", "ci/ios-build.yml", ".github/workflows/ios-build.yml"]
+
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Install XcodeGen
+        run: brew install xcodegen
+      - name: Test the shared logic compiles for iPhone
+        run: ./gradlew :shared:compileKotlinIosArm64
+      - name: Generate the Xcode project
+        run: cd iosApp && xcodegen generate
+      - name: Build (unsigned)
+        run: |
+          xcodebuild -project iosApp/RoadPulse.xcodeproj -scheme RoadPulse -configuration Release \
+            -sdk iphoneos -derivedDataPath build/ios \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" build
+      - name: Package the .ipa
+        run: |
+          mkdir -p build/ipa/Payload
+          cp -R build/ios/Build/Products/Release-iphoneos/RoadPulse.app build/ipa/Payload/
+          cd build/ipa && zip -qr RoadPulse-unsigned.ipa Payload
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RoadPulse-unsigned-ipa
+          path: build/ipa/RoadPulse-unsigned.ipa

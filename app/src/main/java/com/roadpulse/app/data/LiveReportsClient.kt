@@ -30,7 +30,7 @@ import kotlin.concurrent.fixedRateTimer
 class LiveReportsClient(
     private val baseUrl: String,
     private val listener: Listener,
-    private val client: OkHttpClient = Http.client.newBuilder().callTimeout(0, java.util.concurrent.TimeUnit.SECONDS).build(),
+    private val client: OkHttpClient = OkHttpTransport.client.newBuilder().callTimeout(0, java.util.concurrent.TimeUnit.SECONDS).build(),
 ) {
     interface Listener {
         /** Handshake done: subscribe and (re)load the list now. */
@@ -49,7 +49,7 @@ class LiveReportsClient(
 
     /** Negotiates and opens the WebSocket. Blocking (call from a background thread). */
     fun connect() {
-        val negotiateBody = Http.client.newCall(
+        val negotiateBody = OkHttpTransport.client.newCall(
             Request.Builder().url("$baseUrl$HUB_PATH/negotiate?negotiateVersion=1").post(ByteArray(0).toRequestBody()).build()
         ).execute().use { r ->
             if (!r.isSuccessful) throw java.io.IOException("Negotiate failed: HTTP ${r.code}")

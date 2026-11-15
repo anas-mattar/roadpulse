@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.roadpulse.app.BuildConfig
+import com.roadpulse.app.data.toPlace
 import com.roadpulse.app.data.GeoPoint
 import com.roadpulse.app.data.GeocodingClient
 import com.roadpulse.app.data.BackendReportRepository

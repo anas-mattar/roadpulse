@@ -4,6 +4,8 @@ import com.roadpulse.app.data.GeoPoint
 import com.roadpulse.app.data.Lane
 import com.roadpulse.app.data.OpenStatus
 import com.roadpulse.app.data.OpeningHours
+import com.roadpulse.app.data.status
+import com.roadpulse.app.data.toPlace
 import com.roadpulse.app.data.RoutingClient
 import com.roadpulse.app.nav.RouteGeometry
 import com.roadpulse.app.nav.SchoolAhead
@@ -81,21 +83,21 @@ class LanesAndSchoolsTest {
         assertEquals(OpenStatus.AlwaysOpen, OpeningHours.status("24/7", at(3)))
         assertEquals(OpenStatus.AlwaysOpen, OpeningHours.status("Mo-Su 00:00-24:00", at(3)))
         val office = "Mo-Fr 08:00-18:00; Sa 09:00-13:00; Su off"
-        assertEquals(OpenStatus.Open(java.time.LocalTime.of(18, 0)), OpeningHours.status(office, at(10)))         // Friday
-        assertEquals(OpenStatus.Closed(java.time.LocalTime.of(9, 0)), OpeningHours.status(office, at(19)))        // Fri evening → Sat 9:00
+        assertEquals(OpenStatus.Open(com.roadpulse.app.data.ClockTime(18, 0)), OpeningHours.status(office, at(10)))         // Friday
+        assertEquals(OpenStatus.Closed(com.roadpulse.app.data.ClockTime(9, 0)), OpeningHours.status(office, at(19)))        // Fri evening → Sat 9:00
         assertEquals(OpenStatus.Closed(null), OpeningHours.status(office, at(14, day = 14)))                       // Sat afternoon → Mon
-        assertEquals(OpenStatus.Closed(java.time.LocalTime.of(8, 0)), OpeningHours.status(office, at(6)))
+        assertEquals(OpenStatus.Closed(com.roadpulse.app.data.ClockTime(8, 0)), OpeningHours.status(office, at(6)))
         // Overnight: open at 01:00 on Saturday from Friday's period.
         val mamak = "Mo-Su 18:00-03:00"
-        assertEquals(OpenStatus.Open(java.time.LocalTime.of(3, 0)), OpeningHours.status(mamak, at(1, day = 14)))
-        assertEquals(OpenStatus.Closed(java.time.LocalTime.of(18, 0)), OpeningHours.status(mamak, at(12)))
+        assertEquals(OpenStatus.Open(com.roadpulse.app.data.ClockTime(3, 0)), OpeningHours.status(mamak, at(1, day = 14)))
+        assertEquals(OpenStatus.Closed(com.roadpulse.app.data.ClockTime(18, 0)), OpeningHours.status(mamak, at(12)))
         // Split hours and lists.
         val lunch = "Mo,We,Fr 11:00-14:00, 18:00-22:00"
-        assertEquals(OpenStatus.Open(java.time.LocalTime.of(22, 0)), OpeningHours.status(lunch, at(20)))
-        assertEquals(OpenStatus.Closed(java.time.LocalTime.of(18, 0)), OpeningHours.status(lunch, at(15)))
+        assertEquals(OpenStatus.Open(com.roadpulse.app.data.ClockTime(22, 0)), OpeningHours.status(lunch, at(20)))
+        assertEquals(OpenStatus.Closed(com.roadpulse.app.data.ClockTime(18, 0)), OpeningHours.status(lunch, at(15)))
         // Times without days apply every day; a later rule replaces an earlier one.
-        assertEquals(OpenStatus.Open(java.time.LocalTime.of(22, 0)), OpeningHours.status("08:00-22:00", at(9, day = 15)))
-        assertEquals(OpenStatus.Closed(java.time.LocalTime.of(8, 0)), OpeningHours.status("Mo-Su 08:00-22:00; Fr off", at(9))) // Friday off → Sat 08:00
+        assertEquals(OpenStatus.Open(com.roadpulse.app.data.ClockTime(22, 0)), OpeningHours.status("08:00-22:00", at(9, day = 15)))
+        assertEquals(OpenStatus.Closed(com.roadpulse.app.data.ClockTime(8, 0)), OpeningHours.status("Mo-Su 08:00-22:00; Fr off", at(9))) // Friday off → Sat 08:00
         // Not understood: nothing shown.
         assertNull(OpeningHours.status("Jan-Mar Mo-Fr 08:00-17:00", at(9)))
         assertNull(OpeningHours.status("sunrise-sunset", at(9)))

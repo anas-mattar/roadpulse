@@ -87,3 +87,6 @@ object VoiceProbe {
         }
     }
 }
+
+/** The Java locale of a guidance language (for the text-to-speech engine). */
+val GuidanceLanguage.locale: Locale get() = Locale.forLanguageTag(localeTag)

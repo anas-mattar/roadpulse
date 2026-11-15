@@ -221,7 +221,7 @@ class BackendReportRepository(
 
     private suspend fun reload(area: MapArea) {
         val list = runCatching {
-            val text = Http.execute(Request.Builder().url("$baseUrl/v1/reports?bbox=${area.bboxParam()}").build())
+            val text = Http.execute("$baseUrl/v1/reports?bbox=${area.bboxParam()}")
             Http.json.decodeFromString(kotlinx.serialization.builtins.ListSerializer(ReportDto.serializer()), text)
         }.onFailure { log("Loading reports failed: ${it::class.simpleName} ${it.message}") }
             .getOrNull() ?: return // offline: keep what we have
@@ -287,7 +287,7 @@ class BackendReportRepository(
                 idempotencyKey?.let { header("Idempotency-Key", it) }
             }
             .build()
-        Http.client.newCall(request).execute().use { r ->
+        OkHttpTransport.client.newCall(request).execute().use { r ->
             val text = r.body?.string().orEmpty()
             when {
                 r.isSuccessful -> text

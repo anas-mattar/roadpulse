@@ -27,3 +27,7 @@ backend/maps/styles/sprites/
 backend/maps/places.geojsonseq
 backend/maps/places-filtered.osm.pbf
 backend/logs/
+
+# iPhone app: the Xcode project is generated from iosApp/project.yml
+iosApp/RoadPulse.xcodeproj/
+shared/build/

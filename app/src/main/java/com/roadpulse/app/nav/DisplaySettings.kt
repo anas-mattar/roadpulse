@@ -6,19 +6,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
-enum class MapColors(val label: String) {
-    AUTO("Automatic (dark after sunset)"),
-    LIGHT("Always light"),
-    DARK("Always dark"),
-}
-
-/** When the speed limit sign is shown while driving. */
-enum class LimitDisplay(val label: String) {
-    ALWAYS("Always"),
-    WHEN_SPEEDING("Only when speeding"),
-    NEVER("Never"),
-}
-
 /** Map appearance and driving-display preferences, kept across restarts. */
 object DisplaySettings {
     private var prefs: SharedPreferences? = null
