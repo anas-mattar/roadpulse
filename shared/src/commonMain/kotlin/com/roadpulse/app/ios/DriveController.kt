@@ -1,6 +1,10 @@
 package com.roadpulse.app.ios
 
+import com.roadpulse.app.data.DeviceApi
 import com.roadpulse.app.data.Geo
+import com.roadpulse.app.data.Report
+import com.roadpulse.app.data.ReportsClient
+import com.roadpulse.app.data.TrafficClient
 import com.roadpulse.app.data.GeoPoint
 import com.roadpulse.app.data.Place
 import com.roadpulse.app.data.RouteOptions
@@ -12,9 +16,13 @@ import com.roadpulse.app.nav.NavState
 import com.roadpulse.app.nav.Narrator
 import com.roadpulse.app.nav.NavigationSession
 import com.roadpulse.app.nav.RouteMatcher
+import com.roadpulse.app.nav.ShareSession
+import com.roadpulse.app.nav.TrafficSegmenter
 import com.roadpulse.app.nav.TurnIcon
 import com.roadpulse.app.nav.narratorFor
+import com.roadpulse.app.i18n.stringsFor
 import com.roadpulse.app.util.mathRound
+import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -56,7 +64,18 @@ class DriveSnapshot(
     val trafficDelayMinutes: Int,
     /** A faster route around heavy traffic: minutes it saves, or 0 when none is offered. */
     val fasterRouteSavesMinutes: Int,
+    /** The car just passed a report: ask "Police still there?" (null when not asking). */
+    val stillThereId: String?,
+    val stillThereQuestion: String?,
+    val stillThereColorHex: String?,
+    /** The drive is shared with a live link. */
+    val sharing: Boolean,
 )
+
+/** Reports sent from this phone (no "still there?" about your own reports). */
+object OwnReports {
+    val ids = mutableSetOf<String>()
+}
 
 /**
  * Turn-by-turn navigation for the iPhone app: starts and stops the shared drive session
@@ -74,6 +93,19 @@ class DriveController(var routingUrl: String) {
     private var simulation: Job? = null
     private var lastPosition: GeoPoint? = null
     private var lastBearing = -1.0
+    private var lastState: NavState? = null
+    private var onStateCallback: ((DriveSnapshot?) -> Unit)? = null
+    private var stillThere: Report? = null
+    private var stillThereJob: Job? = null
+    private val askedAbout = mutableSetOf<String>()
+
+    /** The driver agreed to help with live traffic (anonymous road pieces, ADR 0004). Off by default. */
+    var contributeTraffic: Boolean = false
+        set(value) {
+            field = value
+            if (!value) segmenter.reset()
+        }
+    private val segmenter = TrafficSegmenter()
 
     private val platform = object : DrivePlatform {
         override fun narrator(): Narrator = narratorFor(language)
@@ -81,6 +113,15 @@ class DriveController(var routingUrl: String) {
         override fun backendUrl(): String = this@DriveController.backendUrl
         override fun routeOptions() = RouteOptions()
         override fun isSimulated(): Boolean = simulated
+        override fun trafficFix(position: GeoPoint, speedMps: Double?, timeMillis: Long, remainingM: Double) {
+            val url = backendUrl
+            if (!contributeTraffic || url.isEmpty()) return
+            val segment = segmenter.add(position, speedMps, timeMillis, remainingM) ?: return
+            // Sent once; on failure it is dropped (no queue of old positions on the phone).
+            scope.launch { runCatching { TrafficClient(url).upload(segment) } }
+        }
+        override fun driveEnded() = segmenter.reset()
+        override fun onArrived() = ShareSession.onArrived()
     }
 
     val isDriving: Boolean get() = NavigationSession.state.value != null
@@ -88,13 +129,21 @@ class DriveController(var routingUrl: String) {
     /** Reports every change of the drive, each sentence to speak, and the arrival. */
     fun observe(onState: (DriveSnapshot?) -> Unit, onSpeak: (String) -> Unit, onArrived: () -> Unit) {
         observers?.cancel()
+        onStateCallback = onState
         observers = scope.launch {
-            launch { NavigationSession.state.collect { onState(it?.let(::snapshot)) } }
+            launch {
+                NavigationSession.state.collect {
+                    lastState = it
+                    if (it == null) clearStillThere()
+                    onState(it?.let(::snapshot))
+                }
+            }
             launch {
                 NavigationSession.events.collect { e ->
                     when (e) {
                         is NavEvent.Speak -> onSpeak(e.text)
                         is NavEvent.Arrived -> onArrived()
+                        is NavEvent.PassedReport -> askStillThere(e.report)
                         else -> Unit
                     }
                 }
@@ -148,6 +197,58 @@ class DriveController(var routingUrl: String) {
     /** The driver took the offered faster route, or kept the current one. */
     fun takeFasterRoute() = NavigationSession.acceptFasterRoute()
     fun keepRoute() = NavigationSession.declineFasterRoute()
+
+    /** Answer to "still there?": true, false, or null for Skip. */
+    fun answerStillThere(stillThere: Boolean?) {
+        val report = this.stillThere ?: return
+        clearStillThere()
+        refresh()
+        val url = backendUrl
+        if (stillThere == null || url.isEmpty()) return
+        scope.launch { runCatching { ReportsClient(url, DeviceApi(url, tokenStoreFor(url))).vote(report.id, stillThere) } }
+    }
+
+    private fun askStillThere(report: Report) {
+        if (backendUrl.isEmpty() || report.id in askedAbout || report.id in OwnReports.ids) return
+        askedAbout += report.id
+        stillThere = report
+        stillThereJob?.cancel()
+        stillThereJob = scope.launch {
+            delay(STILL_THERE_SHOWN_MS)
+            if (stillThere?.id == report.id) {
+                stillThere = null
+                refresh()
+            }
+        }
+        refresh()
+    }
+
+    private fun clearStillThere() {
+        stillThere = null
+        stillThereJob?.cancel()
+    }
+
+    private fun refresh() {
+        val s = lastState ?: return
+        onStateCallback?.invoke(snapshot(s))
+    }
+
+    /**
+     * Shares the drive with a live link (needs the laptop server); returns the link. [name] is shown
+     * on the page ("Anas is on the way"), or null.
+     */
+    @Throws(Exception::class, CancellationException::class)
+    suspend fun startSharing(name: String?): String {
+        val url = backendUrl
+        val link = ShareSession.start(url, tokenStoreFor(url), name)
+        refresh()
+        return link.url
+    }
+
+    fun stopSharing() {
+        ShareSession.stop()
+        refresh()
+    }
 
     /** A GPS fix from the phone. Pass -1 for values the phone does not report. Ignored while simulating. */
     fun onLocation(lat: Double, lon: Double, accuracyM: Double, bearingDeg: Double, speedMps: Double) {
@@ -206,6 +307,14 @@ class DriveController(var routingUrl: String) {
             reportAheadM = s.reportAhead?.metersAhead ?: -1.0,
             trafficDelayMinutes = mathRound(s.trafficDelaySeconds / 60).toInt(),
             fasterRouteSavesMinutes = s.fasterRoute?.let { mathRound(it.savedSeconds / 60).toInt() } ?: 0,
+            stillThereId = stillThere?.id,
+            stillThereQuestion = stillThere?.let { stringsFor(language).stillThereQuestion(it.type) },
+            stillThereColorHex = stillThere?.type?.colorHex,
+            sharing = ShareSession.link.value != null,
         )
+    }
+
+    private companion object {
+        const val STILL_THERE_SHOWN_MS = 12_000L
     }
 }

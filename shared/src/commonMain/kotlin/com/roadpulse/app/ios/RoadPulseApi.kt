@@ -50,6 +50,14 @@ class ReportPin(
 class TrafficPolyline(val level: String, val points: List<GeoPoint>)
 
 /** A place from the RoadPulse server (fuel, parking…), described in the app language. */
+/** The driver's profile, ready to show. */
+class ProfileCard(
+    val nickname: String, val levelName: String, val points: String, val progress: Float, val toNext: String,
+    val reports: Int, val confirmed: Int, val votes: Int, val badges: List<BadgeItem>,
+)
+
+class BadgeItem(val label: String, val earned: Boolean)
+
 class PlaceResult(val name: String, val detail: String, val lat: Double, val lon: Double)
 
 /**
@@ -63,7 +71,6 @@ class RoadPulseApi(geocodingUrl: String, routingUrl: String, private val backend
     private val router = RoutingClient(routingUrl)
     private val device = backendUrl.takeIf { it.isNotEmpty() }?.let { DeviceApi(it, tokenStoreFor(it)) }
     private val reports = device?.let { ReportsClient(backendUrl, it) }
-    private val ownReportIds = mutableSetOf<String>()
 
     val hasServer: Boolean get() = backendUrl.isNotEmpty()
 
@@ -107,10 +114,11 @@ class RoadPulseApi(geocodingUrl: String, routingUrl: String, private val backend
 
     /** Sends a report at the given position. */
     @Throws(Exception::class, CancellationException::class)
-    suspend fun report(typeName: String, lat: Double, lon: Double, subtype: String?, language: GuidanceLanguage): ReportPin? {
+    /** Sends a report; [subtype] is a code from [reportDetails] or null, [durationMinutes] -1 for the usual time. */
+    suspend fun report(typeName: String, lat: Double, lon: Double, subtype: String?, durationMinutes: Int, language: GuidanceLanguage): ReportPin? {
         val client = reports ?: return null
-        val r = client.submit(ReportType.valueOf(typeName), GeoPoint(lat, lon), subtype)
-        ownReportIds += r.id
+        val r = client.submit(ReportType.valueOf(typeName), GeoPoint(lat, lon), subtype, durationMinutes.takeIf { it > 0 })
+        OwnReports.ids += r.id
         return pin(r, language)
     }
 
@@ -156,10 +164,67 @@ class RoadPulseApi(geocodingUrl: String, routingUrl: String, private val backend
         return ReportType.entries.map { listOf(it.name, s.reportType(it), it.colorHex) }
     }
 
+    /** Optional details for a report type: (code, label). Empty when the type has none. */
+    fun reportDetails(typeName: String, language: GuidanceLanguage): List<List<String>> {
+        val s = stringsFor(language)
+        val type = ReportType.valueOf(typeName)
+        return com.roadpulse.app.data.ReportDetails.subtypes[type].orEmpty().map { (code, label) -> listOf(code, s.reportDetail(type, code) ?: label) }
+    }
+
+    /** "How long?" choices for a closure: (minutes, or "" for not sure; label). */
+    fun closureDurations(language: GuidanceLanguage): List<List<String>> {
+        val s = stringsFor(language)
+        return com.roadpulse.app.data.ReportDetails.closureDurations.map { (minutes, _) -> listOf(minutes?.toString() ?: "", s.closureDuration(minutes)) }
+    }
+
+    // ------------------------------------------------------------ Profile and privacy
+
+    private val profileClient = device?.let { com.roadpulse.app.data.ProfileClient(it) }
+    private val privacyClient = device?.let { com.roadpulse.app.data.PrivacyClient(it) }
+
+    /** Points, level and badges for this phone (null without the laptop server). */
+    @Throws(Exception::class, CancellationException::class)
+    suspend fun profile(language: GuidanceLanguage): ProfileCard? = profileClient?.get()?.let { card(it, language) }
+
+    /** Sets the nickname (empty text removes it). */
+    @Throws(Exception::class, CancellationException::class)
+    suspend fun setNickname(name: String, language: GuidanceLanguage): ProfileCard? =
+        profileClient?.setNickname(name.trim().ifEmpty { null })?.let { card(it, language) }
+
+    /** Everything the server holds about this phone, as JSON text. */
+    @Throws(Exception::class, CancellationException::class)
+    suspend fun exportMyData(): String = privacyClient?.export() ?: "{}"
+
+    /** Deletes this phone's reports, votes, profile and shares on the server, and forgets the device token. */
+    @Throws(Exception::class, CancellationException::class)
+    suspend fun deleteMyData() {
+        privacyClient?.deleteAll()
+        tokenStoreFor(backendUrl).save(null)
+        OwnReports.ids.clear()
+    }
+
+    private fun card(p: com.roadpulse.app.data.Profile, language: GuidanceLanguage): ProfileCard {
+        val s = stringsFor(language)
+        val levels = listOf("LEARNER", "ROAD_SCOUT", "NAVIGATOR", "ROAD_GUARDIAN", "ROAD_LEGEND")
+        val next = levels.getOrNull(p.levelIndex + 1)
+        val toNext = p.nextLevelPoints?.let { n -> if (next != null) s.pointsToNext(n - p.points, s.levelName(next)) else null } ?: s.topLevel
+        return ProfileCard(
+            nickname = p.nickname ?: "",
+            levelName = s.levelName(p.level),
+            points = s.points(p.points),
+            progress = p.progress(),
+            toNext = toNext,
+            reports = p.stats.reports,
+            confirmed = p.stats.confirmationsReceived,
+            votes = p.stats.votes,
+            badges = com.roadpulse.app.data.Profile.ALL_BADGES.map { BadgeItem(s.badge(it), it in p.badges) },
+        )
+    }
+
     private fun pin(r: Report, language: GuidanceLanguage): ReportPin {
         val s = stringsFor(language)
         val detail = r.subtype?.let { s.reportDetail(r.type, it) }
         val info = listOfNotNull(detail, if (r.confirmations > 0) s.confirmations(r.confirmations) else null).joinToString(" · ")
-        return ReportPin(r.id, r.type.name, s.reportType(r.type), info, r.type.colorHex, r.location.lat, r.location.lon, r.id in ownReportIds)
+        return ReportPin(r.id, r.type.name, s.reportType(r.type), info, r.type.colorHex, r.location.lat, r.location.lon, r.id in OwnReports.ids)
     }
 }

@@ -8,6 +8,17 @@ final class AppConfig: ObservableObject {
     @AppStorage("useLaptop") var useLaptop = false { willSet { objectWillChange.send() } }
     @AppStorage("laptopAddress") var laptopAddress = "" { willSet { objectWillChange.send() } }
     @AppStorage("laptopMaps") var laptopMaps = false { willSet { objectWillChange.send() } }
+    /// "Help with live traffic" (anonymous road pieces while driving, ADR 0004). Off until the driver agrees.
+    @AppStorage("helpTraffic") var helpTraffic = false { willSet { objectWillChange.send() } }
+
+    /// Turns traffic help on or off, keeping when and to which wording the driver agreed (on the phone only).
+    func setHelpTraffic(_ on: Bool) {
+        helpTraffic = on
+        if on {
+            UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: "trafficConsentAt")
+            UserDefaults.standard.set("2026-11-15", forKey: "trafficConsentVersion")
+        }
+    }
 
     static let publicRouting = "https://valhalla1.openstreetmap.de"
     static let search = "https://photon.komoot.io"

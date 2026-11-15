@@ -1,10 +1,11 @@
 # RoadPulse on iPhone
 
-Status (15 November 2026): **step 5 of the iPhone app**: map, search, route choices, turn-by-turn
-navigation with voice (plus a simulated drive), and, with the laptop's servers over Wi-Fi: reports
-(send, see, vote), places by category with opening hours, toll prices, traffic colours, camera,
-school and report alerts while driving, and the faster-route offer. Steps 1-4 built green on
-GitHub; the app has not been run on a phone yet.
+Status (15 November 2026): **step 6 of the iPhone app**: everything from step 5 (map, search, routes,
+turn-by-turn with voice, reports, places, tolls, traffic, drive alerts, faster route) plus saved
+places (Home, Work, favourites, recent), planned drives with "time to leave" notifications,
+profile and points, share my drive, report details (and how long for a closure), "still there?"
+after passing a report, and privacy (traffic help opt-in, privacy policy, export and delete my
+data, clear saved places). Steps 1-5 built green on GitHub; the app has not been run on a phone yet.
 
 ## How the two apps share code
 
@@ -69,6 +70,12 @@ on the same Wi-Fi could reach these ports; use `-Remove` on networks you do not 
 5. **Done in code:** laptop server over Wi-Fi (setting + firewall script); reports (send, vote,
    map pins), places by category, tolls on route cards, traffic layer, camera/school/report
    alerts, traffic delay and faster route.
-6. iPhone: saved places, planned drives, profile, share, privacy, report details, "still there?" while driving.
-7. Not possible the same way on iPhone: music controls for other apps (iOS only allows Apple
+6. **Done in code:** saved places and planned drives (same `PlacesStore` as Android, kept on the
+   phone; reminders are local notifications), profile, share my drive (`ShareSession` now shared),
+   report details and closure time, "still there?", privacy screen and traffic help (opt-in, same
+   wording and rules as Android, ADR 0004).
+7. Next: the rest of Android's settings and extras on iPhone: route options (avoid tolls, highways,
+   ferries; vehicle), map colours and view, speedometer and speed-limit options, "I parked here",
+   adding a stop, route overview, and search by voice.
+8. Not possible the same way on iPhone: music controls for other apps (iOS only allows Apple
    Music control), and background limits differ. These will be adapted, not copied.

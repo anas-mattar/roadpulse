@@ -29,6 +29,11 @@ class IosApiTest {
                     path.startsWith("/v1/reports?bbox=") -> MockResponse().setBody("[$report]")
                     path == "/v1/reports" -> MockResponse().setResponseCode(201).setBody("""{"report":$report,"merged":false}""")
                     path.endsWith("/votes") -> MockResponse().setBody(report)
+                    path == "/v1/me" && request.method == "DELETE" -> MockResponse().setResponseCode(204)
+                    path == "/v1/me" -> MockResponse().setBody(
+                        """{"nickname":"Anas","points":130,"level":"ROAD_SCOUT","levelIndex":1,"nextLevelPoints":500,
+                            "stats":{"reports":12,"confirmationsReceived":5,"votes":3},"badges":["FIRST_REPORT","REPORTER_10"]}""")
+                    path == "/v1/me/export" -> MockResponse().setBody("""{"reports":[]}""")
                     path.startsWith("/v1/places/nearby") -> MockResponse().setBody(
                         """[{"id":"n1","category":"FUEL","name":"Petronas","lat":3.15,"lon":101.7,"distanceM":240,"openingHours":"Mo-Su 06:00-23:00"}]""")
                     path.startsWith("/v1/traffic?") -> MockResponse().setBody(
@@ -53,7 +58,7 @@ class IosApiTest {
         assertEquals("Hidden · 2 confirmed", pins.single().detail)
         assertEquals(1, ReportFeed.reports.value.size) // shared with the drive for warnings ahead
 
-        val mine = api.report("POLICE", 3.14, 101.69, null, GuidanceLanguage.AR)!!
+        val mine = api.report("POLICE", 3.14, 101.69, "HIDDEN", -1, GuidanceLanguage.AR)!!
         assertEquals("شرطة", mine.label)
         assertTrue(mine.own)
         api.vote("r1", true)
@@ -69,11 +74,65 @@ class IosApiTest {
     }
 
     @Test
+    fun reportDetailsProfileAndPrivacy() = runBlocking {
+        val s = server()
+        val base = s.url("").toString().trimEnd('/')
+        val api = RoadPulseApi("http://unused", "http://unused", base)
+
+        assertEquals(listOf("VISIBLE", "Visible"), api.reportDetails("POLICE", GuidanceLanguage.EN).first())
+        assertTrue(api.reportDetails("ROAD_CLOSED", GuidanceLanguage.EN).isNotEmpty())
+        assertEquals(listOf("60", "1 hour"), api.closureDurations(GuidanceLanguage.EN)[1])
+        assertEquals("", api.closureDurations(GuidanceLanguage.EN)[0][0])
+
+        api.report("ROAD_CLOSED", 3.14, 101.69, "FULL", 180, GuidanceLanguage.EN)
+        var sent: RecordedRequest
+        do { sent = s.takeRequest() } while (sent.path != "/v1/reports")
+        val body = sent.body.readUtf8()
+        assertTrue(body, body.contains("\"subtype\":\"FULL\"") && body.contains("180"))
+
+        val card = api.profile(GuidanceLanguage.EN)!!
+        assertEquals("Anas", card.nickname)
+        assertEquals(12, card.reports)
+        assertEquals(2, card.badges.count { it.earned })
+        assertEquals(5, card.badges.size)
+        assertTrue(card.progress > 0f && card.progress < 1f)
+
+        assertEquals("""{"reports":[]}""", api.exportMyData())
+        api.deleteMyData()
+        s.shutdown()
+    }
+
+    @Test
+    fun savedPlacesAndPlannedDrivesOnThePhone() {
+        val book = com.roadpulse.app.ios.SavedPlacesBook()
+        book.clear()
+        val klcc = com.roadpulse.app.ios.SearchResult("KLCC", "Kuala Lumpur", 3.158, 101.712)
+        book.setHome(klcc)
+        book.addRecent(klcc)
+        book.addRecent(klcc)
+        book.addFavourite("Gym", com.roadpulse.app.ios.SearchResult("Fitness", "", 3.1, 101.6))
+        assertEquals("KLCC", book.home!!.name)
+        assertEquals(1, book.recent.size)
+        assertEquals("Gym", book.favourites.single().name)
+
+        val route = com.roadpulse.app.ios.RouteSummary("Fastest", null, 30, 20.0, false, emptyList(),
+            com.roadpulse.app.data.Route(emptyList(), emptyList(), 20.0, 1800.0), null)
+        val now = 1_800_000_000_000L
+        assertNull(book.addPlanned(klcc, route, now + 20 * 60_000L, now)) // 30 min drive: too late
+        val planned = book.addPlanned(klcc, route, now + 3 * 3_600_000L, now)!!
+        assertEquals(now + 3 * 3_600_000L - 40 * 60_000L, planned.leaveAtMillis) // drive + 10 spare
+        assertEquals(1, book.planned(now).size)
+        book.removePlanned(planned.id)
+        assertTrue(book.planned(now).isEmpty())
+    }
+
+    @Test
     fun withoutAServerTheFeaturesAreQuiet() = runBlocking {
         val api = RoadPulseApi("http://unused", "http://unused")
         assertTrue(!api.serverReachable())
         assertTrue(api.reportsIn(3.1, 101.6, 3.2, 101.7, GuidanceLanguage.EN).isEmpty())
-        assertNull(api.report("POLICE", 3.1, 101.6, null, GuidanceLanguage.EN))
+        assertNull(api.report("POLICE", 3.1, 101.6, null, -1, GuidanceLanguage.EN))
+        assertNull(api.profile(GuidanceLanguage.EN))
     }
 
     @Test

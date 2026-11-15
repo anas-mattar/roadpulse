@@ -79,6 +79,7 @@ import com.roadpulse.app.data.Place
 import com.roadpulse.app.data.Report
 import com.roadpulse.app.data.ReportType
 import com.roadpulse.app.data.Route
+import com.roadpulse.app.nav.start
 import com.roadpulse.app.nav.DeviceLocation
 import com.roadpulse.app.data.MapArea
 import com.roadpulse.app.data.ServerSettings

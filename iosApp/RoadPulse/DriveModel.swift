@@ -18,6 +18,8 @@ final class DriveModel: ObservableObject {
     private let controller = DriveController(routingUrl: AppConfig.publicRouting)
     private let speech = Speech()
     private var voiceTag = "en-US"
+    /// Name of the destination being driven to (for "I'm driving to …").
+    private(set) var destinationName = ""
 
     init() {
         controller.observe(
@@ -39,6 +41,21 @@ final class DriveModel: ObservableObject {
         controller.backendUrl = backendUrl
     }
 
+    /// Anonymous road pieces for live traffic, only when the driver agreed.
+    func setTrafficHelp(_ on: Bool) { controller.contributeTraffic = on }
+
+    /// "Still there?" answer: true, false, or nil for Skip.
+    func answerStillThere(_ answer: Bool?) {
+        controller.answerStillThere(stillThere: answer.map { KotlinBoolean(bool: $0) })
+    }
+
+    /// Starts a live link for this drive and returns it.
+    func startSharing(name: String?) async throws -> String {
+        try await controller.startSharing(name: name)
+    }
+
+    func stopSharing() { controller.stopSharing() }
+
     func takeFasterRoute() { controller.takeFasterRoute() }
     func keepRoute() { controller.keepRoute() }
 
@@ -55,6 +72,7 @@ final class DriveModel: ObservableObject {
     }
 
     func start(route: RouteSummary, to place: SearchResult, simulated: Bool) {
+        destinationName = place.name
         if simulated {
             controller.startSimulated(route: route, destinationName: place.name, destLat: place.lat, destLon: place.lon, speedKmh: 60)
         } else {
