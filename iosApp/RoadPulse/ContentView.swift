@@ -24,7 +24,8 @@ final class SearchModel: ObservableObject {
     private var area: (Double, Double, Double, Double)?
     private var areaTask: Task<Void, Never>?
 
-    init(config: AppConfig) {
+    init() {
+        let config = AppConfig()
         api = config.makeApi()
         configKey = config.key
     }
@@ -149,8 +150,8 @@ final class SearchModel: ObservableObject {
 
 struct ContentView: View {
     @AppStorage("language") private var languageCode = "en"
-    @StateObject private var config: AppConfig
-    @StateObject private var model: SearchModel
+    @StateObject private var config = AppConfig()
+    @StateObject private var model = SearchModel()
     @StateObject private var location = LocationProvider()
     @StateObject private var drive = DriveModel()
     @State private var recenterToken = 0
@@ -159,12 +160,6 @@ struct ContentView: View {
     @State private var selectedReport: ReportPin?
     @State private var serverCheck: String?
     @FocusState private var searching: Bool
-
-    init() {
-        let config = AppConfig()
-        _config = StateObject(wrappedValue: config)
-        _model = StateObject(wrappedValue: SearchModel(config: config))
-    }
 
     private var language: GuidanceLanguage {
         switch languageCode {
@@ -229,6 +224,7 @@ struct ContentView: View {
             location.start()
             location.onFix = { fix in Task { @MainActor in drive.onFix(fix) } }
             drive.setLanguage(language)
+            model.configure(config)
             drive.configure(routingUrl: config.routingUrl, backendUrl: config.backendUrl)
         }
         .onChange(of: languageCode) { _ in drive.setLanguage(language) }
@@ -300,7 +296,7 @@ struct ContentView: View {
                     ForEach(Array(s.lanes.enumerated()), id: \.offset) { _, lane in
                         Image(systemName: turnSymbol(lane.icon))
                             .font(.system(size: 22, weight: .bold))
-                            .foregroundColor(.white.opacity(lane.recommended ? 1 : (lane.usable ? 0.6 : 0.25)))
+                            .foregroundColor(Color.white.opacity(laneOpacity(lane)))
                             .frame(width: 34, height: 34)
                     }
                 }
@@ -344,7 +340,7 @@ struct ContentView: View {
                         Text("\(s.speedKmh)").font(.system(size: 22, weight: .semibold))
                         Text(strings.kmh).font(.system(size: 10))
                     }
-                    .foregroundColor(s.speedLimitKph > 0 && s.speedKmh > s.speedLimitKph + 3 ? .red : .white)
+                    .foregroundColor(isSpeeding(s) ? Color.red : Color.white)
                     .frame(width: 64, height: 64)
                     .background(Color(white: 0.17)).clipShape(Circle())
                 }
@@ -387,17 +383,17 @@ struct ContentView: View {
                 .task(id: s.fasterRouteSavesMinutes) {
                     // Closes by itself (keeping the route) after 20 seconds.
                     try? await Task.sleep(nanoseconds: 20_000_000_000)
-                    if drive.snapshot?.fasterRouteSavesMinutes ?? 0 > 0 { drive.keepRoute() }
+                    let saves = drive.snapshot?.fasterRouteSavesMinutes ?? 0
+                    if saves > 0 { drive.keepRoute() }
                 }
             }
 
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
                     // Arrival includes the delay from live traffic on the route ahead.
-                    Text(Date().addingTimeInterval(Double(s.remainingMinutes + s.trafficDelayMinutes) * 60), style: .time)
+                    Text(arrival(s), style: .time)
                         .font(.system(size: 26, weight: .semibold))
-                    Text("\(strings.duration(minutes: s.remainingMinutes)) · \(strings.distance(km: s.remainingKm))"
-                         + (s.trafficDelayMinutes > 0 ? " · " + strings.trafficDelay(minutes: s.trafficDelayMinutes) : ""))
+                    Text(tripLine(s))
                         .font(.subheadline).opacity(0.8)
                 }
                 Spacer()
@@ -414,6 +410,28 @@ struct ContentView: View {
             .clipShape(RoundedRectangle(cornerRadius: 22))
             .shadow(radius: 5)
         }
+    }
+
+    private func laneOpacity(_ lane: LaneArrow) -> Double {
+        if lane.recommended { return 1 }
+        return lane.usable ? 0.6 : 0.25
+    }
+
+    private func isSpeeding(_ s: DriveSnapshot) -> Bool {
+        let limit = Int(s.speedLimitKph)
+        return limit > 0 && Int(s.speedKmh) > limit + 3
+    }
+
+    /// Arrival time, including the delay from live traffic on the route ahead.
+    private func arrival(_ s: DriveSnapshot) -> Date {
+        let minutes = Int(s.remainingMinutes) + Int(s.trafficDelayMinutes)
+        return Date().addingTimeInterval(Double(minutes) * 60)
+    }
+
+    private func tripLine(_ s: DriveSnapshot) -> String {
+        var parts: [String] = [strings.duration(minutes: s.remainingMinutes), strings.distance(km: s.remainingKm)]
+        if s.trafficDelayMinutes > 0 { parts.append(strings.trafficDelay(minutes: s.trafficDelayMinutes)) }
+        return parts.joined(separator: " · ")
     }
 
     // MARK: Reports
@@ -672,7 +690,8 @@ struct ContentView: View {
                         Button("Test connection") {
                             serverCheck = "…"
                             Task {
-                                let ok = (try? await config.makeApi().serverReachable()) ?? false
+                                let reply = try? await config.makeApi().serverReachable()
+                                let ok = reply?.boolValue ?? false
                                 serverCheck = ok ? "Connected to \(config.backendUrl)" : "No answer from \(config.backendUrl)"
                             }
                         }
