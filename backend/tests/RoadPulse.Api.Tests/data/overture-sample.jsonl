@@ -1,0 +1,7 @@
+{"id": "a1", "name": "M-City Jalan Ampang", "category": "shopping_mall", "address": "Jalan Ampang, Kuala Lumpur", "lat": 3.1593, "lon": 101.7472, "confidence": 0.9}
+{"id": "a2", "name": "M City Dental Clinic", "category": "dental_clinic", "address": null, "lat": 3.1587, "lon": 101.748, "confidence": 0.8}
+{"id": "a3", "name": "Sky Gym at M-City Residence", "category": "gym", "address": null, "lat": 3.1589, "lon": 101.7474, "confidence": 0.7}
+{"id": "a4", "name": "Mcity Inn", "category": "hotel", "address": "Miri", "lat": 4.39, "lon": 113.99, "confidence": 0.7}
+{"id": "a1", "name": "duplicate id is skipped", "category": null, "address": null, "lat": 3.0, "lon": 101.0, "confidence": 0.9}
+{"id": "a5", "name": "!!", "category": null, "address": null, "lat": 3.0, "lon": 101.0, "confidence": 0.9}
+

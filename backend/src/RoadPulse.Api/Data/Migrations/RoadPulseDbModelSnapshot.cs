@@ -21,6 +21,7 @@ namespace RoadPulse.Api.Data.Migrations
                 .HasAnnotation("ProductVersion", "10.0.15")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
+            NpgsqlModelBuilderExtensions.HasPostgresExtension(modelBuilder, "pg_trgm");
             NpgsqlModelBuilderExtensions.HasPostgresExtension(modelBuilder, "postgis");
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
@@ -185,6 +186,61 @@ namespace RoadPulse.Api.Data.Migrations
                         .HasDatabaseName("ix_devices_token_hash");
 
                     b.ToTable("devices", (string)null);
+                });
+
+            modelBuilder.Entity("RoadPulse.Api.Data.DirectoryPlace", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Address")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("address");
+
+                    b.Property<string>("Category")
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("category");
+
+                    b.Property<float?>("Confidence")
+                        .HasColumnType("real")
+                        .HasColumnName("confidence");
+
+                    b.Property<Point>("Location")
+                        .IsRequired()
+                        .HasColumnType("geography (point, 4326)")
+                        .HasColumnName("location");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("name");
+
+                    b.Property<string>("SearchKey")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("search_key");
+
+                    b.HasKey("Id")
+                        .HasName("pk_directory_places");
+
+                    b.HasIndex("Location")
+                        .HasDatabaseName("ix_directory_places_location");
+
+                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("Location"), "gist");
+
+                    b.HasIndex("SearchKey")
+                        .HasDatabaseName("ix_directory_places_search_key");
+
+                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("SearchKey"), "gin");
+                    NpgsqlIndexBuilderExtensions.HasOperators(b.HasIndex("SearchKey"), new[] { "gin_trgm_ops" });
+
+                    b.ToTable("directory_places", (string)null);
                 });
 
             modelBuilder.Entity("RoadPulse.Api.Data.IdempotencyRecord", b =>

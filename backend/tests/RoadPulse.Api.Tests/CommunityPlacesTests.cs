@@ -7,6 +7,7 @@ using RoadPulse.Api.Data;
 using RoadPulse.Api.Modules.CommunityPlaces;
 using RoadPulse.Api.Modules.Devices;
 using RoadPulse.Api.Modules.Moderation;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace RoadPulse.Api.Tests;
 
@@ -95,5 +96,32 @@ public class CommunityPlacesTests
         Assert.Empty(await Search(me, "fake"));
         var export = await me.GetStringAsync("/v1/me/export");
         Assert.Contains("Fake Shop", export);
+    }
+}
+
+/// <summary>Overture places: import from the export file and search by name near a position.</summary>
+[Collection("database")]
+public class DirectoryPlacesTests
+{
+    private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
+
+    [Fact]
+    public async Task ImportThenSearchNearbyByName()
+    {
+        using var api = new ApiFactory();
+        using (var scope = api.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<RoadPulseDb>();
+            var n = await RoadPulse.Api.Modules.Directory.DirectoryImporter.ImportAsync(db,
+                Path.Combine(AppContext.BaseDirectory, "data", "overture-sample.jsonl"), Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance);
+            Assert.Equal(4, n); // the duplicate id and the name without letters are skipped
+        }
+        var c = await api.ClientAsync(); // public: no device token needed
+        var hits = (await c.GetFromJsonAsync<List<RoadPulse.Api.Modules.Directory.DirectoryPlaceDto>>(
+            "/v1/places/search?q=mcity&lat=3.16&lon=101.72", Json))!;
+        // Names starting with "mcity" first, then the gym; Miri is more than 100 km away.
+        Assert.Equal(["M-City Jalan Ampang", "M City Dental Clinic", "Sky Gym at M-City Residence"], hits.Select(h => h.Name).ToList());
+        Assert.Equal("shopping_mall", hits[0].Category);
+        Assert.Equal(HttpStatusCode.BadRequest, (await c.GetAsync("/v1/places/search?q=m&lat=3.16&lon=101.72")).StatusCode);
     }
 }

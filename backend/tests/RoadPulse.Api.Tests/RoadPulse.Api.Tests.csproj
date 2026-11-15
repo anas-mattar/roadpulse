@@ -23,6 +23,7 @@
 
   <ItemGroup>
     <None Include="valhalla_trace_attributes.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="data/overture-sample.jsonl" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

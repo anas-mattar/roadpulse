@@ -14,10 +14,12 @@ public class RoadPulseDb(DbContextOptions<RoadPulseDb> options) : DbContext(opti
     public DbSet<TrafficEdge> TrafficEdges => Set<TrafficEdge>();
     public DbSet<TrafficObservation> TrafficObservations => Set<TrafficObservation>();
     public DbSet<CommunityPlace> CommunityPlaces => Set<CommunityPlace>();
+    public DbSet<DirectoryPlace> DirectoryPlaces => Set<DirectoryPlace>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
         b.HasPostgresExtension("postgis");
+        b.HasPostgresExtension("pg_trgm");
 
         b.Entity<Device>(e =>
         {
@@ -79,6 +81,20 @@ public class RoadPulseDb(DbContextOptions<RoadPulseDb> options) : DbContext(opti
             e.Property(p => p.Location).HasColumnType("geography (point, 4326)");
             e.HasIndex(p => p.Location).HasMethod("gist");
             e.HasIndex(p => p.Category);
+        });
+
+        b.Entity<DirectoryPlace>(e =>
+        {
+            e.ToTable("directory_places");
+            e.Property(p => p.Id).HasMaxLength(64);
+            e.Property(p => p.Name).HasMaxLength(200);
+            e.Property(p => p.Category).HasMaxLength(60);
+            e.Property(p => p.Address).HasMaxLength(200);
+            e.Property(p => p.SearchKey).HasMaxLength(200);
+            e.Property(p => p.Location).HasColumnType("geography (point, 4326)");
+            e.HasIndex(p => p.Location).HasMethod("gist");
+            // "contains" search on names is fast with a trigram index.
+            e.HasIndex(p => p.SearchKey).HasMethod("gin").HasOperators("gin_trgm_ops");
         });
 
         b.Entity<CommunityPlace>(e =>

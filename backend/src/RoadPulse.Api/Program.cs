@@ -1,4 +1,5 @@
 using RoadPulse.Api.Modules.CommunityPlaces;
+using RoadPulse.Api.Modules.Directory;
 using System.Text.Json.Serialization;
 using Microsoft.EntityFrameworkCore;
 using RoadPulse.Api;
@@ -72,6 +73,17 @@ if (args.Length >= 2 && args[0] == "import-places")
     return;
 }
 
+// One-off command: load Overture places made by setup-overture-places.ps1, then exit.
+//   dotnet RoadPulse.Api.dll import-overture /maps/overture-places.jsonl
+if (args.Length >= 2 && args[0] == "import-overture")
+{
+    using var scope = app.Services.CreateScope();
+    var db = scope.ServiceProvider.GetRequiredService<RoadPulseDb>();
+    db.Database.Migrate();
+    await DirectoryImporter.ImportAsync(db, args[1], app.Logger);
+    return;
+}
+
 if (app.Configuration.GetValue("Database:MigrateOnStartup", false))
 {
     using var scope = app.Services.CreateScope();
@@ -116,6 +128,7 @@ v1.MapReportEndpoints();
 v1.MapModerationEndpoints();
 v1.MapPlaceEndpoints();
 v1.MapCommunityPlaceEndpoints();
+v1.MapDirectoryEndpoints();
 v1.MapTollEndpoints();
 v1.MapProfileEndpoints();
 v1.MapShareEndpoints();

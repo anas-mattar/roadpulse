@@ -26,6 +26,8 @@ backend/maps/tmp/
 backend/maps/styles/sprites/
 backend/maps/places.geojsonseq
 backend/maps/places-filtered.osm.pbf
+backend/maps/overture-places.jsonl
+backend/maps/overture-places.jsonl.tmp
 backend/logs/
 
 # iPhone app: the Xcode project is generated from iosApp/project.yml

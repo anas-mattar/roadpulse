@@ -202,7 +202,7 @@ extension ContentView {
             } else if !model.routes.isEmpty {
                 routePreview
             }
-            Text("© OpenStreetMap contributors · OpenMapTiles · OpenFreeMap")
+            Text("© OpenStreetMap contributors · OpenMapTiles · OpenFreeMap · Places: Overture Maps Foundation")
                 .font(.system(size: 9)).foregroundColor(.secondary)
         }
         .padding(14)

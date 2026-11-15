@@ -98,6 +98,23 @@ public class MapPlace
     public required Point Location { get; set; }
 }
 
+/// <summary>
+/// A named place from Overture Maps (shops, clinics, offices, condos… from Meta, Microsoft,
+/// Foursquare and others; open data), for search. Replaced in full on each import.
+/// </summary>
+public class DirectoryPlace
+{
+    /// <summary>Overture id (stable across releases).</summary>
+    public required string Id { get; set; }
+    public required string Name { get; set; }
+    /// <summary>Overture basic category, e.g. "shopping_mall", "dentist".</summary>
+    public string? Category { get; set; }
+    public string? Address { get; set; }
+    public required string SearchKey { get; set; }
+    public required Point Location { get; set; }
+    public float? Confidence { get; set; }
+}
+
 /// <summary>What kind of place a driver added (shown as an icon and in search).</summary>
 public enum CommunityPlaceKind { SHOP, FOOD, CAFE, CLINIC, OFFICE, HOTEL, RESIDENCE, BUILDING, ENTRANCE, PARKING, OTHER }
 

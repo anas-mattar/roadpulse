@@ -232,7 +232,9 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
                 val community = url.takeIf { it.isNotEmpty() }?.let {
                     com.roadpulse.app.data.CommunityPlacesClient(com.roadpulse.app.data.DeviceApi(it, ServerSettings.tokenStore(getApplication(), it)))
                 }
-                val results = com.roadpulse.app.data.PlaceSearch.search(geocoder, community, query, near, com.roadpulse.app.i18n.currentStrings(), limit = 6)
+                val directory = url.takeIf { it.isNotEmpty() }?.let { com.roadpulse.app.data.DirectoryClient(it) }
+                val results = com.roadpulse.app.data.PlaceSearch.search(geocoder, community, query, near, com.roadpulse.app.i18n.currentStrings(),
+                    limit = 8, directory = directory)
                 _state.update { it.copy(searchResults = results, searchFrom = near) }
             } catch (e: CancellationException) {
                 throw e // superseded by newer typing: not an error

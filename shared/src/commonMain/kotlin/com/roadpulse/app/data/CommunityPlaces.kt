@@ -53,21 +53,56 @@ class CommunityPlacesClient(private val api: DeviceApi) {
     @Serializable private data class AddBody(val name: String, val kind: CommunityPlaceKind, val lat: Double, val lon: Double, val note: String?)
 }
 
+/** A named place from Overture Maps on the RoadPulse server (shops, clinics, condos…). */
+@Serializable
+data class DirectoryPlace(
+    val id: String,
+    val name: String,
+    val category: String? = null,
+    val address: String? = null,
+    val lat: Double,
+    val lon: Double,
+    val distanceM: Double = 0.0,
+) {
+    /** "Dental clinic · Jalan Ampang, Kuala Lumpur". */
+    fun toPlace(): Place {
+        val kind = category?.replace('_', ' ')?.replaceFirstChar { it.uppercase() }
+        return Place(name, listOfNotNull(kind, address?.takeIf { it.isNotBlank() }).joinToString(" · "), GeoPoint(lat, lon))
+    }
+}
+
+/** Overture Maps places search on the RoadPulse server (public, no device token). */
+class DirectoryClient(private val baseUrl: String) {
+    suspend fun search(query: String, near: GeoPoint, limit: Int = 10): List<DirectoryPlace> {
+        val url = Http.url("$baseUrl/v1/places/search", "q" to query, "lat" to near.lat.toString(), "lon" to near.lon.toString(), "limit" to limit.toString())
+        return Http.json.decodeFromString(kotlinx.serialization.builtins.ListSerializer(DirectoryPlace.serializer()), Http.execute(url, headers = Http.USER_AGENT))
+    }
+}
+
 /**
- * Search used by both apps: OpenStreetMap places (Photon) and places drivers added, one list,
- * nearest first. A failing server only drops the drivers' places.
+ * Search used by both apps: places drivers added, Overture Maps places (both from the RoadPulse
+ * server) and OpenStreetMap places (Photon), one list, nearest first. A failing server only drops
+ * its part; duplicates (same name within 50 m) are shown once.
  */
 object PlaceSearch {
     suspend fun search(
         geocoder: GeocodingClient, community: CommunityPlacesClient?, query: String, near: GeoPoint?, s: AppStrings, limit: Int,
+        directory: DirectoryClient? = null,
     ): List<Place> = kotlinx.coroutines.coroutineScope {
-        val added = if (community != null && near != null && query.count { it.isLetterOrDigit() } >= 2) {
-            async { runCatching { community.search(query, near) }.getOrDefault(emptyList()).map { it.toPlace(s) } }
+        val usable = near != null && query.count { it.isLetterOrDigit() } >= 2
+        val added = if (community != null && usable) {
+            async { runCatching { community.search(query, near!!) }.getOrDefault(emptyList()).map { it.toPlace(s) } }
+        } else null
+        val listed = if (directory != null && usable) {
+            async { runCatching { directory.search(query, near!!) }.getOrDefault(emptyList()).map { it.toPlace() } }
         } else null
         val osm = geocoder.search(query, near, limit)
-        val mine = added?.await().orEmpty()
         // Drivers' places first inside each distance band (they were added because search missed them).
-        val merged = (mine + osm.filterNot { o -> mine.any { m -> m.name.equals(o.name, true) && Geo.distanceMeters(m.location, o.location) < 50 } })
-        GeocodingClient.rankByDistance(merged, near).take(limit)
+        val all = added?.await().orEmpty() + listed?.await().orEmpty() + osm
+        val unique = mutableListOf<Place>()
+        for (p in all) {
+            if (unique.none { it.name.equals(p.name, true) && Geo.distanceMeters(it.location, p.location) < 50 }) unique += p
+        }
+        GeocodingClient.rankByDistance(unique, near).take(limit)
     }
 }

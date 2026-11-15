@@ -525,13 +525,14 @@ object EnglishStrings : AppStrings {
         "Sent to the RoadPulse server: an anonymous device id (no name, email or phone number), the reports, votes and flags you make, and your nickname if you set one. Reports are public on the map without a name.",
         "Places you add (name, kind, note and location) are stored on the server with your anonymous device id. Only you see them until a moderator approves them; then they appear in everyone's search without your name. Export or delete them with your data.",
         "Share my drive, only when you tap Share: destination, arrival time and position, for anyone with the link, until you stop, 30 minutes after arrival, or 12 hours. You see how many people have the link open; they are counted with a random number made up by each open page, nothing about them is kept.",
+        "Searches: what you type and your approximate position go to the place search service (Photon, with OpenStreetMap data) and, when the RoadPulse server is used, to that server to search Overture Maps places and places drivers added. Searches are not stored.",
         "Live traffic, only if you turn it on: speed and position in 2-minute pieces with no device id, nothing from the first and last 500 m of a trip. Only average road speeds are kept.",
         "Kept for: reports 90 days after they expire; road speed averages 12 months (no driver information).",
         "Your choices: export or delete your data below, and turn live traffic off at any time.",
     )
     override val exportData = "Export my data"
     override val deleteData = "Delete my data"
-    override val deleteDataConfirm = "This deletes your reports, votes, flags, nickname and share links from the server, and your saved places, planned drives and parking spot from this phone. It cannot be undone."
+    override val deleteDataConfirm = "This deletes your reports, votes, flags, added places, nickname and share links from the server, and your saved places, planned drives and parking spot from this phone. It cannot be undone."
     override val delete = "Delete"
     override val dataDeleted = "Your data was deleted"
     override val deleteFailed = "Could not delete your data on the server. Check the connection and try again."
@@ -881,11 +882,12 @@ object ArabicStrings : AppStrings {
         "مشاركة الرحلة، فقط عند الضغط على مشاركة: الوجهة ووقت الوصول والموقع لمن لديه الرابط، حتى تتوقف أو بعد 30 دقيقة من الوصول أو 12 ساعة. ترى عدد من يفتحون الرابط؛ يُحسبون برقم عشوائي تنشئه كل صفحة مفتوحة، ولا يُحفظ عنهم شيء.",
         "حركة المرور، فقط إذا فعّلتها: السرعة والموقع على شكل أجزاء مدتها دقيقتان بلا معرّف جهاز، ولا شيء من أول وآخر 500 م من الرحلة. يُحتفظ بمتوسط سرعات الطرق فقط.",
         "مدة الحفظ: البلاغات 90 يومًا بعد انتهائها، ومتوسط سرعات الطرق 12 شهرًا (بلا معلومات عن السائقين).",
+        "عمليات البحث: ما تكتبه وموقعك التقريبي يُرسلان إلى خدمة البحث عن الأماكن (Photon ببيانات OpenStreetMap)، وعند استخدام خادم RoadPulse إلى ذلك الخادم للبحث في أماكن Overture Maps والأماكن التي أضافها السائقون. لا تُحفظ عمليات البحث.",
         "خياراتك: صدّر بياناتك أو احذفها أدناه، وأوقف مشاركة حركة المرور في أي وقت.",
     )
     override val exportData = "تصدير بياناتي"
     override val deleteData = "حذف بياناتي"
-    override val deleteDataConfirm = "سيحذف هذا بلاغاتك وتصويتاتك وإبلاغاتك واسمك المستعار وروابط المشاركة من الخادم، وأماكنك المحفوظة ورحلاتك المخطط لها ومكان ركن سيارتك من هذا الهاتف. لا يمكن التراجع عن ذلك."
+    override val deleteDataConfirm = "سيحذف هذا بلاغاتك وتصويتاتك وإبلاغاتك والأماكن التي أضفتها واسمك المستعار وروابط المشاركة من الخادم، وأماكنك المحفوظة ورحلاتك المخطط لها ومكان ركن سيارتك من هذا الهاتف. لا يمكن التراجع عن ذلك."
     override val delete = "حذف"
     override val dataDeleted = "تم حذف بياناتك"
     override val deleteFailed = "تعذّر حذف بياناتك من الخادم. تحقق من الاتصال وحاول مجددًا."

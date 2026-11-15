@@ -96,7 +96,7 @@ import com.roadpulse.app.nav.TurnIcon
 enum class ScreenMode { EXPLORE, PREVIEW, DRIVING }
 
 /** Credits required by the map data and tile licences. */
-internal const val MAP_CREDITS = "© OpenStreetMap contributors · OpenMapTiles · OpenFreeMap"
+internal const val MAP_CREDITS = "© OpenStreetMap contributors · OpenMapTiles · OpenFreeMap · Places: Overture Maps Foundation"
 
 // ---------------------------------------------------------------- Explore
 

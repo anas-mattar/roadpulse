@@ -37,6 +37,9 @@ class IosApiTest {
                     path.startsWith("/api/?") -> MockResponse().setBody(
                         """{"features":[{"geometry":{"coordinates":[-90.88,32.35]},"properties":{"name":"MCITy","country":"United States"}},
                             {"geometry":{"coordinates":[101.72,3.16]},"properties":{"name":"M City","street":"Jalan Ampang","country":"Malaysia"}}]}""")
+                    path.startsWith("/v1/places/search") -> MockResponse().setBody(
+                        """[{"id":"o1","name":"M City Dental Clinic","category":"dental_clinic","address":"Jalan Ampang","lat":3.1602,"lon":101.7202,"distanceM":60},
+                            {"id":"o2","name":"M City","category":"shopping_mall","lat":3.16,"lon":101.72,"distanceM":0}]""")
                     path.startsWith("/v1/places/community/search") -> MockResponse().setBody(
                         """[{"id":"c1","name":"M City Lobby 2","kind":"ENTRANCE","note":"Side gate","lat":3.1601,"lon":101.7201,"distanceM":40,"status":"Approved","own":false}]""")
                     path == "/v1/places/community" -> MockResponse().setResponseCode(201).setBody(
@@ -115,8 +118,10 @@ class IosApiTest {
         val base = s.url("").toString().trimEnd('/')
         val api = RoadPulseApi(base, "http://unused", base)
         val hits = api.search("mcity", 3.16, 101.72, GuidanceLanguage.EN)
-        assertEquals(listOf("M City Lobby 2", "M City", "MCITy"), hits.map { it.name })
+        // Drivers' place, then Overture places, then OpenStreetMap; "M City" from both sources once; the USA last.
+        assertEquals(listOf("M City Lobby 2", "M City Dental Clinic", "M City", "MCITy"), hits.map { it.name })
         assertEquals("Entrance · Added by drivers · Side gate", hits[0].detail)
+        assertEquals("Dental clinic · Jalan Ampang", hits[1].detail)
         assertTrue(api.addPlace("Klinik Sara", "CLINIC", 3.1, 101.6, ""))
         assertEquals("CLINIC", api.placeKinds(GuidanceLanguage.EN)[3][0])
         s.shutdown()

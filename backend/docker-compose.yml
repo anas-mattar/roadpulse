@@ -39,7 +39,7 @@ services:
       # Live traffic: map matching on the local routing server (ADR 0004).
       Traffic__ValhallaUrl: http://valhalla:8002
     volumes:
-      - ./maps:/maps:ro # places file for "import-places" (setup-places.ps1)
+      - ./maps:/maps:ro # places files for "import-places" and "import-overture" (setup-places.ps1, setup-overture-places.ps1)
       - ./tolls:/tolls:ro # toll prices you keep up to date (tolls/toll-rates.csv); read on every change
     ports:
       - "8080:8080"

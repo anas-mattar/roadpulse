@@ -3,6 +3,7 @@
 #   1. downloads the new map file safely (resumable; the current file stays until the new one is complete)
 #   2. rebuilds the routing data (Valhalla)          ~10-20 min, local routing is unavailable meanwhile
 #   3. reloads places: fuel, parking, cameras...      ~ a few minutes  (setup-places.ps1)
+#      and shops, clinics, offices... from Overture   ~ a few minutes  (setup-overture-places.ps1)
 #   4. rebuilds the offline map tiles, if set up     ~5-10 min        (setup-offline-maps.ps1)
 # Community reports are live and are not touched.
 #
@@ -134,6 +135,12 @@ if (-not $routeOk) { throw "The routing server started but did not answer a test
 # ---- 3. Places -------------------------------------------------------------------------------
 Step "Reloading places"
 & (Join-Path $PSScriptRoot "setup-places.ps1")
+# Overture places come from the internet, not the map file: if that fails, keep the current ones.
+try {
+  & (Join-Path $PSScriptRoot "setup-overture-places.ps1")
+} catch {
+  Write-Host ("Overture places not updated (kept the current ones): " + $_.Exception.Message) -ForegroundColor Yellow
+}
 
 # ---- 4. Offline map tiles --------------------------------------------------------------------
 $tiles = Join-Path $PSScriptRoot "maps\malaysia.mbtiles"

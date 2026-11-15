@@ -110,7 +110,8 @@ class RoadPulseApi(geocodingUrl: String, routingUrl: String, private val backend
     /** OpenStreetMap places and places drivers added (with the laptop server), nearest first. */
     @Throws(Exception::class, CancellationException::class)
     suspend fun search(query: String, nearLat: Double, nearLon: Double, language: GuidanceLanguage): List<SearchResult> =
-        com.roadpulse.app.data.PlaceSearch.search(geocoder, community, query, GeoPoint(nearLat, nearLon), stringsFor(language), limit = 8)
+        com.roadpulse.app.data.PlaceSearch.search(geocoder, community, query, GeoPoint(nearLat, nearLon), stringsFor(language), limit = 8,
+            directory = backendUrl.takeIf { it.isNotEmpty() }?.let { com.roadpulse.app.data.DirectoryClient(it) })
             .map { SearchResult(it.name, it.description, it.location.lat, it.location.lon) }
 
     /** Kinds for "Add a missing place": (name, label in the app language). */
