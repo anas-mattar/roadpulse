@@ -10,7 +10,7 @@ import java.util.Locale
  * arrival), plus a summary row at the end. Written only in debug builds, to app-private storage,
  * and never uploaded. Contains precise locations: treat log files as personal data.
  */
-class NavLog(val file: File, private val clock: () -> Long = { System.nanoTime() / 1_000_000 }) : Closeable {
+class NavLog(val file: File, private val clock: () -> Long = { System.nanoTime() / 1_000_000 }) : Closeable, DriveLog {
     private val out = PrintWriter(file.bufferedWriter())
     private var closed = false
 
@@ -27,7 +27,7 @@ class NavLog(val file: File, private val clock: () -> Long = { System.nanoTime()
         )
     }
 
-    fun fix(fix: LocationFix, p: Progress) {
+    override fun fix(fix: LocationFix, p: Progress) {
         if (closed) return
         fixes++
         if (p.poorSignal) poorFixes++
@@ -39,7 +39,7 @@ class NavLog(val file: File, private val clock: () -> Long = { System.nanoTime()
         )
     }
 
-    fun event(timeMillis: Long, name: String, detail: String = "") {
+    override fun event(timeMillis: Long, name: String, detail: String) {
         if (closed) return
         when (name) {
             "prompt" -> prompts++

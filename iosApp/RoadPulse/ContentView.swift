@@ -2,8 +2,8 @@ import CoreLocation
 import RoadPulseShared
 import SwiftUI
 
-/// Step 3 of the iPhone app: the map with your position, place search and route choices drawn on
-/// the map, using the same shared logic as Android. Turn-by-turn navigation comes next.
+/// The iPhone app's screen: the map with your position, place search, route choices, and
+/// turn-by-turn navigation with voice, all on the same shared logic as Android.
 @MainActor
 final class SearchModel: ObservableObject {
     @Published var query = ""
@@ -61,6 +61,7 @@ struct ContentView: View {
     @AppStorage("language") private var languageCode = "en"
     @StateObject private var model = SearchModel()
     @StateObject private var location = LocationProvider()
+    @StateObject private var drive = DriveModel()
     @State private var recenterToken = 0
     @State private var showSettings = false
     @FocusState private var searching: Bool
@@ -78,27 +79,146 @@ struct ContentView: View {
 
     var body: some View {
         ZStack {
-            MapView(routes: model.routes, selected: model.selected, destination: model.destination, recenterToken: recenterToken)
+            MapView(routes: model.routes, selected: model.selected, destination: model.destination,
+                    recenterToken: recenterToken, drive: drive.snapshot)
                 .ignoresSafeArea()
 
-            VStack(spacing: 10) {
-                HStack {
-                    Spacer()
-                    circleButton("gearshape.fill", label: strings.settings) { showSettings = true }
+            Group {
+                if let snapshot = drive.snapshot {
+                    drivingOverlay(snapshot)
+                } else {
+                    VStack(spacing: 10) {
+                        HStack {
+                            Spacer()
+                            circleButton("gearshape.fill", label: strings.settings) { showSettings = true }
+                        }
+                        Spacer()
+                        HStack {
+                            Spacer()
+                            circleButton("location.fill", label: strings.showMyLocation) { recenterToken += 1 }
+                        }
+                        card
+                    }
                 }
-                Spacer()
-                HStack {
-                    Spacer()
-                    circleButton("location.fill", label: strings.showMyLocation) { recenterToken += 1 }
-                }
-                card
             }
             .padding(12)
             .environment(\.layoutDirection, strings.rtl ? .rightToLeft : .leftToRight)
         }
-        .onAppear { location.start() }
+        .onAppear {
+            location.start()
+            location.onFix = { fix in Task { @MainActor in drive.onFix(fix) } }
+            drive.setLanguage(language)
+        }
+        .onChange(of: languageCode) { _ in drive.setLanguage(language) }
+        .onChange(of: drive.isDriving) { driving in
+            // Keep the screen on and the GPS running in the background while navigating.
+            UIApplication.shared.isIdleTimerDisabled = driving
+            location.setNavigating(driving)
+            if !driving { model.clear() }
+        }
         .sheet(isPresented: $showSettings) { settings }
     }
+
+    // MARK: Driving
+
+    private func drivingOverlay(_ s: DriveSnapshot) -> some View {
+        VStack(spacing: 8) {
+            // Next turn.
+            HStack(spacing: 14) {
+                Image(systemName: turnSymbol(s.turnIcon))
+                    .font(.system(size: 38, weight: .bold))
+                    .frame(width: 52)
+                VStack(alignment: .leading, spacing: 2) {
+                    if s.distanceToTurnM >= 0 {
+                        Text(strings.distance(km: s.distanceToTurnM / 1000)).font(.system(size: 30, weight: .semibold))
+                    }
+                    Text(s.instruction).font(.subheadline).opacity(0.85).lineLimit(2)
+                }
+                Spacer(minLength: 0)
+            }
+            .foregroundColor(.white)
+            .padding(.horizontal, 16).padding(.vertical, 14)
+            .background(indigo)
+            .clipShape(RoundedRectangle(cornerRadius: 22))
+            .shadow(radius: 5)
+
+            // Lanes: always left to right, as on the road.
+            if !s.lanes.isEmpty && s.distanceToTurnM >= 0 && s.distanceToTurnM <= 1500 {
+                HStack(spacing: 4) {
+                    ForEach(Array(s.lanes.enumerated()), id: \.offset) { _, lane in
+                        Image(systemName: turnSymbol(lane.icon))
+                            .font(.system(size: 22, weight: .bold))
+                            .foregroundColor(.white.opacity(lane.recommended ? 1 : (lane.usable ? 0.6 : 0.25)))
+                            .frame(width: 34, height: 34)
+                    }
+                }
+                .padding(.horizontal, 10).padding(.vertical, 6)
+                .background(Color(red: 0.15, green: 0.13, blue: 0.36))
+                .clipShape(RoundedRectangle(cornerRadius: 16))
+                .environment(\.layoutDirection, .leftToRight)
+            }
+
+            HStack(alignment: .top) {
+                if let status = s.status {
+                    Text(status).font(.footnote).bold()
+                        .padding(.horizontal, 12).padding(.vertical, 6)
+                        .background(Color.orange.opacity(0.9)).foregroundColor(.black)
+                        .clipShape(Capsule())
+                }
+                Spacer()
+                VStack(spacing: 10) {
+                    circleButton(drive.muted ? "speaker.slash.fill" : "speaker.wave.2.fill",
+                                 label: drive.muted ? strings.unmuteVoice : strings.muteVoice) { drive.muted.toggle() }
+                    circleButton("location.fill", label: strings.showMyLocation) { recenterToken += 1 }
+                }
+            }
+
+            Spacer()
+
+            HStack(alignment: .bottom, spacing: 8) {
+                if s.speedKmh >= 0 {
+                    VStack(spacing: 0) {
+                        Text("\(s.speedKmh)").font(.system(size: 22, weight: .semibold))
+                        Text(strings.kmh).font(.system(size: 10))
+                    }
+                    .foregroundColor(s.speedLimitKph > 0 && s.speedKmh > s.speedLimitKph + 3 ? .red : .white)
+                    .frame(width: 64, height: 64)
+                    .background(Color(white: 0.17)).clipShape(Circle())
+                }
+                if s.speedLimitKph > 0 {
+                    Text("\(s.speedLimitKph)").font(.system(size: 17, weight: .bold)).foregroundColor(.black)
+                        .frame(width: 46, height: 46)
+                        .background(Color.white).clipShape(Circle())
+                        .overlay(Circle().stroke(Color.red, lineWidth: 5))
+                }
+                Spacer()
+            }
+
+            // Trip: arrival time, time and distance left, stop.
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(Date().addingTimeInterval(Double(s.remainingMinutes) * 60), style: .time)
+                        .font(.system(size: 26, weight: .semibold))
+                    Text("\(strings.duration(minutes: s.remainingMinutes)) · \(strings.distance(km: s.remainingKm))")
+                        .font(.subheadline).opacity(0.8)
+                }
+                Spacer()
+                Button { drive.stop() } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 20, weight: .bold)).foregroundColor(.white)
+                        .frame(width: 52, height: 52).background(Color.red).clipShape(Circle())
+                }
+                .accessibilityLabel(strings.stopNavigation)
+            }
+            .foregroundColor(.white)
+            .padding(16)
+            .background(Color(white: 0.2))
+            .clipShape(RoundedRectangle(cornerRadius: 22))
+            .shadow(radius: 5)
+        }
+    }
+
+    // MARK: Explore and preview
 
     private func circleButton(_ icon: String, label: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
@@ -163,6 +283,26 @@ struct ContentView: View {
                         ForEach(Array(model.routes.enumerated()), id: \.offset) { index, route in
                             routeCard(route, isSelected: index == model.selected)
                                 .onTapGesture { model.selected = index }
+                        }
+                    }
+                }
+                if let place = model.destination, model.selected < model.routes.count {
+                    HStack(spacing: 10) {
+                        // Try the drive at a desk: the car follows the route by itself.
+                        Button { drive.start(route: model.routes[model.selected], to: place, simulated: true) } label: {
+                            Image(systemName: "play.fill").foregroundColor(.primary)
+                                .frame(width: 52, height: 52)
+                                .background(Color(.secondarySystemBackground)).clipShape(Circle())
+                        }
+                        .accessibilityLabel(strings.simulateDrive)
+                        Button { drive.start(route: model.routes[model.selected], to: place, simulated: false) } label: {
+                            HStack {
+                                Image(systemName: "location.north.fill")
+                                Text(strings.goNow).font(.headline)
+                            }
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity).frame(height: 52)
+                            .background(indigo).clipShape(Capsule())
                         }
                     }
                 }

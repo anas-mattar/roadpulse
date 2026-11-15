@@ -1,6 +1,7 @@
 package com.roadpulse.app.nav
 
-import com.roadpulse.app.BuildConfig
+import com.roadpulse.app.data.IOException
+import com.roadpulse.app.util.mathRound
 import com.roadpulse.app.data.GeoPoint
 import com.roadpulse.app.data.Place
 import com.roadpulse.app.data.Route
@@ -21,7 +22,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import java.io.IOException
 
 sealed interface NavEvent {
     data class Speak(val text: String) : NavEvent
@@ -82,7 +82,10 @@ data class FasterRoute(val route: Route, val savedSeconds: Double)
 object NavigationSession {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     // Read on each use, so the debug server switch also applies to reroutes.
-    private val router get() = RoutingClient(com.roadpulse.app.data.ServerSettings.routingUrl())
+    private val router get() = RoutingClient(platform.routingUrl())
+
+    /** What the phone provides (voice language, server addresses, options). Set once at start-up. */
+    var platform: DrivePlatform = DrivePlatform.Default
 
     private val _state = MutableStateFlow<NavState?>(null)
     val state: StateFlow<NavState?> = _state.asStateFlow()
@@ -91,13 +94,14 @@ object NavigationSession {
     val events: SharedFlow<NavEvent> = _events.asSharedFlow()
 
     /** Monotonic clock shared by GPS fixes, the simulator and the log (set to elapsedRealtime on device). */
-    var clock: () -> Long = { System.nanoTime() / 1_000_000 }
+    private val started = kotlin.time.TimeSource.Monotonic.markNow()
+    var clock: () -> Long = { started.elapsedNow().inWholeMilliseconds }
     fun now(): Long = clock()
 
-    private var store: DriveStore? = null
+    private var store: DriveStorage? = null
     private var persist = true
     private var tracker: RouteTracker? = null
-    private var log: NavLog? = null
+    private var log: DriveLog? = null
     private var rerouteJob: Job? = null
     private var watchdogJob: Job? = null
     private var limitsJob: Job? = null
@@ -123,7 +127,7 @@ object NavigationSession {
     private var lastSpeedingAlert = Long.MIN_VALUE / 2
 
     /** Called once from the activity and the service; safe to repeat. */
-    fun init(driveStore: DriveStore, monotonicClock: () -> Long) {
+    fun init(driveStore: DriveStorage, monotonicClock: () -> Long) {
         if (store == null) store = driveStore
         clock = monotonicClock
     }
@@ -152,7 +156,7 @@ object NavigationSession {
             while (_state.value != null) {
                 runCatching { checkTraffic() }.onFailure { e ->
                     if (e is CancellationException) throw e
-                    log?.event(now(), "traffic_check", "failed: ${e.javaClass.simpleName}")
+                    log?.event(now(), "traffic_check", "failed: ${e::class.simpleName}")
                 }
                 delay(TRAFFIC_CHECK_MS)
             }
@@ -160,7 +164,7 @@ object NavigationSession {
     }
 
     private suspend fun checkTraffic() {
-        val url = com.roadpulse.app.data.ServerSettings.backendUrl()
+        val url = platform.backendUrl()
         val current = _state.value ?: return
         if (url.isEmpty() || current.rerouting) return
         var ahead = TrafficDelay.ahead(current.route.shape, current.displayPosition)
@@ -177,14 +181,14 @@ object NavigationSession {
         if (delaySeconds < FASTER_ROUTE_MIN_SAVING_S || current.fasterRoute != null || now() < fasterRouteSuppressedUntil) return
         val avoid = TrafficDelay.avoidAreas(hit)
         if (avoid.isEmpty()) return
-        val alt = router.route(position, current.destination.location, remainingStops(), com.roadpulse.app.data.RouteSettings.options.value, avoid)
+        val alt = router.route(position, current.destination.location, remainingStops(), platform.routeOptions(), avoid)
         val altDelay = TrafficDelay.estimate(TrafficDelay.ahead(alt.shape, null), lines).first
         val stay = (_state.value?.remainingSeconds ?: return) + delaySeconds
         val saved = stay - (alt.timeSeconds + altDelay)
         log?.event(now(), "faster_route", "saved_s=${saved.toInt()}")
         if (saved < FASTER_ROUTE_MIN_SAVING_S || _state.value?.route !== current.route) return
         _state.update { it?.copy(fasterRoute = FasterRoute(alt, saved)) }
-        speak(VoiceSettings.narrator().fasterRouteFound(Math.round(saved / 60).toInt()))
+        speak(platform.narrator().fasterRouteFound(mathRound(saved / 60).toInt()))
     }
 
     /** The driver took the faster route. */
@@ -193,7 +197,7 @@ object NavigationSession {
         val faster = current.fasterRoute ?: return
         log?.event(now(), "faster_route_taken", "saved_s=${faster.savedSeconds.toInt()}")
         applyRoute(faster.route, current.destination, resumed = false)
-        speak(faster.route.maneuvers.firstOrNull()?.let(VoiceSettings.narrator()::atTurn))
+        speak(faster.route.maneuvers.firstOrNull()?.let(platform.narrator()::atTurn))
     }
 
     /** The driver kept the current route: no new offer for a while. */
@@ -214,7 +218,7 @@ object NavigationSession {
     }
 
     /** Debug builds: records this drive to [navLog] until it stops. */
-    fun attachLog(navLog: NavLog, replay: DriveReplay.Config?) {
+    fun attachLog(navLog: DriveLog, source: String?) {
         log?.close()
         log = navLog
         val s = _state.value
@@ -222,7 +226,7 @@ object NavigationSession {
             now(), "drive_start",
             "destination=${s?.destination?.name};route_km=${s?.route?.lengthKm};" +
                 "route_min=${s?.route?.timeSeconds?.div(60)?.toInt()};resumed=${s?.resumed};" +
-                "source=${replay?.label ?: "device GPS"}",
+                "source=${source ?: "device GPS"}",
         )
     }
 
@@ -240,7 +244,7 @@ object NavigationSession {
     /** Speaks (and logs) the first instruction of the current route. */
     fun announceStart() {
         val s = _state.value ?: return
-        val n = VoiceSettings.narrator()
+        val n = platform.narrator()
         speak(if (s.resumed) n.resuming(s.destination.name) else null)
         speak(s.route.maneuvers.firstOrNull()?.let(n::atTurn))
     }
@@ -258,7 +262,7 @@ object NavigationSession {
         camerasJob?.cancel()
         cameras = emptyList()
         announcedCameras.clear()
-        TrafficUploader.driveEnded()
+        platform.driveEnded()
         trafficJob?.cancel()
         schoolsJob?.cancel()
         schools = emptyList()
@@ -284,13 +288,13 @@ object NavigationSession {
         val progress = t.update(fix)
         log?.fix(fix, progress)
         // Opt-in live traffic (ADR 0004): real drives only, never simulations; ends trimmed.
-        if (usable && !DriveReplay.active.value) {
-            TrafficUploader.onFix(fix.position, fix.speedMps, fix.timeMillis, progress.remainingMeters)
+        if (usable && !platform.isSimulated()) {
+            platform.trafficFix(fix.position, fix.speedMps, fix.timeMillis, progress.remainingMeters)
         }
         if (progress.arrived) {
             log?.event(fix.timeMillis, "arrived")
-            ShareSession.onArrived()
-            speak(VoiceSettings.narrator().arrived)
+            platform.onArrived()
+            speak(platform.narrator().arrived)
             _events.tryEmit(NavEvent.Arrived)
             stop()
             return
@@ -316,19 +320,19 @@ object NavigationSession {
         val cameraDue = camera != null && progress.prompt == null && camera.metersAhead <= CAMERA_WARN_M && announcedCameras.add(camera.id)
         if (camera != null && cameraDue) {
             log?.event(fix.timeMillis, "camera_ahead", "m=${camera.metersAhead.toInt()}")
-            speak(VoiceSettings.narrator().cameraAhead(ReportAnnouncer.spokenMeters(camera.metersAhead), camera.maxSpeedKph), fix.timeMillis)
+            speak(platform.narrator().cameraAhead(ReportAnnouncer.spokenMeters(camera.metersAhead), camera.maxSpeedKph), fix.timeMillis)
         }
         val limitHere = if (progress.matched) speedLimits.at(progress.segmentIndex) else current.speedLimitKph
         val school = if (progress.matched) schoolsAhead().firstOrNull() else null
         if (school != null && progress.prompt == null && !cameraDue && schoolAlerts.shouldWarn(school, carAlongM, limitHere)) {
             log?.event(fix.timeMillis, "school_ahead", "m=${school.metersAhead.toInt()}")
-            speak(VoiceSettings.narrator().schoolZoneAhead(ReportAnnouncer.spokenMeters(school.metersAhead)), fix.timeMillis)
+            speak(platform.narrator().schoolZoneAhead(ReportAnnouncer.spokenMeters(school.metersAhead)), fix.timeMillis)
         }
         checkSpeeding(fix.speedMps, limitHere)
         if (progress.prompt == null) { // never talk over a turn instruction
             ahead?.let(announcer::next)?.let { due ->
                 log?.event(fix.timeMillis, "report_ahead", "type=${due.report.type};m=${due.metersAhead.toInt()}")
-                speak(VoiceSettings.narrator().reportAhead(due.report.type, ReportAnnouncer.spokenMeters(due.metersAhead)), fix.timeMillis)
+                speak(platform.narrator().reportAhead(due.report.type, ReportAnnouncer.spokenMeters(due.metersAhead)), fix.timeMillis)
             }
         }
         // Back on the route: the kept route is valid again, so "offline" no longer applies.
@@ -337,7 +341,7 @@ object NavigationSession {
         _state.update {
             it?.copy(
                 offline = if (progress.matched) false else it.offline,
-                instruction = progress.upcoming?.let { m -> PromptText.tidy(VoiceSettings.narrator().banner(m)) },
+                instruction = progress.upcoming?.let { m -> PromptText.tidy(platform.narrator().banner(m)) },
                 upcomingType = progress.upcoming?.type,
                 thenType = progress.following?.type,
                 thenGapMeters = progress.followingGapMeters,
@@ -357,7 +361,7 @@ object NavigationSession {
     }
 
     private fun applyRoute(route: Route, destination: Place, resumed: Boolean) {
-        tracker = RouteTracker(route, resumed, VoiceSettings::narrator)
+        tracker = RouteTracker(route, resumed, { platform.narrator() })
         routeReports = RouteReports(route.shape)
         passedReports.newRoute() // reports no longer on the new route were not "passed"
         fetchCameras(route)
@@ -370,7 +374,7 @@ object NavigationSession {
         _state.value = NavState(
             route = route,
             destination = destination,
-            instruction = route.maneuvers.firstOrNull()?.let { m -> PromptText.tidy(VoiceSettings.narrator().banner(m)) },
+            instruction = route.maneuvers.firstOrNull()?.let { m -> PromptText.tidy(platform.narrator().banner(m)) },
             distanceToTurnMeters = null,
             remainingKm = route.lengthKm,
             remainingSeconds = route.timeSeconds,
@@ -393,7 +397,7 @@ object NavigationSession {
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                log?.event(now(), "speed_limits", "failed: ${e.javaClass.simpleName}")
+                log?.event(now(), "speed_limits", "failed: ${e::class.simpleName}")
             }
         }
     }
@@ -415,7 +419,7 @@ object NavigationSession {
                 if (signal.check(now())) {
                     log?.event(now(), "gps_lost")
                     _state.update { it?.copy(gpsLost = true) }
-                    speak(VoiceSettings.narrator().gpsLost)
+                    speak(platform.narrator().gpsLost)
                 }
             }
         }
@@ -428,22 +432,22 @@ object NavigationSession {
         lastRerouteAttemptMillis = t
         _state.value = current.copy(rerouting = true)
         log?.event(t, "reroute_start", "from=${from.lat},${from.lon}")
-        if (!current.offline) speak(VoiceSettings.narrator().rerouting)
+        if (!current.offline) speak(platform.narrator().rerouting)
         rerouteJob = scope.launch {
             try {
-                val route = router.route(from, current.destination.location, remainingStops(), com.roadpulse.app.data.RouteSettings.options.value)
+                val route = router.route(from, current.destination.location, remainingStops(), platform.routeOptions())
                 if (_state.value == null) return@launch
                 log?.event(now(), "reroute_done", "route_km=${route.lengthKm}")
                 applyRoute(route, current.destination, resumed = false)
-                speak(route.maneuvers.firstOrNull()?.let(VoiceSettings.narrator()::atTurn))
+                speak(route.maneuvers.firstOrNull()?.let(platform.narrator()::atTurn))
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 val noNetwork = e is IOException
-                log?.event(now(), "reroute_failed", "${e.javaClass.simpleName}: ${e.message.orEmpty()}")
+                log?.event(now(), "reroute_failed", "${e::class.simpleName}: ${e.message.orEmpty()}")
                 val wasOffline = _state.value?.offline == true
                 _state.update { it?.copy(rerouting = false, offline = noNetwork) }
-                if (noNetwork && !wasOffline) speak(VoiceSettings.narrator().noInternet)
+                if (noNetwork && !wasOffline) speak(platform.narrator().noInternet)
                 // Retried on a later off-route fix, at most every REROUTE_MIN_INTERVAL_MS.
             }
         }
@@ -453,7 +457,7 @@ object NavigationSession {
     private fun fetchCameras(route: com.roadpulse.app.data.Route) {
         camerasJob?.cancel()
         cameras = emptyList()
-        val url = com.roadpulse.app.data.ServerSettings.backendUrl()
+        val url = platform.backendUrl()
         if (url.isEmpty()) return
         camerasJob = scope.launch {
             try {
@@ -463,7 +467,7 @@ object NavigationSession {
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                log?.event(now(), "speed_cameras", "failed: ${e.javaClass.simpleName}")
+                log?.event(now(), "speed_cameras", "failed: ${e::class.simpleName}")
             }
         }
     }
@@ -474,7 +478,7 @@ object NavigationSession {
         schools = emptyList()
         schoolRoute = RouteReports(route.shape, corridorM = SCHOOL_CORRIDOR_M)
         schoolAlerts.reset() // positions along the old route no longer apply
-        val url = com.roadpulse.app.data.ServerSettings.backendUrl()
+        val url = platform.backendUrl()
         if (url.isEmpty()) return
         schoolsJob = scope.launch {
             try {
@@ -485,7 +489,7 @@ object NavigationSession {
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                log?.event(now(), "schools", "failed: ${e.javaClass.simpleName}")
+                log?.event(now(), "schools", "failed: ${e::class.simpleName}")
             }
         }
     }
@@ -530,14 +534,14 @@ object NavigationSession {
         log?.event(now(), "stop_added", "stops=${stops.size}")
         rerouteJob = scope.launch {
             try {
-                val route = router.route(from, current.destination.location, stops, com.roadpulse.app.data.RouteSettings.options.value)
+                val route = router.route(from, current.destination.location, stops, platform.routeOptions())
                 if (_state.value == null) return@launch
                 applyRoute(route, current.destination, resumed = false)
-                speak(route.maneuvers.firstOrNull()?.let(VoiceSettings.narrator()::atTurn))
+                speak(route.maneuvers.firstOrNull()?.let(platform.narrator()::atTurn))
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                log?.event(now(), "stop_add_failed", e.javaClass.simpleName)
+                log?.event(now(), "stop_add_failed", e::class.simpleName.orEmpty())
                 _state.update { it?.copy(rerouting = false, offline = e is IOException) }
             }
         }
@@ -554,8 +558,8 @@ object NavigationSession {
     /** Emits [NavEvent.SpeedingAlert] when the speed first goes over limit + margin (at most every 20 s). */
     private fun checkSpeeding(speedMps: Double?, limitKph: Int?) {
         val kmh = speedMps?.let { (it * 3.6).toInt() } ?: return
-        val speeding = com.roadpulse.app.ui.isSpeeding(kmh, limitKph, DisplaySettings.speedingMarginKmh.value)
-        if (speeding && !wasSpeeding && DisplaySettings.speedingSound.value && now() - lastSpeedingAlert > SPEEDING_ALERT_GAP_MS) {
+        val speeding = limitKph != null && kmh > limitKph + platform.speedingMarginKmh()
+        if (speeding && !wasSpeeding && platform.speedingSound() && now() - lastSpeedingAlert > SPEEDING_ALERT_GAP_MS) {
             lastSpeedingAlert = now()
             log?.event(now(), "speeding_alert", "kmh=$kmh;limit=$limitKph")
             _events.tryEmit(NavEvent.SpeedingAlert)

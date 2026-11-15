@@ -4,6 +4,8 @@ import Foundation
 /// The phone's position (asks for "While Using the App" permission on first use).
 final class LocationProvider: NSObject, ObservableObject, CLLocationManagerDelegate {
     @Published var coordinate: CLLocationCoordinate2D?
+    /// Every GPS fix, for the drive in progress.
+    var onFix: ((CLLocation) -> Void)?
     private let manager = CLLocationManager()
 
     override init() {
@@ -17,8 +19,19 @@ final class LocationProvider: NSObject, ObservableObject, CLLocationManagerDeleg
         manager.startUpdatingLocation()
     }
 
+    /// While navigating: best accuracy, and keep receiving fixes with the screen off.
+    func setNavigating(_ navigating: Bool) {
+        manager.desiredAccuracy = navigating ? kCLLocationAccuracyBestForNavigation : kCLLocationAccuracyBest
+        manager.activityType = navigating ? .automotiveNavigation : .other
+        manager.pausesLocationUpdatesAutomatically = !navigating
+        manager.allowsBackgroundLocationUpdates = navigating
+        manager.showsBackgroundLocationIndicator = navigating
+    }
+
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
-        if let last = locations.last { coordinate = last.coordinate }
+        guard let last = locations.last else { return }
+        coordinate = last.coordinate
+        onFix?(last)
     }
 
     func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {

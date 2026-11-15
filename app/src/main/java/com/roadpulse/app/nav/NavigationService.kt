@@ -64,6 +64,7 @@ class NavigationService : Service() {
         com.roadpulse.app.data.ServerSettings.init(this)
         voice = VoiceGuide(this)
         deviceLocation = DeviceLocation(this)
+        NavigationSession.platform = AndroidDrivePlatform
         NavigationSession.init(driveStore(this), SystemClock::elapsedRealtime)
         createChannel()
     }
@@ -158,7 +159,7 @@ class NavigationService : Service() {
             val dir = File(getExternalFilesDir(null), "navlogs").apply { mkdirs() }
             val stamp = SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(Date())
             val kind = if (replay != null) "replay" else "gps"
-            NavigationSession.attachLog(NavLog(File(dir, "drive-$stamp-$kind.csv"), SystemClock::elapsedRealtime), replay)
+            NavigationSession.attachLog(NavLog(File(dir, "drive-$stamp-$kind.csv"), SystemClock::elapsedRealtime), replay?.label)
         }
     }
 

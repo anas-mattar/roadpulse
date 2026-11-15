@@ -17,6 +17,8 @@ class RouteSummary(
     val tag: String, val via: String?, val minutes: Int, val km: Double, val hasToll: Boolean,
     /** The route line, for drawing on the map. */
     val shape: List<GeoPoint>,
+    /** The full route, handed back to [DriveController.start]. */
+    val route: com.roadpulse.app.data.Route,
 )
 
 /**
@@ -38,7 +40,7 @@ class RoadPulseApi(geocodingUrl: String, routingUrl: String) {
         val routes = router.routes(GeoPoint(fromLat, fromLon), GeoPoint(toLat, toLon))
         val choices = RouteChoices.describe(routes, stringsFor(language))
         return routes.mapIndexed { i, r ->
-            RouteSummary(choices[i].tag, choices[i].via, mathRound(r.timeSeconds / 60).toInt(), r.lengthKm, r.hasToll, r.shape)
+            RouteSummary(choices[i].tag, choices[i].via, mathRound(r.timeSeconds / 60).toInt(), r.lengthKm, r.hasToll, r.shape, r)
         }
     }
 }

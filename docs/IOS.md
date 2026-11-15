@@ -1,7 +1,8 @@
 # RoadPulse on iPhone
 
-Status (15 November 2026): **step 3 of the iPhone app**: map with your position, place search and
-route choices on the map. Steps 1-2 built green on GitHub; the app has not been run on a phone yet.
+Status (15 November 2026): **step 4 of the iPhone app**: map, search, route choices, and turn-by-turn
+navigation with voice (plus a simulated drive). Steps 1-3 built green on GitHub; the app has not
+been run on a phone yet.
 
 ## How the two apps share code
 
@@ -45,8 +46,9 @@ be online. This is a change from "nothing opened to Wi-Fi" and will be an explic
    privacy) with OkHttp on Android and URLSession on iPhone; the iPhone app searches places and
    shows route choices (from Kuala Lumpur city centre, public servers).
    Still to move: live reports (WebSocket) and the drive session.
-3. **Map, search and route preview written** (MapLibre, CoreLocation). Next: turn-by-turn with
-   voice and background navigation (needs the drive session in `shared`).
+3. **Done in code:** map, search and route preview (MapLibre, CoreLocation); the drive session is
+   in `shared` and both apps use it; iPhone turn-by-turn with voice, lanes, speed, rerouting,
+   background location, and a simulated drive (play button).
 4. iPhone: reports, places, tolls, lanes, schools, cameras, traffic layer.
 5. iPhone: settings, Arabic layout, saved places, planned drives, profile, share, privacy.
 6. Not possible the same way on iPhone: music controls for other apps (iOS only allows Apple

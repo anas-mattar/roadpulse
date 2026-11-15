@@ -80,6 +80,7 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
 
     testImplementation(libs.junit)
+    testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.okhttp.mockwebserver)
     // Screenshot tests of the map overlays on the JVM (no device needed).
     testImplementation(libs.robolectric)

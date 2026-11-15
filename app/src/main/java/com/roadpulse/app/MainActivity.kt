@@ -48,6 +48,7 @@ class MainActivity : ComponentActivity() {
         com.roadpulse.app.nav.LeaveReminders.rescheduleAll(this)
         handleReminder(intent)
         VoiceProbe.check(this, VoiceSettings.language.value)
+        NavigationSession.platform = com.roadpulse.app.nav.AndroidDrivePlatform
         NavigationSession.init(NavigationService.driveStore(this), SystemClock::elapsedRealtime)
         enableEdgeToEdge()
         setContent {
