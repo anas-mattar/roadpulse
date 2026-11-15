@@ -98,6 +98,32 @@ public class MapPlace
     public required Point Location { get; set; }
 }
 
+/// <summary>What kind of place a driver added (shown as an icon and in search).</summary>
+public enum CommunityPlaceKind { SHOP, FOOD, CAFE, CLINIC, OFFICE, HOTEL, RESIDENCE, BUILDING, ENTRANCE, PARKING, OTHER }
+
+/// <summary>Pending: only its creator sees it. Approved: in everyone's search. Rejected: hidden.</summary>
+public enum CommunityPlaceStatus { Pending, Approved, Rejected }
+
+/// <summary>
+/// A place a driver added because search could not find it (shop, clinic, condo entrance…).
+/// Others see it after a moderator approves it.
+/// </summary>
+public class CommunityPlace
+{
+    public Guid Id { get; set; }
+    public Guid DeviceId { get; set; }
+    public required string Name { get; set; }
+    public CommunityPlaceKind Kind { get; set; }
+    /// <summary>Optional hint, e.g. "Level 2, next to the lifts".</summary>
+    public string? Note { get; set; }
+    /// <summary>Lower-case letters and digits of the name, for search ("M-City" and "mcity" match).</summary>
+    public required string SearchKey { get; set; }
+    public required Point Location { get; set; }
+    public DateTimeOffset CreatedAt { get; set; }
+    public CommunityPlaceStatus Status { get; set; } = CommunityPlaceStatus.Pending;
+    public DateTimeOffset? ReviewedAt { get; set; }
+}
+
 /// <summary>Append-only record of every moderator action. Holds IDs only, no locations or tokens.</summary>
 public class AuditEntry
 {

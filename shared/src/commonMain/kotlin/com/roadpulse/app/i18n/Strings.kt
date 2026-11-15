@@ -281,6 +281,17 @@ interface AppStrings {
     val helpTopics: List<Pair<String, String>>
     val sendFeedback: String
     fun version(v: String): String
+
+    // Add a missing place
+    val addPlace: String
+    val placeName: String
+    val whatKindOfPlace: String
+    fun placeKind(kind: com.roadpulse.app.data.CommunityPlaceKind): String
+    val placeNoteHint: String
+    val placeAdded: String
+    val placeAddFailed: String
+    val addedByDrivers: String
+    val waitingForReview: String
 }
 
 /** Screen language for a chosen app language. */
@@ -512,6 +523,7 @@ object EnglishStrings : AppStrings {
         "Draft for testing: to be reviewed for Malaysia's Personal Data Protection Act before public release.",
         "On your phone only: Home, Work, recent and saved places, planned drives, where you parked, and your settings.",
         "Sent to the RoadPulse server: an anonymous device id (no name, email or phone number), the reports, votes and flags you make, and your nickname if you set one. Reports are public on the map without a name.",
+        "Places you add (name, kind, note and location) are stored on the server with your anonymous device id. Only you see them until a moderator approves them; then they appear in everyone's search without your name. Export or delete them with your data.",
         "Share my drive, only when you tap Share: destination, arrival time and position, for anyone with the link, until you stop, 30 minutes after arrival, or 12 hours. You see how many people have the link open; they are counted with a random number made up by each open page, nothing about them is kept.",
         "Live traffic, only if you turn it on: speed and position in 2-minute pieces with no device id, nothing from the first and last 500 m of a trip. Only average road speeds are kept.",
         "Kept for: reports 90 days after they expire; road speed averages 12 months (no driver information).",
@@ -566,6 +578,28 @@ object EnglishStrings : AppStrings {
     )
     override val sendFeedback = "Send feedback by email"
     override fun version(v: String) = "Version $v"
+
+    override val addPlace = "Add a missing place"
+    override val placeName = "Name of the place"
+    override val whatKindOfPlace = "What is it?"
+    override fun placeKind(kind: com.roadpulse.app.data.CommunityPlaceKind) = when (kind) {
+        com.roadpulse.app.data.CommunityPlaceKind.SHOP -> "Shop"
+        com.roadpulse.app.data.CommunityPlaceKind.FOOD -> "Food"
+        com.roadpulse.app.data.CommunityPlaceKind.CAFE -> "Cafe"
+        com.roadpulse.app.data.CommunityPlaceKind.CLINIC -> "Clinic"
+        com.roadpulse.app.data.CommunityPlaceKind.OFFICE -> "Office"
+        com.roadpulse.app.data.CommunityPlaceKind.HOTEL -> "Hotel"
+        com.roadpulse.app.data.CommunityPlaceKind.RESIDENCE -> "Residence"
+        com.roadpulse.app.data.CommunityPlaceKind.BUILDING -> "Building"
+        com.roadpulse.app.data.CommunityPlaceKind.ENTRANCE -> "Entrance"
+        com.roadpulse.app.data.CommunityPlaceKind.PARKING -> "Parking"
+        com.roadpulse.app.data.CommunityPlaceKind.OTHER -> "Other"
+    }
+    override val placeNoteHint = "Note (optional), e.g. Level 2, next to the lifts"
+    override val placeAdded = "Thanks! You can find it in search now; others will after a quick check."
+    override val placeAddFailed = "Could not add the place. Check the connection and try again."
+    override val addedByDrivers = "Added by drivers"
+    override val waitingForReview = "Waiting for review"
 }
 
 /** Modern Standard Arabic. Review sheet: docs/ARABIC_SCREENS.md. */
@@ -843,6 +877,7 @@ object ArabicStrings : AppStrings {
         "مسودة للاختبار: تحتاج إلى مراجعة وفق قانون حماية البيانات الشخصية الماليزي قبل الإطلاق العام.",
         "على هاتفك فقط: المنزل والعمل والأماكن الأخيرة والمحفوظة، والرحلات المخطط لها، ومكان ركن سيارتك، وإعداداتك.",
         "يُرسل إلى خادم RoadPulse: معرّف جهاز مجهول (بلا اسم أو بريد أو رقم هاتف)، والبلاغات والتصويتات والإبلاغات التي تقوم بها، واسمك المستعار إن عيّنته. تظهر البلاغات على الخريطة بلا اسم.",
+        "الأماكن التي تضيفها (الاسم والنوع والملاحظة والموقع) تُحفظ على الخادم مع معرّف جهازك المجهول. لا يراها غيرك حتى يوافق عليها مشرف، ثم تظهر في بحث الجميع دون اسمك. يمكنك تصديرها أو حذفها مع بياناتك.",
         "مشاركة الرحلة، فقط عند الضغط على مشاركة: الوجهة ووقت الوصول والموقع لمن لديه الرابط، حتى تتوقف أو بعد 30 دقيقة من الوصول أو 12 ساعة. ترى عدد من يفتحون الرابط؛ يُحسبون برقم عشوائي تنشئه كل صفحة مفتوحة، ولا يُحفظ عنهم شيء.",
         "حركة المرور، فقط إذا فعّلتها: السرعة والموقع على شكل أجزاء مدتها دقيقتان بلا معرّف جهاز، ولا شيء من أول وآخر 500 م من الرحلة. يُحتفظ بمتوسط سرعات الطرق فقط.",
         "مدة الحفظ: البلاغات 90 يومًا بعد انتهائها، ومتوسط سرعات الطرق 12 شهرًا (بلا معلومات عن السائقين).",
@@ -899,4 +934,26 @@ object ArabicStrings : AppStrings {
     )
     override val sendFeedback = "أرسل ملاحظاتك بالبريد"
     override fun version(v: String) = "الإصدار $v"
+
+    override val addPlace = "أضف مكانًا غير موجود"
+    override val placeName = "اسم المكان"
+    override val whatKindOfPlace = "ما نوعه؟"
+    override fun placeKind(kind: com.roadpulse.app.data.CommunityPlaceKind) = when (kind) {
+        com.roadpulse.app.data.CommunityPlaceKind.SHOP -> "متجر"
+        com.roadpulse.app.data.CommunityPlaceKind.FOOD -> "مطعم"
+        com.roadpulse.app.data.CommunityPlaceKind.CAFE -> "مقهى"
+        com.roadpulse.app.data.CommunityPlaceKind.CLINIC -> "عيادة"
+        com.roadpulse.app.data.CommunityPlaceKind.OFFICE -> "مكتب"
+        com.roadpulse.app.data.CommunityPlaceKind.HOTEL -> "فندق"
+        com.roadpulse.app.data.CommunityPlaceKind.RESIDENCE -> "سكن"
+        com.roadpulse.app.data.CommunityPlaceKind.BUILDING -> "مبنى"
+        com.roadpulse.app.data.CommunityPlaceKind.ENTRANCE -> "مدخل"
+        com.roadpulse.app.data.CommunityPlaceKind.PARKING -> "موقف سيارات"
+        com.roadpulse.app.data.CommunityPlaceKind.OTHER -> "أخرى"
+    }
+    override val placeNoteHint = "ملاحظة (اختيارية)، مثل: الطابق 2 بجانب المصاعد"
+    override val placeAdded = "شكرًا! يمكنك إيجاده في البحث الآن، وسيراه الآخرون بعد مراجعة سريعة."
+    override val placeAddFailed = "تعذّرت إضافة المكان. تحقق من الاتصال وحاول مجددًا."
+    override val addedByDrivers = "أضافه السائقون"
+    override val waitingForReview = "بانتظار المراجعة"
 }

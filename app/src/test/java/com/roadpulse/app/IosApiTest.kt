@@ -34,6 +34,13 @@ class IosApiTest {
                         """{"nickname":"Anas","points":130,"level":"ROAD_SCOUT","levelIndex":1,"nextLevelPoints":500,
                             "stats":{"reports":12,"confirmationsReceived":5,"votes":3},"badges":["FIRST_REPORT","REPORTER_10"]}""")
                     path == "/v1/me/export" -> MockResponse().setBody("""{"reports":[]}""")
+                    path.startsWith("/api/?") -> MockResponse().setBody(
+                        """{"features":[{"geometry":{"coordinates":[-90.88,32.35]},"properties":{"name":"MCITy","country":"United States"}},
+                            {"geometry":{"coordinates":[101.72,3.16]},"properties":{"name":"M City","street":"Jalan Ampang","country":"Malaysia"}}]}""")
+                    path.startsWith("/v1/places/community/search") -> MockResponse().setBody(
+                        """[{"id":"c1","name":"M City Lobby 2","kind":"ENTRANCE","note":"Side gate","lat":3.1601,"lon":101.7201,"distanceM":40,"status":"Approved","own":false}]""")
+                    path == "/v1/places/community" -> MockResponse().setResponseCode(201).setBody(
+                        """{"id":"c2","name":"Klinik Sara","kind":"CLINIC","lat":3.1,"lon":101.6,"status":"Pending","own":true}""")
                     path.startsWith("/v1/places/nearby") -> MockResponse().setBody(
                         """[{"id":"n1","category":"FUEL","name":"Petronas","lat":3.15,"lon":101.7,"distanceM":240,"openingHours":"Mo-Su 06:00-23:00"}]""")
                     path.startsWith("/v1/traffic?") -> MockResponse().setBody(
@@ -99,6 +106,19 @@ class IosApiTest {
 
         assertEquals("""{"reports":[]}""", api.exportMyData())
         api.deleteMyData()
+        s.shutdown()
+    }
+
+    @Test
+    fun searchMixesDriversPlacesWithOpenStreetMapNearestFirst() = runBlocking {
+        val s = server()
+        val base = s.url("").toString().trimEnd('/')
+        val api = RoadPulseApi(base, "http://unused", base)
+        val hits = api.search("mcity", 3.16, 101.72, GuidanceLanguage.EN)
+        assertEquals(listOf("M City Lobby 2", "M City", "MCITy"), hits.map { it.name })
+        assertEquals("Entrance · Added by drivers · Side gate", hits[0].detail)
+        assertTrue(api.addPlace("Klinik Sara", "CLINIC", 3.1, 101.6, ""))
+        assertEquals("CLINIC", api.placeKinds(GuidanceLanguage.EN)[3][0])
         s.shutdown()
     }
 

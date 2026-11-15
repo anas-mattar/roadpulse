@@ -1,3 +1,4 @@
+using RoadPulse.Api.Modules.CommunityPlaces;
 using System.Text.Json.Serialization;
 using Microsoft.EntityFrameworkCore;
 using RoadPulse.Api;
@@ -114,6 +115,7 @@ v1.MapDeviceEndpoints();
 v1.MapReportEndpoints();
 v1.MapModerationEndpoints();
 v1.MapPlaceEndpoints();
+v1.MapCommunityPlaceEndpoints();
 v1.MapTollEndpoints();
 v1.MapProfileEndpoints();
 v1.MapShareEndpoints();

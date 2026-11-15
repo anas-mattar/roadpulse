@@ -28,6 +28,7 @@
     <section id="app" hidden>
       <nav class="tabs" role="tablist">
         <button role="tab" data-tab="queue" aria-selected="true">Review queue <span id="queueCount" class="badge" hidden></span></button>
+        <button role="tab" data-tab="places">New places <span id="placesCount" class="badge" hidden></span></button>
         <button role="tab" data-tab="recent">Recent reports</button>
         <button role="tab" data-tab="lookup">Look up</button>
         <button role="tab" data-tab="audit">Audit log</button>
@@ -39,6 +40,11 @@
       <div data-panel="queue">
         <p class="muted">Reports hidden after abuse flags come first, then active reports with flags. Expired reports leave the queue (find them under Recent reports). Reports restored by a moderator are not auto-hidden again.</p>
         <div id="queueList" class="list"></div>
+      </div>
+
+      <div data-panel="places" hidden>
+        <p class="muted">Places drivers added because search could not find them. Until approved, only the driver who added one sees it. Check the name and the spot on the map, then approve or reject.</p>
+        <div id="placesList" class="list"></div>
       </div>
 
       <div data-panel="recent" hidden>

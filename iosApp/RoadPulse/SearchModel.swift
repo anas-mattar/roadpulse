@@ -25,6 +25,8 @@ final class SearchModel: ObservableObject {
     @Published var stops: [SearchResult] = []
     /// A long-pressed point and its name, with actions (drive here, add stop, parked here, save).
     @Published var pinned: SearchResult?
+    /// App language (for the details of drivers' places in search).
+    var language: GuidanceLanguage = .en
     /// Vehicle and roads to avoid (from Settings).
     var routeOptions = Choices.shared.routeOptions(vehicleName: "CAR", avoidTolls: false, avoidHighways: false,
                                                     avoidFerries: false, allowUnpaved: false)
@@ -77,7 +79,7 @@ final class SearchModel: ObservableObject {
         errorText = nil
         resultsTitle = nil
         do {
-            results = try await api.search(query: text, nearLat: near.latitude, nearLon: near.longitude)
+            results = try await api.search(query: text, nearLat: near.latitude, nearLon: near.longitude, language: language)
         } catch {
             errorText = error.localizedDescription
         }
@@ -180,6 +182,12 @@ final class SearchModel: ObservableObject {
         book.removeFavourite(place: place)
         objectWillChange.send()
         message = strings.removed(name: place.name)
+    }
+
+    /// "Add a missing place": the driver finds it in search at once, others after review.
+    func addPlace(name: String, kind: String, at point: SearchResult, note: String, strings: AppStrings) async {
+        let ok = (try? await api.addPlace(name: name, kindName: kind, lat: point.lat, lon: point.lon, note: note))?.boolValue ?? false
+        message = ok ? strings.placeAdded : strings.placeAddFailed
     }
 
     func setParking(_ point: SearchResult, strings: AppStrings) {

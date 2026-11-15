@@ -105,10 +105,27 @@ class RoadPulseApi(geocodingUrl: String, routingUrl: String, private val backend
         else SearchResult(stringsFor(language).droppedPin, "${sixDecimals(lat)}, ${sixDecimals(lon)}", lat, lon)
     }
 
+    private val community = device?.let { com.roadpulse.app.data.CommunityPlacesClient(it) }
+
+    /** OpenStreetMap places and places drivers added (with the laptop server), nearest first. */
     @Throws(Exception::class, CancellationException::class)
-    suspend fun search(query: String, nearLat: Double, nearLon: Double): List<SearchResult> =
-        geocoder.search(query, GeoPoint(nearLat, nearLon), limit = 8)
+    suspend fun search(query: String, nearLat: Double, nearLon: Double, language: GuidanceLanguage): List<SearchResult> =
+        com.roadpulse.app.data.PlaceSearch.search(geocoder, community, query, GeoPoint(nearLat, nearLon), stringsFor(language), limit = 8)
             .map { SearchResult(it.name, it.description, it.location.lat, it.location.lon) }
+
+    /** Kinds for "Add a missing place": (name, label in the app language). */
+    fun placeKinds(language: GuidanceLanguage): List<List<String>> {
+        val s = stringsFor(language)
+        return com.roadpulse.app.data.CommunityPlaceKind.entries.map { listOf(it.name, s.placeKind(it)) }
+    }
+
+    /** Adds a place search does not know; returns false when the server refused or could not be reached. */
+    @Throws(Exception::class, CancellationException::class)
+    suspend fun addPlace(name: String, kindName: String, lat: Double, lon: Double, note: String): Boolean {
+        val client = community ?: return false
+        val kind = com.roadpulse.app.data.CommunityPlaceKind.entries.firstOrNull { it.name == kindName } ?: return false
+        return runCatching { client.add(name, kind, GeoPoint(lat, lon), note) }.isSuccess
+    }
 
     /**
      * The fastest route and up to two alternatives via [stops] (in order), planned with [options]

@@ -136,6 +136,29 @@
       actions);
   }
 
+  const KINDS = { SHOP: "Shop", FOOD: "Food", CAFE: "Cafe", CLINIC: "Clinic", OFFICE: "Office", HOTEL: "Hotel",
+    RESIDENCE: "Residence", BUILDING: "Building", ENTRANCE: "Entrance", PARKING: "Parking", OTHER: "Other" };
+
+  function placeItem(item) {
+    const p = item.place;
+    const map = "https://www.openstreetmap.org/?mlat=" + p.lat + "&mlon=" + p.lon + "#map=18/" + p.lat + "/" + p.lon;
+    return el("div", { class: "item" },
+      el("div", { class: "icon", bg: "#0F6E56", text: "NEW" }),
+      el("div", {},
+        el("div", { class: "title" }, p.name, el("span", { class: "pill active", text: KINDS[p.kind] || p.kind })),
+        p.note ? el("div", { class: "meta", text: "Note: " + p.note }) : null,
+        el("div", { class: "meta" }, "Added " + ago(item.createdAt) + " · ",
+          el("a", { href: map, target: "_blank", rel: "noopener noreferrer", text: "Show on map" })),
+        el("div", { class: "meta" }, "Added by ", el("span", { class: "mono", text: shortId(item.deviceId) }),
+          ": " + item.devicePlaces + (item.devicePlaces === 1 ? " place, " : " places, ") + item.deviceRejected + " rejected · ",
+          el("span", { class: "mono", text: "ID " + p.id }))),
+      el("div", { class: "actions" },
+        el("button", { text: "Approve", onclick: () =>
+          act("Approve place", "\"" + p.name + "\" will appear in everyone's search.", "/places/" + p.id + "/approve") }),
+        el("button", { class: "danger", text: "Reject", onclick: () =>
+          act("Reject place", "\"" + p.name + "\" stays hidden. It is deleted after 90 days.", "/places/" + p.id + "/reject") })));
+  }
+
   function renderList(container, items, emptyText) {
     container.replaceChildren(...(items.length ? items.map(reportItem) : [el("div", { class: "empty", text: emptyText })]));
   }
@@ -160,6 +183,11 @@
         renderList($("queueList"), items, "Nothing to review. Reports appear here when drivers flag them.");
         const hidden = items.filter((i) => i.status === "PendingReview").length;
         $("queueCount").hidden = hidden === 0; $("queueCount").textContent = hidden;
+      } else if (tab === "places") {
+        const items = await api("/places");
+        $("placesList").replaceChildren(...(items.length ? items.map(placeItem)
+          : [el("div", { class: "empty", text: "No new places to check. They appear here when drivers add a missing place." })]));
+        $("placesCount").hidden = items.length === 0; $("placesCount").textContent = items.length;
       } else if (tab === "recent") {
         renderList($("recentList"), await api("/reports?limit=100"), "No reports yet.");
       } else if (tab === "audit") {
@@ -193,7 +221,7 @@
   function signedIn(isIn) {
     $("login").hidden = isIn; $("app").hidden = !isIn; $("signOut").hidden = !isIn;
     clearInterval(timer);
-    if (isIn) { show(tab); timer = setInterval(() => { if (tab === "queue" || tab === "recent") load(); }, 30000); }
+    if (isIn) { show(tab); timer = setInterval(() => { if (tab === "queue" || tab === "recent" || tab === "places") load(); }, 30000); }
   }
 
   function signOut(message) {

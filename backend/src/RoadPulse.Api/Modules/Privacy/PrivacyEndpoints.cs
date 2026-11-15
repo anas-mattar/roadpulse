@@ -13,8 +13,11 @@ public record ExportedVote(Guid ReportId, bool StillThere, DateTimeOffset Create
 public record ExportedFlag(Guid ReportId, FlagReason Reason, DateTimeOffset CreatedAt);
 /// <summary>Everything the server holds about one device (PDPA access request). Traffic samples are
 /// anonymous and not linked to devices, so there is nothing to export for them.</summary>
+public record ExportedPlace(Guid Id, string Name, CommunityPlaceKind Kind, string? Note, double Lat, double Lon,
+    DateTimeOffset CreatedAt, CommunityPlaceStatus Status);
 public record DataExport(Guid DeviceId, DateTimeOffset RegisteredAt, string? Nickname, bool Blocked,
-    List<ExportedReport> Reports, List<ExportedVote> Votes, List<ExportedFlag> Flags, string Note);
+    List<ExportedReport> Reports, List<ExportedVote> Votes, List<ExportedFlag> Flags, string Note,
+    List<ExportedPlace>? AddedPlaces = null);
 
 /// <summary>How long data is kept. Pure values, shown in the privacy policy too.</summary>
 public static class Retention
@@ -70,8 +73,10 @@ public static class PrivacyEndpoints
             .Select(v => new ExportedVote(v.ReportId, v.StillThere, v.CreatedAt)).ToListAsync();
         var flags = await db.ReportFlags.AsNoTracking().Where(f => f.DeviceId == id).OrderBy(f => f.CreatedAt)
             .Select(f => new ExportedFlag(f.ReportId, f.Reason, f.CreatedAt)).ToListAsync();
+        var places = (await db.CommunityPlaces.AsNoTracking().Where(p => p.DeviceId == id).OrderBy(p => p.CreatedAt).ToListAsync())
+            .Select(p => new ExportedPlace(p.Id, p.Name, p.Kind, p.Note, p.Location.Y, p.Location.X, p.CreatedAt, p.Status)).ToList();
         return TypedResults.Ok(new DataExport(id, device.CreatedAt, device.Nickname, device.Blocked, reports, votes, flags,
-            "Live traffic samples are anonymous and not linked to this device; only road speed averages are kept."));
+            "Live traffic samples are anonymous and not linked to this device; only road speed averages are kept.", places));
     }
 
     private static async Task<NoContent> Delete(HttpContext http, RoadPulseDb db, ShareStore shares, LiveReports live)
@@ -98,6 +103,7 @@ public static class PrivacyEndpoints
         var own = await db.Reports.Where(r => r.DeviceId == id).ToListAsync();
         await db.IdempotencyRecords.Where(i => i.DeviceId == id).ExecuteDeleteAsync();
         await db.Reports.Where(r => r.DeviceId == id).ExecuteDeleteAsync();
+        await db.CommunityPlaces.Where(p => p.DeviceId == id).ExecuteDeleteAsync();
         await db.Devices.Where(d => d.Id == id).ExecuteDeleteAsync();
         await tx.CommitAsync();
 
@@ -119,6 +125,8 @@ public sealed class PrivacyRetention(IServiceScopeFactory scopes, TimeProvider c
         n += await db.IdempotencyRecords.Where(i => i.CreatedAt < keyCutoff).ExecuteDeleteAsync(ct);
         var auditCutoff = now - Retention.ModerationLog;
         n += await db.AuditLog.Where(a => a.At < auditCutoff).ExecuteDeleteAsync(ct);
+        // Places a moderator rejected are kept a while (in case of appeal), then deleted.
+        n += await db.CommunityPlaces.Where(p => p.Status == CommunityPlaceStatus.Rejected && p.ReviewedAt < reportCutoff).ExecuteDeleteAsync(ct);
         return n;
     }
 

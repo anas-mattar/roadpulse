@@ -24,6 +24,9 @@ struct ContentView: View {
     @State var showSharePreview = false
     @State var showSharedPanel = false
     @State var shareUrl: String?
+    /// "Add a missing place" form for this long-pressed point.
+    @State var showAddPlace = false
+    @State var addPlacePoint: SearchResult?
     @State var showLeaveLater = false
     @State var askFavouriteName = false
     @State var favouriteName = ""
@@ -102,6 +105,7 @@ struct ContentView: View {
             location.start()
             location.onFix = { fix in Task { @MainActor in drive.onFix(fix) } }
             drive.setLanguage(language)
+            model.language = language
             model.configure(config)
             applyServers()
             applySettings()
@@ -112,7 +116,10 @@ struct ContentView: View {
                 Task { await model.planRoutes(from: here, language: language) }
             }
         }
-        .onChange(of: languageCode) { _ in drive.setLanguage(language) }
+        .onChange(of: languageCode) { _ in
+            drive.setLanguage(language)
+            model.language = language
+        }
         .onChange(of: config.key) { _ in
             model.configure(config)
             applyServers()
@@ -152,6 +159,16 @@ struct ContentView: View {
             }, onCancel: { showReport = false })
         }
         .sheet(isPresented: $showSharePreview) { sharePreview }
+        .sheet(isPresented: $showAddPlace) {
+            if let point = addPlacePoint {
+                AddPlaceSheet(api: model.api, language: language, strings: strings, initialName: point.name == strings.droppedPin ? "" : point.name,
+                              onAdd: { name, kind, note in
+                                  showAddPlace = false
+                                  Task { await model.addPlace(name: name, kind: kind, at: point, note: note, strings: strings) }
+                              },
+                              onCancel: { showAddPlace = false })
+            }
+        }
         .sheet(isPresented: $showSharedPanel) { sharedPanel }
         .sheet(isPresented: $showLeaveLater) { leaveLaterSheet }
         .sheet(item: $shareItem) { item in ActivityView(items: item.items) }

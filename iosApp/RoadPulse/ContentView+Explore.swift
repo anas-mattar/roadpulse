@@ -73,6 +73,16 @@ extension ContentView {
                         askFavouriteName = true
                     }
                 }
+                if model.hasServer {
+                    Button {
+                        addPlacePoint = point
+                        model.pinned = nil
+                        showAddPlace = true
+                    } label: {
+                        Label(strings.addPlace, systemImage: "mappin.and.ellipse").font(.subheadline.bold())
+                    }
+                    .foregroundColor(indigo)
+                }
             }
         }
         .padding(16)

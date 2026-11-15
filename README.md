@@ -38,6 +38,9 @@ components. "RoadPulse" is a placeholder name; check trademark availability befo
   driving, pull up the trip card for the route with traffic, other routes, share and stop
 - Driving map: traffic colours on the route line, the next turn and its road name on the map,
   compass top left
+- Search: nearby results first with the distance on each; "Add a missing place" (press and hold the
+  map) for shops, clinics, entrances… search does not know: the driver finds it at once, everyone
+  after a moderator approves it (admin page, New places tab)
 - Menu: profile, planned drives, settings grouped in pages (General, Map display, Voice and sound,
   Navigation, Vehicle, Alerts and reports, Speedometer, Privacy), help and feedback
 - Live traffic (opt-in, anonymous, ADR 0004): slow and jammed roads on the map

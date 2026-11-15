@@ -228,7 +228,11 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
         searchJob = viewModelScope.launch {
             delay(350) // debounce typing
             try {
-                val results = geocoder.search(query, near)
+                val url = ServerSettings.backendUrl()
+                val community = url.takeIf { it.isNotEmpty() }?.let {
+                    com.roadpulse.app.data.CommunityPlacesClient(com.roadpulse.app.data.DeviceApi(it, ServerSettings.tokenStore(getApplication(), it)))
+                }
+                val results = com.roadpulse.app.data.PlaceSearch.search(geocoder, community, query, near, com.roadpulse.app.i18n.currentStrings(), limit = 6)
                 _state.update { it.copy(searchResults = results, searchFrom = near) }
             } catch (e: CancellationException) {
                 throw e // superseded by newer typing: not an error
@@ -327,6 +331,21 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             val info = com.roadpulse.app.nav.RouteTraffic.forRoutes(url, routes)
             _state.update { if (it.routeChoices === routes) it.copy(routeTraffic = info) else it }
+        }
+    }
+
+    /** "Add a missing place": saved on the server; the driver finds it in search at once, others after review. */
+    fun addCommunityPlace(at: GeoPoint, name: String, kind: com.roadpulse.app.data.CommunityPlaceKind, note: String) {
+        val url = ServerSettings.backendUrl()
+        if (url.isEmpty()) return
+        _state.update { it.copy(pinned = null) }
+        viewModelScope.launch {
+            val s = com.roadpulse.app.i18n.currentStrings()
+            runCatching {
+                com.roadpulse.app.data.CommunityPlacesClient(com.roadpulse.app.data.DeviceApi(url, ServerSettings.tokenStore(getApplication(), url)))
+                    .add(name, kind, at, note)
+            }.onSuccess { _state.update { it.copy(message = s.placeAdded) } }
+                .onFailure { _state.update { it.copy(message = s.placeAddFailed) } }
         }
     }
 

@@ -1,5 +1,7 @@
 package com.roadpulse.app.ui
 
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
 import com.roadpulse.app.i18n.strings
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -46,8 +48,11 @@ fun PinnedPlaceCard(
     onPark: () -> Unit,
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
+    /** "Add a missing place" (name, kind, note); null hides it (no server). */
+    onAddPlace: ((String, com.roadpulse.app.data.CommunityPlaceKind, String) -> Unit)? = null,
 ) {
     var naming by remember { mutableStateOf(false) }
+    var adding by remember { mutableStateOf(false) }
     Island(modifier = modifier.fillMaxWidth()) {
         Column(Modifier.padding(start = 16.dp, end = 8.dp, top = 12.dp, bottom = 14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -65,7 +70,20 @@ fun PinnedPlaceCard(
                 Action(strings.save, Icons.Filled.Star, true, { naming = true }, Modifier.weight(1f))
                 Action(strings.parkedHere, Icons.Filled.LocalParking, true, onPark, Modifier.weight(1f))
             }
+            if (onAddPlace != null) {
+                TextButton(onClick = { adding = true }, modifier = Modifier.padding(top = 4.dp)) {
+                    Icon(Icons.Filled.AddLocationAlt, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Text(strings.addPlace, modifier = Modifier.padding(start = 6.dp))
+                }
+            }
         }
+    }
+    if (adding && onAddPlace != null) {
+        AddPlaceDialog(
+            initialName = if (place.name == strings.droppedPin) "" else place.name,
+            onAdd = { name, kind, note -> adding = false; onAddPlace(name, kind, note) },
+            onDismiss = { adding = false },
+        )
     }
     if (naming) {
         val pinLabel = strings.droppedPin
@@ -82,6 +100,38 @@ fun PinnedPlaceCard(
             dismissButton = { TextButton(onClick = { naming = false }) { Text(strings.cancel) } },
         )
     }
+}
+
+/** Name, kind and an optional note for a place search does not know. */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+private fun AddPlaceDialog(initialName: String, onAdd: (String, com.roadpulse.app.data.CommunityPlaceKind, String) -> Unit, onDismiss: () -> Unit) {
+    var name by remember { mutableStateOf(initialName) }
+    var note by remember { mutableStateOf("") }
+    var kind by remember { mutableStateOf<com.roadpulse.app.data.CommunityPlaceKind?>(null) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(strings.addPlace) },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState())) {
+                OutlinedTextField(value = name, onValueChange = { name = it.take(80) }, label = { Text(strings.placeName) }, singleLine = true)
+                Text(strings.whatKindOfPlace, fontSize = 14.sp, color = RP.TextSecondary, modifier = Modifier.padding(top = 12.dp, bottom = 4.dp))
+                androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    com.roadpulse.app.data.CommunityPlaceKind.entries.forEach { k ->
+                        androidx.compose.material3.FilterChip(selected = kind == k, onClick = { kind = k }, label = { Text(strings.placeKind(k)) })
+                    }
+                }
+                OutlinedTextField(value = note, onValueChange = { note = it.take(120) }, label = { Text(strings.placeNoteHint) },
+                    modifier = Modifier.padding(top = 8.dp))
+            }
+        },
+        confirmButton = {
+            TextButton(enabled = name.count { it.isLetterOrDigit() } >= 2 && kind != null, onClick = { onAdd(name.trim(), kind!!, note.trim()) }) {
+                Text(strings.save)
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(strings.cancel) } },
+    )
 }
 
 @Composable

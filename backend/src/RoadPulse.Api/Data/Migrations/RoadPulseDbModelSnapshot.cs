@@ -77,6 +77,76 @@ namespace RoadPulse.Api.Data.Migrations
                     b.ToTable("audit_log", (string)null);
                 });
 
+            modelBuilder.Entity("RoadPulse.Api.Data.CommunityPlace", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("DeviceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("device_id");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("kind");
+
+                    b.Property<Point>("Location")
+                        .IsRequired()
+                        .HasColumnType("geography (point, 4326)")
+                        .HasColumnName("location");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)")
+                        .HasColumnName("name");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("note");
+
+                    b.Property<DateTimeOffset?>("ReviewedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("reviewed_at");
+
+                    b.Property<string>("SearchKey")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)")
+                        .HasColumnName("search_key");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("status");
+
+                    b.HasKey("Id")
+                        .HasName("pk_community_places");
+
+                    b.HasIndex("DeviceId")
+                        .HasDatabaseName("ix_community_places_device_id");
+
+                    b.HasIndex("Location")
+                        .HasDatabaseName("ix_community_places_location");
+
+                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("Location"), "gist");
+
+                    b.HasIndex("Status")
+                        .HasDatabaseName("ix_community_places_status");
+
+                    b.ToTable("community_places", (string)null);
+                });
+
             modelBuilder.Entity("RoadPulse.Api.Data.Device", b =>
                 {
                     b.Property<Guid>("Id")
@@ -389,6 +459,16 @@ namespace RoadPulse.Api.Data.Migrations
                         .HasDatabaseName("ix_traffic_observations_window_start");
 
                     b.ToTable("traffic_observations", (string)null);
+                });
+
+            modelBuilder.Entity("RoadPulse.Api.Data.CommunityPlace", b =>
+                {
+                    b.HasOne("RoadPulse.Api.Data.Device", null)
+                        .WithMany()
+                        .HasForeignKey("DeviceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_community_places_devices_device_id");
                 });
 
             modelBuilder.Entity("RoadPulse.Api.Data.Report", b =>

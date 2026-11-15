@@ -23,7 +23,7 @@ class SharedApiTest {
         val base = server.url("").toString().trimEnd('/')
         val api = RoadPulseApi(base, base)
 
-        val hit = api.search("M City Jalan Ampang", 3.139, 101.6869).single()
+        val hit = api.search("M City Jalan Ampang", 3.139, 101.6869, GuidanceLanguage.EN).single()
         assertEquals("M City", hit.name)
         assertEquals("Kuala Lumpur, Malaysia", hit.detail)
         val searchPath = server.takeRequest().path!!

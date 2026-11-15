@@ -13,6 +13,7 @@ public class RoadPulseDb(DbContextOptions<RoadPulseDb> options) : DbContext(opti
     public DbSet<MapPlace> Places => Set<MapPlace>();
     public DbSet<TrafficEdge> TrafficEdges => Set<TrafficEdge>();
     public DbSet<TrafficObservation> TrafficObservations => Set<TrafficObservation>();
+    public DbSet<CommunityPlace> CommunityPlaces => Set<CommunityPlace>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -78,6 +79,21 @@ public class RoadPulseDb(DbContextOptions<RoadPulseDb> options) : DbContext(opti
             e.Property(p => p.Location).HasColumnType("geography (point, 4326)");
             e.HasIndex(p => p.Location).HasMethod("gist");
             e.HasIndex(p => p.Category);
+        });
+
+        b.Entity<CommunityPlace>(e =>
+        {
+            e.ToTable("community_places");
+            e.Property(p => p.Name).HasMaxLength(80);
+            e.Property(p => p.Note).HasMaxLength(120);
+            e.Property(p => p.SearchKey).HasMaxLength(80);
+            e.Property(p => p.Kind).HasConversion<string>().HasMaxLength(20);
+            e.Property(p => p.Status).HasConversion<string>().HasMaxLength(20);
+            e.Property(p => p.Location).HasColumnType("geography (point, 4326)");
+            e.HasIndex(p => p.Location).HasMethod("gist");
+            e.HasIndex(p => p.Status);
+            e.HasIndex(p => p.DeviceId);
+            e.HasOne<Device>().WithMany().HasForeignKey(p => p.DeviceId);
         });
 
         b.Entity<TrafficEdge>(e =>

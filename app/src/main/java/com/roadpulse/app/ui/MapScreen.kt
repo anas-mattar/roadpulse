@@ -643,6 +643,7 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                         onPark = { viewModel.parkHere(pin.location) },
                         onClose = viewModel::dismissPinned,
                         modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(12.dp),
+                        onAddPlace = if (state.placesAvailable) ({ name, kind, note -> viewModel.addCommunityPlace(pin.location, name, kind, note) }) else null,
                     )
                 }
             }
