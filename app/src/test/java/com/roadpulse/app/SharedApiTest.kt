@@ -29,13 +29,17 @@ class SharedApiTest {
         val searchPath = server.takeRequest().path!!
         assertTrue(searchPath, searchPath.startsWith("/api/?q=M%20City%20Jalan%20Ampang&limit=8&lat=3.139&lon=101.6869"))
 
-        val routes = api.routes(3.139, 101.6869, hit.lat, hit.lon, GuidanceLanguage.AR)
+        val stop = com.roadpulse.app.ios.SearchResult("Stop", "", 3.15, 101.7)
+        val options = com.roadpulse.app.data.RouteOptions(com.roadpulse.app.data.Vehicle.MOTORCYCLE, avoidTolls = true)
+        val routes = api.routes(3.139, 101.6869, hit.lat, hit.lon, listOf(stop), options, GuidanceLanguage.AR)
         assertEquals("الأسرع", routes.single().tag)
         assertTrue(routes.single().minutes > 5)
         assertTrue(routes.single().shape.size > 50)
         val routeRequest = server.takeRequest()
         assertEquals("RoadPulse/0.1", routeRequest.getHeader("User-Agent"))
         assertTrue(routeRequest.getHeader("Content-Type")!!.startsWith("application/json"))
+        val sent = routeRequest.body.readUtf8()
+        assertTrue(sent, sent.contains("motorcycle") && sent.contains("use_tolls") && sent.contains("3.15"))
         server.shutdown()
     }
 

@@ -7,6 +7,10 @@ import com.roadpulse.app.data.PlannedDrive
 import com.roadpulse.app.data.SavedPlaces
 import com.roadpulse.app.data.Shortcut
 import com.roadpulse.app.data.TextFile
+import com.roadpulse.app.data.ParkedCar
+import com.roadpulse.app.data.reportAge
+import com.roadpulse.app.i18n.stringsFor
+import com.roadpulse.app.nav.GuidanceLanguage
 
 /** Where this phone keeps its saved places (the app's own settings on iPhone). */
 expect fun phonePlacesFile(): TextFile
@@ -56,6 +60,21 @@ class SavedPlacesBook(file: TextFile) {
     /** When to leave for [arriveByMillis] with [route] (to show before saving). */
     fun leaveAtMillis(route: RouteSummary, arriveByMillis: Long): Long =
         PlannedDrive(0, Place("", "", GeoPoint(0.0, 0.0)), arriveByMillis, route.route.timeSeconds).leaveAtMillis
+
+    /** Where the car is parked, if marked. */
+    val parking: SearchResult? get() = saved.parking?.let { SearchResult("", "", it.location.lat, it.location.lon) }
+
+    /** "Your car · parked 2 h ago", or null when no spot is marked. */
+    fun parkingLabel(nowMillis: Long, language: GuidanceLanguage): String? = saved.parking?.let {
+        val s = stringsFor(language)
+        s.yourCarParked(reportAge(it.savedAtMillis, nowMillis, s))
+    }
+
+    fun setParking(lat: Double, lon: Double, nowMillis: Long) {
+        saved = store.setParking(ParkedCar(GeoPoint(lat, lon), nowMillis))
+    }
+
+    fun clearParking() { saved = store.setParking(null) }
 
     fun removePlanned(id: Long) { saved = store.removePlanned(id) }
 

@@ -37,6 +37,9 @@ targets:
         # The laptop's servers are plain HTTP on the home network (Settings > Use my laptop's server).
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true
+        # Search by voice (Apple's speech recognition).
+        NSMicrophoneUsageDescription: RoadPulse listens when you tap the microphone to search for a place by voice.
+        NSSpeechRecognitionUsageDescription: RoadPulse turns what you say into a place to search for.
         NSLocalNetworkUsageDescription: RoadPulse connects to the RoadPulse server on your laptop over your Wi-Fi.
     settings:
       base:

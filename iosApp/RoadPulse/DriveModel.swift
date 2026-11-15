@@ -41,6 +41,19 @@ final class DriveModel: ObservableObject {
         controller.backendUrl = backendUrl
     }
 
+    /// Vehicle, roads to avoid and the speeding warning, from Settings.
+    func applySettings(_ settings: DriveSettings) {
+        controller.routeOptions = settings.routeOptions()
+        controller.speedingMarginKmh = Int32(settings.warnOverBy)
+        controller.speedingSound = settings.speedingSound
+    }
+
+    /// Adds a stop on the way; false when there is no position yet.
+    func addStop(lat: Double, lon: Double) -> Bool { controller.addStop(lat: lat, lon: lon) }
+
+    /// The route still ahead, for the overview.
+    func remainingShape() -> [GeoPoint] { controller.remainingShape() }
+
     /// Anonymous road pieces for live traffic, only when the driver agreed.
     func setTrafficHelp(_ on: Bool) { controller.contributeTraffic = on }
 

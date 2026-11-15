@@ -122,6 +122,10 @@ class IosApiTest {
         val planned = book.addPlanned(klcc, route, now + 3 * 3_600_000L, now)!!
         assertEquals(now + 3 * 3_600_000L - 40 * 60_000L, planned.leaveAtMillis) // drive + 10 spare
         assertEquals(1, book.planned(now).size)
+        book.setParking(3.1, 101.6, now - 2 * 3_600_000L)
+        assertEquals("Your car · parked 2 h ago", book.parkingLabel(now, GuidanceLanguage.EN))
+        book.clearParking()
+        assertNull(book.parking)
         book.removePlanned(planned.id)
         assertTrue(book.planned(now).isEmpty())
     }

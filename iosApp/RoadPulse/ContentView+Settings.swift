@@ -4,7 +4,7 @@ import SwiftUI
 /// Settings: language, the laptop server, and privacy.
 extension ContentView {
     var settings: some View {
-        SettingsView(config: config, model: model, languageCode: $languageCode, strings: strings,
+        SettingsView(config: config, model: model, prefs: prefs, languageCode: $languageCode, language: language, strings: strings,
                      onShare: { items in
                          showSettings = false
                          // Let the settings sheet close before the share sheet opens.
@@ -17,7 +17,9 @@ extension ContentView {
 struct SettingsView: View {
     @ObservedObject var config: AppConfig
     @ObservedObject var model: SearchModel
+    @ObservedObject var prefs: DriveSettings
     @Binding var languageCode: String
+    let language: GuidanceLanguage
     let strings: AppStrings
     let onShare: ([Any]) -> Void
     let onClose: () -> Void
@@ -39,6 +41,9 @@ struct SettingsView: View {
                     .pickerStyle(.inline)
                     .labelsHidden()
                 }
+                routeSection
+                mapSection
+                speedSection
                 server
                 privacy
             }
@@ -58,6 +63,41 @@ struct SettingsView: View {
             }
         }
         .environment(\.layoutDirection, strings.rtl ? .rightToLeft : .leftToRight)
+    }
+
+    private var routeSection: some View {
+        Section(strings.route) {
+            Picker(strings.route, selection: $prefs.vehicle) {
+                ForEach(Choices.shared.vehicles(language: language), id: \.self) { v in Text(v[1]).tag(v[0]) }
+            }
+            .pickerStyle(.segmented)
+            Toggle(strings.avoidTolls, isOn: $prefs.avoidTolls)
+            Toggle(strings.avoidHighways, isOn: $prefs.avoidHighways)
+            Toggle(strings.avoidFerries, isOn: $prefs.avoidFerries)
+            Toggle(strings.allowUnpaved, isOn: $prefs.allowUnpaved)
+        }
+    }
+
+    private var mapSection: some View {
+        Section(strings.mapView) {
+            Picker(strings.mapColours, selection: $prefs.mapColors) {
+                ForEach(Choices.shared.mapColors(language: language), id: \.self) { c in Text(c[1]).tag(c[0]) }
+            }
+            Toggle(strings.northUp, isOn: $prefs.northUp)
+            Toggle(strings.showCompass, isOn: $prefs.showCompass)
+            Toggle(strings.flatMap, isOn: $prefs.flatMap)
+        }
+    }
+
+    private var speedSection: some View {
+        Section(strings.speed) {
+            Toggle(strings.showSpeedometer, isOn: $prefs.showSpeedometer)
+            Picker(strings.showSpeedLimit, selection: $prefs.limitDisplay) {
+                ForEach(Choices.shared.limitDisplays(language: language), id: \.self) { c in Text(c[1]).tag(c[0]) }
+            }
+            Stepper("\(strings.warnOverLimitBy): \(prefs.warnOverBy) \(strings.kmh)", value: $prefs.warnOverBy, in: 0...20)
+            Toggle(strings.soundWhenSpeeding, isOn: $prefs.speedingSound)
+        }
     }
 
     // Developer setting (English, like on Android): the RoadPulse servers on the laptop.

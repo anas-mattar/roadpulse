@@ -21,6 +21,13 @@ final class SearchModel: ObservableObject {
     /// Searching for the Home ("home") or Work ("work") address instead of a destination.
     @Published var shortcutTarget: String?
     @Published var profile: ProfileCard?
+    /// Stops on the way to the destination, in order.
+    @Published var stops: [SearchResult] = []
+    /// A long-pressed point and its name, with actions (drive here, add stop, parked here, save).
+    @Published var pinned: SearchResult?
+    /// Vehicle and roads to avoid (from Settings).
+    var routeOptions = Choices.shared.routeOptions(vehicleName: "CAR", avoidTolls: false, avoidHighways: false,
+                                                    avoidFerries: false, allowUnpaved: false)
 
     /// Home, Work, favourites, recent places and planned drives (only on this phone).
     let book = SavedPlacesBook()
@@ -96,17 +103,43 @@ final class SearchModel: ObservableObject {
         results = []
         resultsTitle = nil
         query = place.name
+        await planRoutes(from: from, language: language)
+    }
+
+    /// Plans (again) to the destination via the stops, with the current route options.
+    func planRoutes(from: CLLocationCoordinate2D, language: GuidanceLanguage) async {
+        guard let place = destination else { return }
         routes = []
         selected = 0
         busy = true
         errorText = nil
         do {
-            routes = try await api.routes(fromLat: from.latitude, fromLon: from.longitude,
-                                          toLat: place.lat, toLon: place.lon, language: language)
+            routes = try await api.routes(fromLat: from.latitude, fromLon: from.longitude, toLat: place.lat, toLon: place.lon,
+                                          stops: stops, options: routeOptions, language: language)
         } catch {
             errorText = error.localizedDescription
         }
         busy = false
+    }
+
+    func addStop(_ place: SearchResult, from: CLLocationCoordinate2D, language: GuidanceLanguage) async {
+        stops.append(place)
+        await planRoutes(from: from, language: language)
+    }
+
+    func removeStop(at index: Int, from: CLLocationCoordinate2D, language: GuidanceLanguage) async {
+        guard index < stops.count else { return }
+        stops.remove(at: index)
+        await planRoutes(from: from, language: language)
+    }
+
+    /// The driver long-pressed the map: show the point at once, then its name.
+    func pin(lat: Double, lon: Double, language: GuidanceLanguage, strings: AppStrings) async {
+        pinned = SearchResult(name: strings.droppedPin, detail: "", lat: lat, lon: lon)
+        if let named = try? await api.placeAt(lat: lat, lon: lon, language: language),
+           let current = pinned, current.lat == lat, current.lon == lon {
+            pinned = named
+        }
     }
 
     func clear() {
@@ -118,12 +151,13 @@ final class SearchModel: ObservableObject {
         selected = 0
         errorText = nil
         shortcutTarget = nil
+        stops = []
     }
 
     // MARK: Saved places
 
-    func saveFavourite(name: String, strings: AppStrings) {
-        guard let place = destination, !name.trimmingCharacters(in: .whitespaces).isEmpty else { return }
+    func saveFavourite(name: String, place: SearchResult?, strings: AppStrings) {
+        guard let place = place, !name.trimmingCharacters(in: .whitespaces).isEmpty else { return }
         book.addFavourite(name: name, place: place)
         objectWillChange.send()
         message = strings.saved(name: name)
@@ -133,6 +167,17 @@ final class SearchModel: ObservableObject {
         book.removeFavourite(place: place)
         objectWillChange.send()
         message = strings.removed(name: place.name)
+    }
+
+    func setParking(_ point: SearchResult, strings: AppStrings) {
+        book.setParking(lat: point.lat, lon: point.lon, nowMillis: millis(Date()))
+        objectWillChange.send()
+        message = strings.parkingSpotSaved
+    }
+
+    func clearParking() {
+        book.clearParking()
+        objectWillChange.send()
     }
 
     func plannedDrives() -> [PlannedItem] { book.planned(nowMillis: millis(Date())) }

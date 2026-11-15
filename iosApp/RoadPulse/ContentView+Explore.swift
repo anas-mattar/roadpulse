@@ -19,7 +19,80 @@ extension ContentView {
                 Spacer()
                 circleButton("location.fill", label: strings.showMyLocation) { recenterToken += 1 }
             }
-            if let pin = selectedReport { reportCard(pin) } else { card }
+            if let pin = selectedReport {
+                reportCard(pin)
+            } else if let point = model.pinned {
+                pinnedCard(point, driving: false)
+            } else {
+                card
+            }
+        }
+    }
+
+    // MARK: Long press
+
+    /// Actions for a long-pressed point.
+    func pinnedCard(_ point: SearchResult, driving: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(point.name).font(.headline)
+                    if !point.detail.isEmpty { Text(point.detail).font(.footnote).foregroundColor(.secondary).lineLimit(2) }
+                }
+                Spacer()
+                Button { model.pinned = nil } label: { Image(systemName: "xmark").foregroundColor(.secondary) }
+                    .accessibilityLabel(strings.close)
+            }
+            HStack(spacing: 8) {
+                if !driving {
+                    pinAction(strings.driveHere, icon: "location.north.fill", filled: true) {
+                        model.pinned = nil
+                        model.clear()
+                        go(point)
+                    }
+                }
+                pinAction(strings.addStop, icon: "flag.fill", filled: driving) { addStop(point) }
+            }
+            if !driving {
+                HStack(spacing: 8) {
+                    pinAction(strings.parkedHere, icon: "car.fill", filled: false) {
+                        model.pinned = nil
+                        model.setParking(point, strings: strings)
+                    }
+                    pinAction(strings.savePlace, icon: "star", filled: false) {
+                        favouritePlace = point
+                        favouriteName = point.name
+                        model.pinned = nil
+                        askFavouriteName = true
+                    }
+                }
+            }
+        }
+        .padding(16)
+        .background(Color(.systemBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 22))
+        .shadow(radius: 6)
+    }
+
+    func pinAction(_ text: String, icon: String, filled: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Label(text, systemImage: icon).font(.subheadline.bold()).lineLimit(1)
+                .frame(maxWidth: .infinity).frame(height: 44)
+                .background(filled ? indigo : indigo.opacity(0.1))
+                .foregroundColor(filled ? .white : indigo)
+                .clipShape(Capsule())
+        }
+    }
+
+    /// Adds a stop: to the drive in progress, or to the route being previewed.
+    func addStop(_ point: SearchResult) {
+        model.pinned = nil
+        if drive.isDriving {
+            model.message = drive.addStop(lat: point.lat, lon: point.lon) ? strings.stopAdded(name: point.name) : strings.waitingForLocation
+        } else if model.destination != nil {
+            Task { await model.addStop(point, from: here, language: language) }
+        } else {
+            model.message = strings.chooseDestinationFirst
         }
     }
 
@@ -129,6 +202,13 @@ extension ContentView {
                 .submitLabel(.search)
                 .onSubmit { Task { await model.search(near: here) } }
             if model.busy { ProgressView() }
+            if model.query.isEmpty && model.shortcutTarget == nil {
+                Button { listen() } label: {
+                    Image(systemName: voice.listening ? "mic.fill" : "mic")
+                        .foregroundColor(voice.listening ? .red : indigo)
+                }
+                .accessibilityLabel(strings.searchByVoice)
+            }
             if !showExplore {
                 Button { model.clear() } label: { Image(systemName: "xmark.circle.fill").foregroundColor(.secondary) }
                     .accessibilityLabel(strings.clear)
@@ -139,12 +219,33 @@ extension ContentView {
         .clipShape(RoundedRectangle(cornerRadius: 16))
     }
 
+    /// Search by voice: the words appear in the box, then the search runs.
+    func listen() {
+        if voice.listening {
+            voice.stop()
+            return
+        }
+        voice.start(localeTag: VoiceSearch.localeTag(for: languageCode)) { text, final in
+            if !text.isEmpty { model.query = text }
+            if final && !text.isEmpty { Task { await model.search(near: here) } }
+        }
+    }
+
     // MARK: Saved places, categories, planned and recent
 
     var explore: some View {
         VStack(alignment: .leading, spacing: 10) {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
+                    if let parked = model.book.parking,
+                       let label = model.book.parkingLabel(nowMillis: millis(Date()), language: language) {
+                        chip(label, icon: "car.fill") {
+                            go(SearchResult(name: strings.parkedHere, detail: "", lat: parked.lat, lon: parked.lon))
+                        }
+                        .contextMenu {
+                            Button(strings.forgetParking, role: .destructive) { model.clearParking() }
+                        }
+                    }
                     shortcutChip(home: true, place: model.book.home)
                     shortcutChip(home: false, place: model.book.work)
                     ForEach(Array(model.book.favourites.enumerated()), id: \.offset) { _, place in
@@ -260,6 +361,10 @@ extension ContentView {
 
     var routePreview: some View {
         VStack(alignment: .leading, spacing: 10) {
+            if let summary = Choices.shared.summary(options: model.routeOptions, language: language) {
+                Label(summary, systemImage: "slider.horizontal.3").font(.caption).foregroundColor(.secondary)
+            }
+            stopsList
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
                     ForEach(Array(model.routes.enumerated()), id: \.offset) { index, route in
@@ -271,6 +376,7 @@ extension ContentView {
             if let place = model.destination, model.selected < model.routes.count {
                 HStack(spacing: 8) {
                     smallButton("star", label: strings.savePlace) {
+                        favouritePlace = place
                         favouriteName = place.name
                         askFavouriteName = true
                     }
@@ -288,6 +394,25 @@ extension ContentView {
                         .frame(maxWidth: .infinity).frame(height: 52)
                         .background(indigo).clipShape(Capsule())
                     }
+                }
+            }
+        }
+    }
+
+    /// Stops on the way, each removable; a tip about adding them when there are none.
+    @ViewBuilder var stopsList: some View {
+        if model.stops.isEmpty {
+            Text(strings.tipAddStop).font(.caption).foregroundColor(.secondary)
+        } else {
+            ForEach(Array(model.stops.enumerated()), id: \.offset) { index, stop in
+                HStack {
+                    Image(systemName: "flag.fill").foregroundColor(.orange)
+                    Text(strings.stop(number: Int32(index + 1), name: stop.name)).font(.subheadline).lineLimit(1)
+                    Spacer()
+                    Button {
+                        Task { await model.removeStop(at: index, from: here, language: language) }
+                    } label: { Image(systemName: "minus.circle.fill").foregroundColor(.secondary) }
+                        .accessibilityLabel(strings.removeStop)
                 }
             }
         }

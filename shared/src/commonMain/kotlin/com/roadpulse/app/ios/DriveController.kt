@@ -99,6 +99,12 @@ class DriveController(var routingUrl: String) {
     private var stillThereJob: Job? = null
     private val askedAbout = mutableSetOf<String>()
 
+    /** Vehicle and roads to avoid, for rerouting and added stops. */
+    var routeOptions: RouteOptions = RouteOptions()
+    /** Warn when this many km/h over the limit; the warning beep can be turned off. */
+    var speedingMarginKmh: Int = 3
+    var speedingSound: Boolean = true
+
     /** The driver agreed to help with live traffic (anonymous road pieces, ADR 0004). Off by default. */
     var contributeTraffic: Boolean = false
         set(value) {
@@ -111,7 +117,9 @@ class DriveController(var routingUrl: String) {
         override fun narrator(): Narrator = narratorFor(language)
         override fun routingUrl(): String = this@DriveController.routingUrl
         override fun backendUrl(): String = this@DriveController.backendUrl
-        override fun routeOptions() = RouteOptions()
+        override fun routeOptions() = this@DriveController.routeOptions
+        override fun speedingMarginKmh(): Int = this@DriveController.speedingMarginKmh
+        override fun speedingSound(): Boolean = this@DriveController.speedingSound
         override fun isSimulated(): Boolean = simulated
         override fun trafficFix(position: GeoPoint, speedMps: Double?, timeMillis: Long, remainingM: Double) {
             val url = backendUrl
@@ -197,6 +205,21 @@ class DriveController(var routingUrl: String) {
     /** The driver took the offered faster route, or kept the current one. */
     fun takeFasterRoute() = NavigationSession.acceptFasterRoute()
     fun keepRoute() = NavigationSession.declineFasterRoute()
+
+    /**
+     * Adds a stop on the way (planned from the car's position, before the remaining stops).
+     * Returns false when there is no drive or no position yet.
+     */
+    fun addStop(lat: Double, lon: Double): Boolean {
+        val from = NavigationSession.state.value?.displayPosition ?: lastPosition ?: return false
+        return NavigationSession.addStop(GeoPoint(lat, lon), from)
+    }
+
+    /** The part of the route still ahead (for the overview). */
+    fun remainingShape(): List<GeoPoint> {
+        val s = NavigationSession.state.value ?: return emptyList()
+        return com.roadpulse.app.nav.RouteGeometry.remaining(s.route.shape, s.displayPosition)
+    }
 
     /** Answer to "still there?": true, false, or null for Skip. */
     fun answerStillThere(stillThere: Boolean?) {

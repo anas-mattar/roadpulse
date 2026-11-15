@@ -9,6 +9,12 @@ final class ReportAnnotation: MLNPointAnnotation {
     var colorHex = "#4C4F69"
 }
 
+/// A stop, the parked car or a long-pressed point: a round marker with a symbol.
+final class MarkerAnnotation: MLNPointAnnotation {
+    var symbol = "mappin"
+    var colorHex = "#5549B8"
+}
+
 /// The map: your position, route choices (selected in indigo, others grey) or the route being
 /// driven, the destination, community reports and live traffic (orange slow, red jammed).
 struct MapView: UIViewRepresentable {
@@ -25,6 +31,17 @@ struct MapView: UIViewRepresentable {
     /// The visible area changed (south, west, north, east).
     var onArea: (Double, Double, Double, Double) -> Void = { _, _, _, _ in }
     var onReportTap: (String) -> Void = { _ in }
+    /// Map view settings: north always up, compass, tilted map while driving.
+    var northUp = false
+    var showCompass = true
+    var tilted = true
+    var stops: [SearchResult] = []
+    var parking: SearchResult? = nil
+    var pinned: SearchResult? = nil
+    /// Increases each time the driver taps "overview": show [overviewShape] (the route ahead).
+    var overviewToken = 0
+    var overviewShape: [GeoPoint] = []
+    var onLongPress: (Double, Double) -> Void = { _, _ in }
 
     static let kualaLumpur = CLLocationCoordinate2D(latitude: 3.139, longitude: 101.6869)
     static let indigo = UIColor(red: 0.33, green: 0.29, blue: 0.72, alpha: 1)
@@ -38,6 +55,12 @@ struct MapView: UIViewRepresentable {
         map.setCenter(MapView.kualaLumpur, zoomLevel: 11, animated: false)
         map.delegate = context.coordinator
         context.coordinator.loadedStyleUrl = styleUrl
+        // Long press: actions for that point (drive here, add a stop, parked here, save).
+        let press = UILongPressGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.longPressed(_:)))
+        for other in map.gestureRecognizers ?? [] where other is UILongPressGestureRecognizer {
+            press.require(toFail: other)
+        }
+        map.addGestureRecognizer(press)
         return map
     }
 
@@ -57,6 +80,15 @@ struct MapView: UIViewRepresentable {
         private var drawnKey = ""
         private var trafficKey = ""
         private var following = true
+        private var lastOverview = 0
+        private var markers: [MarkerAnnotation] = []
+        private var markersKey = ""
+
+        @objc func longPressed(_ press: UILongPressGestureRecognizer) {
+            guard press.state == .began, let map = press.view as? MLNMapView else { return }
+            let point = map.convert(press.location(in: map), toCoordinateFrom: map)
+            view?.onLongPress(point.latitude, point.longitude)
+        }
 
         // MARK: Map events
 
@@ -87,6 +119,12 @@ struct MapView: UIViewRepresentable {
         }
 
         func mapView(_ mapView: MLNMapView, imageFor annotation: MLNAnnotation) -> MLNAnnotationImage? {
+            if let marker = annotation as? MarkerAnnotation {
+                let id = "marker-\(marker.symbol)-\(marker.colorHex)"
+                if let reused = mapView.dequeueReusableAnnotationImage(withIdentifier: id) { return reused }
+                return MLNAnnotationImage(image: Coordinator.marker(color: UIColor(hex: marker.colorHex), symbol: marker.symbol),
+                                          reuseIdentifier: id)
+            }
             guard let report = annotation as? ReportAnnotation else { return nil }
             let id = "report-\(report.typeName)"
             if let reused = mapView.dequeueReusableAnnotationImage(withIdentifier: id) { return reused }
@@ -121,12 +159,21 @@ struct MapView: UIViewRepresentable {
                 map.styleURL = url
                 return // continues in didFinishLoading
             }
+            map.allowsRotating = !view.northUp
+            map.compassView.isHidden = !view.showCompass
+            if view.northUp && view.drive == nil && map.direction != 0 { map.resetNorth() }
             if view.recenterToken != lastRecenter {
                 lastRecenter = view.recenterToken
                 following = true
                 if view.drive == nil { map.userTrackingMode = .follow }
             }
+            if view.overviewToken != lastOverview {
+                lastOverview = view.overviewToken
+                following = false
+                fit(view.overviewShape, on: map, padding: UIEdgeInsets(top: 260, left: 40, bottom: 240, right: 40))
+            }
             updateReports(view.reports, on: map)
+            updateMarkers(view, on: map)
             guard styleLoaded, let style = map.style else { return }
             updateTraffic(view.traffic, style: style)
 
@@ -204,10 +251,45 @@ struct MapView: UIViewRepresentable {
                 map.addAnnotation(pin)
                 carPin = pin
             }
-            if following {
-                let direction = drive.bearingDeg >= 0 ? drive.bearingDeg : map.direction
-                map.setCenter(position, zoomLevel: 16.5, direction: direction, animated: true)
+            if following, let view = view {
+                let direction = view.northUp ? 0 : (drive.bearingDeg >= 0 ? drive.bearingDeg : map.direction)
+                let camera = MLNMapCamera(lookingAtCenter: position, acrossDistance: 700,
+                                          pitch: view.tilted ? 45 : 0, heading: direction)
+                map.setCamera(camera, animated: true)
             }
+        }
+
+        /// Stops (numbered colour), the parked car and the long-pressed point.
+        private func updateMarkers(_ view: MapView, on map: MLNMapView) {
+            var wanted: [(SearchResult, String, String)] = view.stops.map { ($0, "flag.fill", "#DF8E1D") }
+            if let p = view.parking { wanted.append((p, "car.fill", "#1E66F5")) }
+            if let p = view.pinned { wanted.append((p, "mappin", "#D20F39")) }
+            let key = wanted.map { "\($0.0.lat),\($0.0.lon),\($0.1)" }.joined(separator: "|")
+            if key == markersKey { return }
+            markersKey = key
+            map.removeAnnotations(markers)
+            markers = wanted.map { item in
+                let m = MarkerAnnotation()
+                m.coordinate = CLLocationCoordinate2D(latitude: item.0.lat, longitude: item.0.lon)
+                m.symbol = item.1
+                m.colorHex = item.2
+                return m
+            }
+            map.addAnnotations(markers)
+        }
+
+        private func fit(_ points: [GeoPoint], on map: MLNMapView, padding: UIEdgeInsets) {
+            guard let first = points.first, points.count >= 2 else { return }
+            var south = first.lat, north = first.lat, west = first.lon, east = first.lon
+            for p in points {
+                south = min(south, p.lat); north = max(north, p.lat)
+                west = min(west, p.lon); east = max(east, p.lon)
+            }
+            let bounds = MLNCoordinateBounds(sw: CLLocationCoordinate2D(latitude: south, longitude: west),
+                                             ne: CLLocationCoordinate2D(latitude: north, longitude: east))
+            let camera = map.cameraThatFitsCoordinateBounds(bounds, edgePadding: padding)
+            camera.pitch = 0
+            map.setCamera(camera, animated: true)
         }
 
         private func updateReports(_ reports: [ReportPin], on map: MLNMapView) {

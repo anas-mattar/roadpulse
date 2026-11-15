@@ -86,7 +86,7 @@ class SharedDriveSessionTest {
         server.start()
         val base = server.url("").toString().trimEnd('/')
         val route = com.roadpulse.app.ios.RoadPulseApi(base, base)
-            .routes(3.139, 101.6869, 3.0738, 101.607, com.roadpulse.app.nav.GuidanceLanguage.EN).single()
+            .routes(3.139, 101.6869, 3.0738, 101.607, emptyList(), com.roadpulse.app.data.RouteOptions(), com.roadpulse.app.nav.GuidanceLanguage.EN).single()
         server.shutdown()
 
         NavigationSession.clock = { testScheduler.currentTime }

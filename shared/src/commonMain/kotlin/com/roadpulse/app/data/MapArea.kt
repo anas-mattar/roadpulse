@@ -47,7 +47,7 @@ data class MapArea(val minLon: Double, val minLat: Double, val maxLon: Double, v
 }
 
 /** "101.686900": six decimals with a dot. */
-internal fun sixDecimals(x: Double): String {
+fun sixDecimals(x: Double): String {
     val micro = com.roadpulse.app.util.mathRound(x * 1_000_000)
     val sign = if (micro < 0) "-" else ""
     val abs = if (micro < 0) -micro else micro

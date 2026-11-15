@@ -14,12 +14,17 @@ extension ContentView {
                     circleButton(drive.muted ? "speaker.slash.fill" : "speaker.wave.2.fill",
                                  label: drive.muted ? strings.unmuteVoice : strings.muteVoice) { drive.muted.toggle() }
                     circleButton("location.fill", label: strings.showMyLocation) { recenterToken += 1 }
+                    circleButton("map", label: strings.overview) {
+                        overviewShape = drive.remainingShape()
+                        overviewToken += 1
+                    }
                     if model.hasServer && !s.sharing {
                         circleButton("square.and.arrow.up", label: strings.shareDrive) { shareDrive(s) }
                     }
                 }
             }
             Spacer()
+            if let point = model.pinned { pinnedCard(point, driving: true) }
             speedRow(s)
             if let question = s.stillThereQuestion { stillThereCard(question, colorHex: s.stillThereColorHex ?? "#4C4F69") }
             if s.fasterRouteSavesMinutes > 0 { fasterRouteCard(s) }
@@ -91,7 +96,7 @@ extension ContentView {
 
     func speedRow(_ s: DriveSnapshot) -> some View {
         HStack(alignment: .bottom, spacing: 8) {
-            if s.speedKmh >= 0 {
+            if prefs.showSpeedometer && s.speedKmh >= 0 {
                 VStack(spacing: 0) {
                     Text("\(s.speedKmh)").font(.system(size: 22, weight: .semibold))
                     Text(strings.kmh).font(.system(size: 10))
@@ -100,7 +105,7 @@ extension ContentView {
                 .frame(width: 64, height: 64)
                 .background(Color(white: 0.17)).clipShape(Circle())
             }
-            if s.speedLimitKph > 0 {
+            if s.speedLimitKph > 0 && Choices.shared.showLimit(limitDisplayName: prefs.limitDisplay, speeding: isSpeeding(s)) {
                 Text("\(s.speedLimitKph)").font(.system(size: 17, weight: .bold)).foregroundColor(.black)
                     .frame(width: 46, height: 46)
                     .background(Color.white).clipShape(Circle())
@@ -216,7 +221,7 @@ extension ContentView {
 
     func isSpeeding(_ s: DriveSnapshot) -> Bool {
         let limit = Int(s.speedLimitKph)
-        return limit > 0 && Int(s.speedKmh) > limit + 3
+        return limit > 0 && Int(s.speedKmh) > limit + prefs.warnOverBy
     }
 
     /// Arrival time, including the delay from live traffic on the route ahead.

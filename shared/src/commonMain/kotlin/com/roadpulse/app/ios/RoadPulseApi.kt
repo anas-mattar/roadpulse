@@ -13,6 +13,8 @@ import com.roadpulse.app.data.ReportFeed
 import com.roadpulse.app.data.ReportType
 import com.roadpulse.app.data.ReportsClient
 import com.roadpulse.app.data.Route
+import com.roadpulse.app.data.RouteOptions
+import com.roadpulse.app.data.sixDecimals
 import com.roadpulse.app.data.RoutingClient
 import com.roadpulse.app.data.TollClient
 import com.roadpulse.app.data.TrafficClient
@@ -74,20 +76,33 @@ class RoadPulseApi(geocodingUrl: String, routingUrl: String, private val backend
 
     val hasServer: Boolean get() = backendUrl.isNotEmpty()
 
+    /** Name of the place at a long-pressed point ("Dropped pin" with coordinates when none is known). */
+    @Throws(Exception::class, CancellationException::class)
+    suspend fun placeAt(lat: Double, lon: Double, language: GuidanceLanguage): SearchResult {
+        val named = runCatching { geocoder.reverse(GeoPoint(lat, lon)) }.getOrNull()
+        return if (named != null) SearchResult(named.name, named.description, lat, lon)
+        else SearchResult(stringsFor(language).droppedPin, "${sixDecimals(lat)}, ${sixDecimals(lon)}", lat, lon)
+    }
+
     @Throws(Exception::class, CancellationException::class)
     suspend fun search(query: String, nearLat: Double, nearLon: Double): List<SearchResult> =
         geocoder.search(query, GeoPoint(nearLat, nearLon), limit = 8)
             .map { SearchResult(it.name, it.description, it.location.lat, it.location.lon) }
 
-    /** The fastest route and up to two alternatives, described in [language], with toll estimates. */
+    /**
+     * The fastest route and up to two alternatives via [stops] (in order), planned with [options]
+     * (vehicle, roads to avoid), described in [language], with toll estimates.
+     */
     @Throws(Exception::class, CancellationException::class)
-    suspend fun routes(fromLat: Double, fromLon: Double, toLat: Double, toLon: Double, language: GuidanceLanguage): List<RouteSummary> {
-        val routes = router.routes(GeoPoint(fromLat, fromLon), GeoPoint(toLat, toLon))
+    suspend fun routes(fromLat: Double, fromLon: Double, toLat: Double, toLon: Double, stops: List<SearchResult>,
+                       options: RouteOptions, language: GuidanceLanguage): List<RouteSummary> {
+        val routes = router.routes(GeoPoint(fromLat, fromLon), GeoPoint(toLat, toLon),
+            stops = stops.map { GeoPoint(it.lat, it.lon) }, options = options)
         val strings = stringsFor(language)
         val choices = RouteChoices.describe(routes, strings)
         return routes.mapIndexed { i, r ->
             val toll = if (r.hasToll && hasServer) {
-                runCatching { TollClient(backendUrl).estimate(r.shape, Vehicle.CAR) }.getOrNull()
+                runCatching { TollClient(backendUrl).estimate(r.shape, options.vehicle) }.getOrNull()
             } else null
             RouteSummary(choices[i].tag, choices[i].via, mathRound(r.timeSeconds / 60).toInt(), r.lengthKm, r.hasToll,
                 r.shape, r, TollClient.label(r.hasToll, toll, strings))

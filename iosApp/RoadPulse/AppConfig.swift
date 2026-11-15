@@ -32,13 +32,15 @@ final class AppConfig: ObservableObject {
     var routingUrl: String { host.map { "http://\($0):8002" } ?? AppConfig.publicRouting }
     /// Empty without the laptop: reports, cameras, places, tolls and traffic are then off.
     var backendUrl: String { host.map { "http://\($0):8080" } ?? "" }
-    var styleUrl: String {
-        if let h = host, laptopMaps { return "http://\(h):8090/styles/liberty/style.json" }
-        return AppConfig.publicStyle
+    /// Day map, or the night map ("fiord") after sunset or when chosen in settings.
+    func styleUrl(dark: Bool) -> String {
+        let name = dark ? "fiord" : "liberty"
+        if let h = host, laptopMaps { return "http://\(h):8090/styles/\(name)/style.json" }
+        return "https://tiles.openfreemap.org/styles/\(name)"
     }
 
     /// Changes whenever any server address changes (to rebuild the clients).
-    var key: String { "\(routingUrl)|\(backendUrl)|\(styleUrl)" }
+    var key: String { "\(routingUrl)|\(backendUrl)|\(styleUrl(dark: false))" }
 
     func makeApi() -> RoadPulseApi {
         RoadPulseApi(geocodingUrl: AppConfig.search, routingUrl: routingUrl, backendUrl: backendUrl)

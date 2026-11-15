@@ -10,6 +10,8 @@ struct ContentView: View {
     @StateObject var model = SearchModel()
     @StateObject var location = LocationProvider()
     @StateObject var drive = DriveModel()
+    @StateObject var prefs = DriveSettings()
+    @StateObject var voice = VoiceSearch()
     @ObservedObject var notifications = NotificationRouter.shared
     @State var recenterToken = 0
     @State var showSettings = false
@@ -18,6 +20,11 @@ struct ContentView: View {
     @State var showLeaveLater = false
     @State var askFavouriteName = false
     @State var favouriteName = ""
+    @State var favouritePlace: SearchResult?
+    @State var overviewToken = 0
+    @State var overviewShape: [GeoPoint] = []
+    /// Ticks every minute (day/night map).
+    @State var minuteTick = 0
     @State var selectedReport: ReportPin?
     @State var shareItem: ShareItem?
     @FocusState var searching: Bool
@@ -34,15 +41,28 @@ struct ContentView: View {
         if let s = drive.snapshot, s.hasPosition { return CLLocationCoordinate2D(latitude: s.lat, longitude: s.lon) }
         return location.coordinate ?? MapView.kualaLumpur
     }
+    /// Night map after sunset (or as chosen in Settings).
+    var darkMap: Bool {
+        _ = minuteTick
+        return Choices.shared.darkMap(mapColorsName: prefs.mapColors, lat: here.latitude, lon: here.longitude, nowMillis: millis(Date()))
+    }
     let indigo = Color(red: 0.33, green: 0.29, blue: 0.72)
     private let refresh = Timer.publish(every: 60, on: .main, in: .common).autoconnect()
 
     var body: some View {
         ZStack {
-            MapView(styleUrl: config.styleUrl, routes: model.routes, selected: model.selected, destination: model.destination,
-                    recenterToken: recenterToken, drive: drive.snapshot, reports: model.reports, traffic: model.traffic,
+            MapView(styleUrl: config.styleUrl(dark: darkMap), routes: model.routes, selected: model.selected,
+                    destination: model.destination, recenterToken: recenterToken, drive: drive.snapshot,
+                    reports: model.reports, traffic: model.traffic,
                     onArea: { s, w, n, e in model.areaChanged(s, w, n, e, language: language) },
-                    onReportTap: { id in selectedReport = model.reports.first { $0.id == id } })
+                    onReportTap: { id in selectedReport = model.reports.first { $0.id == id } },
+                    northUp: prefs.northUp, showCompass: prefs.showCompass, tilted: !prefs.flatMap,
+                    stops: model.stops, parking: model.book.parking, pinned: model.pinned,
+                    overviewToken: overviewToken, overviewShape: overviewShape,
+                    onLongPress: { lat, lon in
+                        selectedReport = nil
+                        Task { await model.pin(lat: lat, lon: lon, language: language, strings: strings) }
+                    })
                 .ignoresSafeArea()
 
             Group {
@@ -63,6 +83,13 @@ struct ContentView: View {
             drive.setLanguage(language)
             model.configure(config)
             applyServers()
+            applySettings()
+        }
+        .onChange(of: prefs.driveKey) { _ in
+            applySettings()
+            if !drive.isDriving && model.destination != nil {
+                Task { await model.planRoutes(from: here, language: language) }
+            }
         }
         .onChange(of: languageCode) { _ in drive.setLanguage(language) }
         .onChange(of: config.key) { _ in
@@ -83,7 +110,10 @@ struct ContentView: View {
                 Task { await model.choose(item.place, from: here, language: language, strings: strings) }
             }
         }
-        .onReceive(refresh) { _ in Task { await model.refreshArea(language: language) } }
+        .onReceive(refresh) { _ in
+            minuteTick += 1
+            Task { await model.refreshArea(language: language) }
+        }
         .sheet(isPresented: $showSettings) { settings }
         .sheet(isPresented: $showReport) {
             ReportSheet(api: model.api, language: language, strings: strings, onSend: { type, subtype, minutes in
@@ -101,9 +131,14 @@ struct ContentView: View {
         .sheet(item: $shareItem) { item in ActivityView(items: item.items) }
         .alert(strings.savePlace, isPresented: $askFavouriteName) {
             TextField(strings.placeNameHint, text: $favouriteName)
-            Button(strings.save) { model.saveFavourite(name: favouriteName, strings: strings) }
+            Button(strings.save) { model.saveFavourite(name: favouriteName, place: favouritePlace, strings: strings) }
             Button(strings.cancel, role: .cancel) {}
         }
+    }
+
+    func applySettings() {
+        model.routeOptions = prefs.routeOptions()
+        drive.applySettings(prefs)
     }
 
     func applyServers() {
