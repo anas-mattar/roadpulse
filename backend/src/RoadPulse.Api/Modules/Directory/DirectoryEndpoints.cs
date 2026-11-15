@@ -142,7 +142,7 @@ public static class DirectoryImporter
         await using var tx = await conn.BeginTransactionAsync(ct);
         await using (var cmd = new NpgsqlCommand(
             "CREATE TEMP TABLE overture_import (id text, name text, category text, address text, search_key text, lat double precision, lon double precision, confidence real) ON COMMIT DROP",
-            conn, tx))
+            conn, tx) { CommandTimeout = 300 })
             await cmd.ExecuteNonQueryAsync(ct);
 
         var count = 0;
@@ -175,8 +175,18 @@ public static class DirectoryImporter
             """, conn, tx) { CommandTimeout = 1800 })
             await cmd.ExecuteNonQueryAsync(ct);
         await tx.CommitAsync(ct);
-        await using (var analyze = new NpgsqlCommand("ANALYZE directory_places", conn)) await analyze.ExecuteNonQueryAsync(ct);
         log.LogInformation("Loaded {Count} Overture places", count);
+        // Statistics for fast searches. Slow on some laptops (Docker disk): allow time, and if it
+        // still fails the places are loaded anyway (PostgreSQL also updates statistics by itself).
+        try
+        {
+            await using var analyze = new NpgsqlCommand("ANALYZE directory_places", conn) { CommandTimeout = 1800 };
+            await analyze.ExecuteNonQueryAsync(ct);
+        }
+        catch (Exception e) when (e is NpgsqlException or TimeoutException)
+        {
+            log.LogWarning("Places are loaded, but updating search statistics failed ({Error}); searches may be slower for a while.", e.Message);
+        }
         return count;
     }
 
