@@ -13,7 +13,11 @@ import kotlin.coroutines.cancellation.CancellationException
 class SearchResult(val name: String, val detail: String, val lat: Double, val lon: Double)
 
 /** One route choice: its tag ("Fastest", "No tolls", "+5 min"), main road, time, length and tolls. */
-class RouteSummary(val tag: String, val via: String?, val minutes: Int, val km: Double, val hasToll: Boolean)
+class RouteSummary(
+    val tag: String, val via: String?, val minutes: Int, val km: Double, val hasToll: Boolean,
+    /** The route line, for drawing on the map. */
+    val shape: List<GeoPoint>,
+)
 
 /**
  * What the iPhone app calls: search and route choices, using the same clients and wording as the
@@ -34,7 +38,7 @@ class RoadPulseApi(geocodingUrl: String, routingUrl: String) {
         val routes = router.routes(GeoPoint(fromLat, fromLon), GeoPoint(toLat, toLon))
         val choices = RouteChoices.describe(routes, stringsFor(language))
         return routes.mapIndexed { i, r ->
-            RouteSummary(choices[i].tag, choices[i].via, mathRound(r.timeSeconds / 60).toInt(), r.lengthKm, r.hasToll)
+            RouteSummary(choices[i].tag, choices[i].via, mathRound(r.timeSeconds / 60).toInt(), r.lengthKm, r.hasToll, r.shape)
         }
     }
 }

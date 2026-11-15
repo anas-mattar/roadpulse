@@ -5,6 +5,11 @@ options:
   bundleIdPrefix: com.roadpulse
   deploymentTarget:
     iOS: "16.0"
+packages:
+  # The map (MapLibre Native for iOS, BSD licence).
+  MapLibre:
+    url: https://github.com/maplibre/maplibre-gl-native-distribution
+    from: 6.0.0
 settings:
   base:
     SWIFT_VERSION: "5.9"
@@ -14,6 +19,9 @@ targets:
     type: application
     platform: iOS
     sources: [RoadPulse]
+    dependencies:
+      - package: MapLibre
+        product: MapLibre
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.roadpulse.app
@@ -22,6 +30,7 @@ targets:
         GENERATE_INFOPLIST_FILE: "YES"
         INFOPLIST_KEY_CFBundleDisplayName: RoadPulse
         INFOPLIST_KEY_UILaunchScreen_Generation: "YES"
+        INFOPLIST_KEY_NSLocationWhenInUseUsageDescription: "RoadPulse shows where you are on the map and plans routes from your position."
         INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait
         TARGETED_DEVICE_FAMILY: "1"
         # The shared Kotlin logic, built by Gradle into a static framework.

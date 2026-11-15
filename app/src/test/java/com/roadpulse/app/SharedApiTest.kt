@@ -32,6 +32,7 @@ class SharedApiTest {
         val routes = api.routes(3.139, 101.6869, hit.lat, hit.lon, GuidanceLanguage.AR)
         assertEquals("الأسرع", routes.single().tag)
         assertTrue(routes.single().minutes > 5)
+        assertTrue(routes.single().shape.size > 50)
         val routeRequest = server.takeRequest()
         assertEquals("RoadPulse/0.1", routeRequest.getHeader("User-Agent"))
         assertTrue(routeRequest.getHeader("Content-Type")!!.startsWith("application/json"))
