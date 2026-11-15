@@ -208,6 +208,8 @@ extension ContentView {
                 .focused($searching)
                 .submitLabel(.search)
                 .onSubmit { Task { await model.search(near: here) } }
+                // Results appear while typing (after a short pause), like on Android.
+                .onChange(of: model.query) { _ in model.queryChanged(near: here) }
             if model.busy { ProgressView() }
             if model.query.isEmpty && model.shortcutTarget == nil {
                 Button { listen() } label: {

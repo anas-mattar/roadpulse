@@ -254,6 +254,10 @@ struct MenuView: View {
                     .textInputAutocapitalization(.never)
                 Toggle("Maps from my laptop", isOn: $config.laptopMaps)
                 Button("Test connection") {
+                    if config.laptopAddress.trimmingCharacters(in: .whitespaces).isEmpty {
+                        serverCheck = "Type your laptop's address first (open-iphone-access.ps1 prints it, e.g. 192.168.1.20)."
+                        return
+                    }
                     serverCheck = "…"
                     Task {
                         let reply = try? await config.makeApi().serverReachable()

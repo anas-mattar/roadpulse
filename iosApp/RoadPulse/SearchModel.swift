@@ -57,6 +57,19 @@ final class SearchModel: ObservableObject {
 
     // MARK: Search and routes
 
+    private var typingTask: Task<Void, Never>?
+
+    /// The search text changed: search after a short pause (not for the name of a chosen place).
+    func queryChanged(near: CLLocationCoordinate2D) {
+        typingTask?.cancel()
+        let text = query.trimmingCharacters(in: .whitespaces)
+        if text.count < 3 || destination?.name == query { return }
+        typingTask = Task {
+            try? await Task.sleep(nanoseconds: 600_000_000)
+            if !Task.isCancelled && query.trimmingCharacters(in: .whitespaces) == text { await search(near: near) }
+        }
+    }
+
     func search(near: CLLocationCoordinate2D) async {
         let text = query.trimmingCharacters(in: .whitespaces)
         guard text.count >= 2 else { return }
