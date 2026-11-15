@@ -340,7 +340,7 @@ extension ContentView {
         }
     }
 
-    func row(icon: String, title: String, detail: String) -> some View {
+    func row(icon: String, title: String, detail: String, distance: String? = nil) -> some View {
         HStack(spacing: 12) {
             Image(systemName: icon).foregroundColor(.secondary).frame(width: 22)
             VStack(alignment: .leading, spacing: 2) {
@@ -348,8 +348,19 @@ extension ContentView {
                 if !detail.isEmpty { Text(detail).font(.footnote).foregroundColor(.secondary).lineLimit(1) }
             }
             Spacer(minLength: 0)
+            if let distance = distance {
+                Text(distance).font(.subheadline).foregroundColor(.secondary)
+            }
         }
         .padding(.vertical, 4)
+    }
+
+    /// "6 km" from here to a search result (category lists already show it in the detail).
+    func distanceText(to place: SearchResult) -> String? {
+        guard model.resultsTitle == nil else { return nil }
+        let from = CLLocation(latitude: here.latitude, longitude: here.longitude)
+        let meters = from.distance(from: CLLocation(latitude: place.lat, longitude: place.lon))
+        return strings.distance(km: meters / 1000)
     }
 
     // MARK: Results and routes
@@ -360,7 +371,9 @@ extension ContentView {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
                     ForEach(Array(model.results.enumerated()), id: \.offset) { _, place in
-                        Button { go(place) } label: { row(icon: "mappin.circle", title: place.name, detail: place.detail) }
+                        Button { go(place) } label: {
+                            row(icon: "mappin.circle", title: place.name, detail: place.detail, distance: distanceText(to: place))
+                        }
                     }
                 }
             }

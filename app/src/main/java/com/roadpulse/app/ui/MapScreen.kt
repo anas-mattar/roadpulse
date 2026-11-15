@@ -520,6 +520,7 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                 ScreenMode.EXPLORE -> ExploreOverlay(
                     query = state.query,
                     results = state.searchResults,
+                    searchFrom = state.searchFrom,
                     saved = state.saved,
                     settingShortcut = state.settingShortcut,
                     onShortcut = { viewModel.onShortcut(it, currentLocation()) },

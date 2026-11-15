@@ -104,6 +104,8 @@ internal const val MAP_CREDITS = "© OpenStreetMap contributors · OpenMapTiles 
 fun ExploreOverlay(
     query: String,
     results: List<Place>,
+    /** Where the search was made from: each result shows its distance (not for category lists, which already do). */
+    searchFrom: com.roadpulse.app.data.GeoPoint? = null,
     saved: SavedPlaces = SavedPlaces(),
     settingShortcut: Shortcut? = null,
     onShortcut: (Shortcut) -> Unit = {},
@@ -176,7 +178,10 @@ fun ExploreOverlay(
                     }
                     if (results.isNotEmpty()) {
                         LazyColumn(Modifier.heightIn(max = 300.dp)) {
-                            items(results) { place -> ResultRow(place) { onSelect(place) } }
+                            items(results) { place ->
+                                val km = if (categoryTitle == null) searchFrom?.let { com.roadpulse.app.data.Geo.distanceMeters(it, place.location) / 1000 } else null
+                                ResultRow(place, distance = km?.let { formatKm(it) }) { onSelect(place) }
+                            }
                         }
                         HorizontalDivider(Modifier.padding(vertical = 8.dp), color = RP.Field)
                     }
@@ -312,7 +317,7 @@ private fun SearchField(
 }
 
 @Composable
-private fun ResultRow(place: Place, icon: ImageVector = Icons.Filled.LocationOn, onClick: () -> Unit) {
+private fun ResultRow(place: Place, icon: ImageVector = Icons.Filled.LocationOn, distance: String? = null, onClick: () -> Unit) {
     Row(
         Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 8.dp, horizontal = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -327,6 +332,9 @@ private fun ResultRow(place: Place, icon: ImageVector = Icons.Filled.LocationOn,
             if (place.description.isNotBlank()) {
                 Text(place.description, fontSize = 12.sp, color = RP.TextSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
+        }
+        if (distance != null) {
+            Text(distance, fontSize = 13.sp, color = RP.TextSecondary, modifier = Modifier.padding(start = 8.dp))
         }
     }
 }

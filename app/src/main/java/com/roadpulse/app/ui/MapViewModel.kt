@@ -111,6 +111,8 @@ data class MapUiState(
     /** "Routes" during a drive: other ways from here (null when the list is closed). */
     val driveAlternatives: List<Route>? = null,
     val loadingAlternatives: Boolean = false,
+    /** Where the last search was made from (distance on each result). */
+    val searchFrom: GeoPoint? = null,
     /** The next turn while driving (map marker and road name). */
     val upcomingPoint: GeoPoint? = null,
     val upcomingStreet: String? = null,
@@ -227,7 +229,7 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
             delay(350) // debounce typing
             try {
                 val results = geocoder.search(query, near)
-                _state.update { it.copy(searchResults = results) }
+                _state.update { it.copy(searchResults = results, searchFrom = near) }
             } catch (e: CancellationException) {
                 throw e // superseded by newer typing: not an error
             } catch (e: Exception) {

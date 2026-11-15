@@ -27,7 +27,7 @@ class SharedApiTest {
         assertEquals("M City", hit.name)
         assertEquals("Kuala Lumpur, Malaysia", hit.detail)
         val searchPath = server.takeRequest().path!!
-        assertTrue(searchPath, searchPath.startsWith("/api/?q=M%20City%20Jalan%20Ampang&limit=8&lat=3.139&lon=101.6869"))
+        assertTrue(searchPath, searchPath.startsWith("/api/?q=M%20City%20Jalan%20Ampang&limit=24&lat=3.139&lon=101.6869"))
 
         val stop = com.roadpulse.app.ios.SearchResult("Stop", "", 3.15, 101.7)
         val options = com.roadpulse.app.data.RouteOptions(com.roadpulse.app.data.Vehicle.MOTORCYCLE, avoidTolls = true)

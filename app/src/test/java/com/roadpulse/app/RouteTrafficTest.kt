@@ -38,3 +38,22 @@ class RouteTrafficTest {
         assertTrue(RouteTraffic.pieces(shape, listOf(line("JAM", 2, 8, lat = 3.102))).isEmpty())
     }
 }
+
+/** Search results: places nearby first, far-away ones only after them. */
+class SearchRankingTest {
+    @Test
+    fun nearbyPlacesComeBeforeFamousOnesAbroad() {
+        val me = GeoPoint(3.2, 101.75) // Kuala Lumpur
+        fun place(name: String, lat: Double, lon: Double) = com.roadpulse.app.data.Place(name, "", GeoPoint(lat, lon))
+        val fromService = listOf(
+            place("MCITy, USA", 32.35, -90.88),
+            place("Mcity Inn, Miri", 4.39, 113.99),
+            place("M City, Jalan Ampang", 3.16, 101.72),
+            place("M City Kopitiam, Selayang", 3.25, 101.65),
+        )
+        val ranked = com.roadpulse.app.data.GeocodingClient.rankByDistance(fromService, me).map { it.name }
+        assertEquals(listOf("M City, Jalan Ampang", "M City Kopitiam, Selayang", "Mcity Inn, Miri", "MCITy, USA"), ranked)
+        // Without a position the service's order is kept.
+        assertEquals(fromService, com.roadpulse.app.data.GeocodingClient.rankByDistance(fromService, null))
+    }
+}
