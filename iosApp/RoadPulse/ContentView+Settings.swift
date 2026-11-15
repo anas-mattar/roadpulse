@@ -53,7 +53,7 @@ struct SettingsView: View {
                 Text(strings.helpTrafficText)
             }
             .confirmationDialog(strings.deleteDataConfirm, isPresented: $askDelete, titleVisibility: .visible) {
-                Button(strings.delete, role: .destructive) { deleteServerData() }
+                Button(strings.deleteData, role: .destructive) { deleteServerData() }
                 Button(strings.cancel, role: .cancel) {}
             }
         }
