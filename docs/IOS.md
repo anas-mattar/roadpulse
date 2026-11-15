@@ -6,7 +6,7 @@ places (Home, Work, favourites, recent), planned drives with "time to leave" not
 profile and points, share my drive, report details (and how long for a closure), "still there?"
 after passing a report, and privacy (traffic help opt-in, privacy policy, export and delete my
 data, clear saved places), and step 7: route options, map and speed settings, stops, parking,
-overview and search by voice. Steps 1-6 built green on GitHub; the app has not been run on a phone yet.
+overview and search by voice. Steps 1-7 built green on GitHub; the app has not been run on a phone yet.
 
 ## How the two apps share code
 

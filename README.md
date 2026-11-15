@@ -39,6 +39,7 @@ components. "RoadPulse" is a placeholder name; check trademark availability befo
 - Traffic: automatic jam reports from live traffic; arrival time includes traffic delay; a faster
   route around jams is offered during the drive (Take it / No thanks)
 - iPhone app: shared Kotlin logic in `shared/`, Swift app in `iosApp/`; reaches the laptop servers over Wi-Fi (`backend/open-iphone-access.ps1`), see `docs/IOS.md`
+- Testing on a real phone (iPhone and Android): step-by-step checklist in `docs/PHONE-TEST.md`
 - Toll estimates on route cards from a price table you maintain (`backend/tolls/`)
 - Real phone over USB with everything on the laptop: `connect-phone.bat`, `docs/REAL_PHONE.md`
 - Navigation keeps running in the background and with the screen off (foreground service
