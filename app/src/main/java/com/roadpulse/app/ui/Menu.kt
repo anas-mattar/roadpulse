@@ -62,8 +62,8 @@ fun MenuPanel(
             ) {
                 Column(Modifier.statusBarsPadding().padding(20.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(Modifier.size(52.dp).background(RP.IndigoLight, CircleShape), contentAlignment = Alignment.Center) {
-                            Icon(Icons.Filled.Person, contentDescription = null, tint = RP.Indigo, modifier = Modifier.size(30.dp))
+                        Box(Modifier.size(52.dp).background(RP.BrandLight, CircleShape), contentAlignment = Alignment.Center) {
+                            Icon(Icons.Filled.Person, contentDescription = null, tint = RP.Brand, modifier = Modifier.size(30.dp))
                         }
                         Column(Modifier.padding(start = 12.dp).weight(1f)) {
                             Text(profile?.nickname ?: "Jalanna", fontSize = 20.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -89,7 +89,7 @@ private fun MenuRow(label: String, icon: ImageVector, onClick: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 16.dp),
     ) {
-        Icon(icon, contentDescription = null, tint = RP.Indigo)
+        Icon(icon, contentDescription = null, tint = RP.Brand)
         Text(label, fontSize = 17.sp, modifier = Modifier.padding(start = 16.dp))
     }
 }

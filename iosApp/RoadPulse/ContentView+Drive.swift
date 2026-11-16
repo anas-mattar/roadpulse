@@ -47,7 +47,7 @@ extension ContentView {
         }
         .foregroundColor(.white)
         .padding(.horizontal, 16).padding(.vertical, 14)
-        .background(indigo)
+        .background(brand)
         .clipShape(RoundedRectangle(cornerRadius: 22))
         .shadow(radius: 5)
     }
@@ -63,7 +63,7 @@ extension ContentView {
             }
         }
         .padding(.horizontal, 10).padding(.vertical, 6)
-        .background(Color(red: 0.15, green: 0.13, blue: 0.36))
+        .background(Color(red: 0.031, green: 0.204, blue: 0.227))
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .environment(\.layoutDirection, .leftToRight)
     }
@@ -82,7 +82,7 @@ extension ContentView {
             }
             if let label = s.cameraLabel, s.cameraAheadM >= 0 {
                 pill(label, icon: "camera.fill", trailing: strings.distance(km: s.cameraAheadM / 1000),
-                     background: Color(red: 0.15, green: 0.13, blue: 0.36))
+                     background: Color(red: 0.031, green: 0.204, blue: 0.227))
             }
             if let label = s.schoolLabel, s.schoolAheadM >= 0 {
                 pill(label, icon: "graduationcap.fill", trailing: strings.distance(km: s.schoolAheadM / 1000),
@@ -285,7 +285,7 @@ extension ContentView {
                         drive.useRoute(route)
                     } label: {
                         Text(strings.goShort).bold().padding(.horizontal, 16).padding(.vertical, 8)
-                            .background(indigo).foregroundColor(.white).clipShape(Capsule())
+                            .background(brand).foregroundColor(.white).clipShape(Capsule())
                     }
                 }
                 .padding(10)
@@ -315,14 +315,14 @@ extension ContentView {
             HStack(spacing: 10) {
                 Button { showSharePreview = false } label: {
                     Text(strings.cancel).frame(maxWidth: .infinity).frame(height: 50)
-                        .background(Color(.secondarySystemBackground)).foregroundColor(indigo).clipShape(Capsule())
+                        .background(Color(.secondarySystemBackground)).foregroundColor(brand).clipShape(Capsule())
                 }
                 Button {
                     showSharePreview = false
                     startSharing()
                 } label: {
                     Text(strings.shareDrive).bold().frame(maxWidth: .infinity).frame(height: 50)
-                        .background(indigo).foregroundColor(.white).clipShape(Capsule())
+                        .background(brand).foregroundColor(.white).clipShape(Capsule())
                 }
             }
         }
@@ -355,7 +355,7 @@ extension ContentView {
                     }
                 } label: {
                     Text(strings.shareDrive).bold().frame(maxWidth: .infinity).frame(height: 50)
-                        .background(indigo).foregroundColor(.white).clipShape(Capsule())
+                        .background(brand).foregroundColor(.white).clipShape(Capsule())
                 }
             }
         }

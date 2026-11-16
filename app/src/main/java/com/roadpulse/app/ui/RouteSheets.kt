@@ -79,9 +79,9 @@ fun MapListSwitch(list: Boolean, onChange: (Boolean) -> Unit, modifier: Modifier
                     label,
                     fontSize = 15.sp,
                     fontWeight = if (on) FontWeight.SemiBold else FontWeight.Normal,
-                    color = if (on) RP.Indigo else RP.TextSecondary,
+                    color = if (on) RP.Brand else RP.TextSecondary,
                     modifier = Modifier
-                        .background(if (on) RP.IndigoLight else Color.Transparent, RoundedCornerShape(18.dp))
+                        .background(if (on) RP.BrandLight else Color.Transparent, RoundedCornerShape(18.dp))
                         .clickable { onChange(isList) }
                         .padding(horizontal = 18.dp, vertical = 8.dp),
                 )
@@ -110,7 +110,7 @@ fun RouteList(
                 onClick = { onSelect(i) },
                 shape = RoundedCornerShape(22.dp),
                 color = Color.White,
-                border = if (i == selected) BorderStroke(2.dp, RP.Indigo) else null,
+                border = if (i == selected) BorderStroke(2.dp, RP.Brand) else null,
                 shadowElevation = 6.dp,
                 modifier = Modifier.fillMaxWidth(),
             ) {
@@ -126,7 +126,7 @@ fun RouteList(
                         Button(
                             onClick = { onGo(i) },
                             shape = RoundedCornerShape(24.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = RP.Indigo, contentColor = Color.White),
+                            colors = ButtonDefaults.buttonColors(containerColor = RP.Brand, contentColor = Color.White),
                         ) {
                             Icon(Icons.Filled.Navigation, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(Modifier.width(6.dp))
@@ -209,7 +209,7 @@ fun DriveSheet(
                     Button(
                         onClick = { onPickRoute(r) },
                         shape = RoundedCornerShape(20.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = RP.Indigo, contentColor = Color.White),
+                        colors = ButtonDefaults.buttonColors(containerColor = RP.Brand, contentColor = Color.White),
                     ) { Text(strings.goShort, fontWeight = FontWeight.SemiBold) }
                 }
             }

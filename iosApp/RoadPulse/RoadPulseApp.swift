@@ -10,6 +10,8 @@ struct RoadPulseApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
+                // Buttons, switches and links use the Jalanna teal instead of the system blue.
+                .tint(Color(red: 0.043, green: 0.498, blue: 0.471))
         }
     }
 }

@@ -68,7 +68,7 @@ struct ContentView: View {
         _ = minuteTick
         return Choices.shared.darkMap(mapColorsName: prefs.mapColors, lat: here.latitude, lon: here.longitude, nowMillis: millis(Date()))
     }
-    let indigo = Color(red: 0.33, green: 0.29, blue: 0.72)
+    let brand = Color(red: 0.043, green: 0.498, blue: 0.471)
     private let refresh = Timer.publish(every: 60, on: .main, in: .common).autoconnect()
 
     var body: some View {
@@ -207,7 +207,7 @@ struct ContentView: View {
         Button(action: action) {
             Image(systemName: icon)
                 .font(.system(size: 18, weight: .semibold))
-                .foregroundColor(indigo)
+                .foregroundColor(brand)
                 .frame(width: 44, height: 44)
                 .background(Color(.systemBackground))
                 .clipShape(Circle())
@@ -236,7 +236,7 @@ struct ContentView: View {
             }
             .font(.subheadline.bold())
             .padding(.horizontal, 14).padding(.vertical, 8)
-            .background(indigo.opacity(0.12)).foregroundColor(indigo).clipShape(Capsule())
+            .background(brand.opacity(0.12)).foregroundColor(brand).clipShape(Capsule())
         }
     }
 }

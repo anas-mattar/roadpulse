@@ -8,14 +8,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 
-/** RoadPulse palette: deep indigo for routes and guidance, amber for reports, teal for progress. */
+/** Jalanna palette: the icon's teal for routes and guidance, amber for reports, green for progress. */
 object RP {
-    val Indigo = Color(0xFF534AB7)
-    val IndigoDark = Color(0xFF3C3489)
-    val IndigoDeep = Color(0xFF26215C)
-    val IndigoLight = Color(0xFFEEEDFE)
-    val IndigoSoft = Color(0xFFCECBF6)
-    val IndigoBright = Color(0xFF7F77DD)
+    val Brand = Color(0xFF0B7F78)
+    val BrandDark = Color(0xFF0A5A5C)
+    val BrandDeep = Color(0xFF08343A)
+    val BrandLight = Color(0xFFE3F5F2)
+    val BrandSoft = Color(0xFFB5E3DC)
+    val BrandBright = Color(0xFF3FC1B0)
     val Amber = Color(0xFFFAC775)
     val AmberDark = Color(0xFF633806)
     val Teal = Color(0xFF5DCAA5)
@@ -35,10 +35,10 @@ object RP {
 fun RoadPulseTheme(content: @Composable () -> Unit) {
     MaterialTheme(
         colorScheme = lightColorScheme(
-            primary = RP.Indigo,
+            primary = RP.Brand,
             onPrimary = Color.White,
-            primaryContainer = RP.IndigoLight,
-            onPrimaryContainer = RP.IndigoDeep,
+            primaryContainer = RP.BrandLight,
+            onPrimaryContainer = RP.BrandDeep,
             secondary = RP.TealDark,
             surface = Color.White,
             surfaceVariant = RP.Field,

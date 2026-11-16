@@ -12,10 +12,10 @@ final class ReportAnnotation: MLNPointAnnotation {
 /// A stop, the parked car or a long-pressed point: a round marker with a symbol.
 final class MarkerAnnotation: MLNPointAnnotation {
     var symbol = "mappin"
-    var colorHex = "#5549B8"
+    var colorHex = "#0B7F78"
 }
 
-/// The map: your position, route choices (selected in indigo, others grey) or the route being
+/// The map: your position, route choices (selected in teal, others grey) or the route being
 /// driven, the destination, community reports and live traffic (orange slow, red jammed).
 struct MapView: UIViewRepresentable {
     var styleUrl: String
@@ -48,7 +48,7 @@ struct MapView: UIViewRepresentable {
     var turn: SearchResult? = nil
 
     static let kualaLumpur = CLLocationCoordinate2D(latitude: 3.139, longitude: 101.6869)
-    static let indigo = UIColor(red: 0.33, green: 0.29, blue: 0.72, alpha: 1)
+    static let brand = UIColor(red: 0.043, green: 0.498, blue: 0.471, alpha: 1)
 
     func makeCoordinator() -> Coordinator { Coordinator() }
 
@@ -192,7 +192,7 @@ struct MapView: UIViewRepresentable {
             updateTurn(view.turn, style: style)
         }
 
-        /// Route choices (selected one in indigo), the destination pin, and fitting them on screen.
+        /// Route choices (selected one in teal), the destination pin, and fitting them on screen.
         private func applyPreview(_ view: MapView, to map: MLNMapView, style: MLNStyle) {
             if let pin = carPin {
                 map.removeAnnotation(pin)
@@ -213,7 +213,7 @@ struct MapView: UIViewRepresentable {
                 if index == view.selected { main.append(line) } else { others.append(line) }
             }
             addLine(to: style, id: "route-alt", lines: others, color: UIColor(white: 0.62, alpha: 1), width: 6)
-            addLine(to: style, id: "route-main", lines: main, color: MapView.indigo, width: 7)
+            addLine(to: style, id: "route-main", lines: main, color: MapView.brand, width: 7)
 
             if let pin = destinationPin { map.removeAnnotation(pin) }
             destinationPin = nil
@@ -251,7 +251,7 @@ struct MapView: UIViewRepresentable {
             if key != drawnKey {
                 drawnKey = key
                 removeRouteLayers(style)
-                addLine(to: style, id: "route-main", lines: [polyline(drive.routeShape)], color: MapView.indigo, width: 8)
+                addLine(to: style, id: "route-main", lines: [polyline(drive.routeShape)], color: MapView.brand, width: 8)
                 following = true
             }
             guard drive.hasPosition else { return }
@@ -372,7 +372,7 @@ struct MapView: UIViewRepresentable {
                     color: UIColor(hex: "#D20F39"), width: 6)
         }
 
-        /// The next turn: a white dot on the route and the road name in an indigo label above it.
+        /// The next turn: a white dot on the route and the road name in a teal label above it.
         private func updateTurn(_ turn: SearchResult?, style: MLNStyle) {
             let key = turn.map { "\($0.lat),\($0.lon),\($0.name)" } ?? ""
             if key == turnKey { return }
@@ -390,7 +390,7 @@ struct MapView: UIViewRepresentable {
             let dot = MLNCircleStyleLayer(identifier: "turn-point", source: source)
             dot.circleRadius = NSExpression(forConstantValue: 7)
             dot.circleColor = NSExpression(forConstantValue: UIColor.white)
-            dot.circleStrokeColor = NSExpression(forConstantValue: UIColor(hex: "#3C3489"))
+            dot.circleStrokeColor = NSExpression(forConstantValue: UIColor(hex: "#0A5A5C"))
             dot.circleStrokeWidth = NSExpression(forConstantValue: 3)
             style.addLayer(dot)
             if !turn.name.isEmpty {
@@ -398,7 +398,7 @@ struct MapView: UIViewRepresentable {
                 label.text = NSExpression(forKeyPath: "street")
                 label.textFontSize = NSExpression(forConstantValue: 14)
                 label.textColor = NSExpression(forConstantValue: UIColor.white)
-                label.textHaloColor = NSExpression(forConstantValue: UIColor(hex: "#3C3489"))
+                label.textHaloColor = NSExpression(forConstantValue: UIColor(hex: "#0A5A5C"))
                 label.textHaloWidth = NSExpression(forConstantValue: 4)
                 label.textAnchor = NSExpression(forConstantValue: "bottom")
                 label.textOffset = NSExpression(forConstantValue: NSValue(cgVector: CGVector(dx: 0, dy: -1.1)))

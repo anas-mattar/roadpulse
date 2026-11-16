@@ -1011,7 +1011,7 @@ private fun Style.addOverlayLayers() {
     )
     add(
         LineLayer("route-casing", ROUTE_SOURCE).withProperties(
-            PropertyFactory.lineColor("#3C3489"),
+            PropertyFactory.lineColor("#0A5A5C"),
             PropertyFactory.lineWidth(10f),
             PropertyFactory.lineCap(Property.LINE_CAP_ROUND),
             PropertyFactory.lineJoin(Property.LINE_JOIN_ROUND),
@@ -1019,7 +1019,7 @@ private fun Style.addOverlayLayers() {
     )
     add(
         LineLayer("route-line", ROUTE_SOURCE).withProperties(
-            PropertyFactory.lineColor("#7F77DD"),
+            PropertyFactory.lineColor("#3FC1B0"),
             PropertyFactory.lineWidth(6f),
             PropertyFactory.lineCap(Property.LINE_CAP_ROUND),
             PropertyFactory.lineJoin(Property.LINE_JOIN_ROUND),
@@ -1041,12 +1041,12 @@ private fun Style.addOverlayLayers() {
             PropertyFactory.lineJoin(Property.LINE_JOIN_ROUND),
         )
     )
-    // Next turn: a white dot on the route and the road name in an indigo label above it.
+    // Next turn: a white dot on the route and the road name in a teal label above it.
     add(
         CircleLayer("turn-point", TURN_SOURCE).withProperties(
             PropertyFactory.circleRadius(7f),
             PropertyFactory.circleColor("#FFFFFF"),
-            PropertyFactory.circleStrokeColor("#3C3489"),
+            PropertyFactory.circleStrokeColor("#0A5A5C"),
             PropertyFactory.circleStrokeWidth(3f),
         )
     )
@@ -1056,7 +1056,7 @@ private fun Style.addOverlayLayers() {
             PropertyFactory.textFont(arrayOf("Noto Sans Regular")),
             PropertyFactory.textSize(14f),
             PropertyFactory.textColor("#FFFFFF"),
-            PropertyFactory.textHaloColor("#3C3489"),
+            PropertyFactory.textHaloColor("#0A5A5C"),
             PropertyFactory.textHaloWidth(4f),
             PropertyFactory.textAnchor(Property.TEXT_ANCHOR_BOTTOM),
             PropertyFactory.textOffset(arrayOf(0f, -1.1f)),
@@ -1067,16 +1067,16 @@ private fun Style.addOverlayLayers() {
     add(
         CircleLayer("destination", DEST_SOURCE).withProperties(
             PropertyFactory.circleRadius(9f),
-            PropertyFactory.circleColor("#26215C"),
+            PropertyFactory.circleColor("#08343A"),
             PropertyFactory.circleStrokeColor("#FFFFFF"),
             PropertyFactory.circleStrokeWidth(3f),
         )
     )
-    // Stops on the way: smaller indigo dots.
+    // Stops on the way: smaller teal dots.
     add(
         CircleLayer("stops", STOP_SOURCE).withProperties(
             PropertyFactory.circleRadius(7f),
-            PropertyFactory.circleColor("#534AB7"),
+            PropertyFactory.circleColor("#0B7F78"),
             PropertyFactory.circleStrokeColor("#FFFFFF"),
             PropertyFactory.circleStrokeWidth(3f),
         )
@@ -1115,7 +1115,7 @@ private fun Style.addOverlayLayers() {
     // Zoomed out: nearby reports become one bubble with their count. Tap it to zoom in.
     add(
         CircleLayer(REPORT_CLUSTER_LAYER, REPORT_SOURCE).withProperties(
-            PropertyFactory.circleColor("#534AB7"),
+            PropertyFactory.circleColor("#0B7F78"),
             PropertyFactory.circleRadius(
                 Expression.step(Expression.get("point_count"), Expression.literal(16f),
                     Expression.stop(5, 19f), Expression.stop(20, 23f))
@@ -1271,7 +1271,7 @@ private fun VoiceSettingsDialog(onDismiss: () -> Unit, onClearPlaces: () -> Unit
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier.fillMaxWidth().clickable { page = id }.padding(vertical = 12.dp),
                         ) {
-                            Icon(icon, contentDescription = null, tint = RP.Indigo, modifier = Modifier.size(22.dp))
+                            Icon(icon, contentDescription = null, tint = RP.Brand, modifier = Modifier.size(22.dp))
                             Text(label, fontSize = 16.sp, modifier = Modifier.padding(start = 14.dp).weight(1f))
                             Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = RP.TextSecondary)
                         }
@@ -1470,7 +1470,7 @@ private fun PlanDriveDialog(driveSeconds: Double, onDismiss: () -> Unit, onPlan:
                 androidx.compose.material3.TimeInput(state = picker)
                 Text(
                     if (late) strings.tooLate else strings.leaveAt(leaveAt, plan.driveMinutes, com.roadpulse.app.data.PlannedDrive.SPARE_MINUTES),
-                    color = if (late) MaterialTheme.colorScheme.error else RP.Indigo,
+                    color = if (late) MaterialTheme.colorScheme.error else RP.Brand,
                     fontSize = 14.sp,
                 )
             }

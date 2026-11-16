@@ -10,7 +10,7 @@ extension ContentView {
                 circleButton("line.3.horizontal", label: strings.menu) { showSettings = true }
                 Spacer()
                 if model.destination != nil && model.routes.count > 1 {
-                    MapListSwitch(list: $listMode, strings: strings, indigo: indigo)
+                    MapListSwitch(list: $listMode, strings: strings, brand: brand)
                     Spacer()
                     Color.clear.frame(width: 44, height: 44)
                 }
@@ -81,7 +81,7 @@ extension ContentView {
                     } label: {
                         Label(strings.addPlace, systemImage: "mappin.and.ellipse").font(.subheadline.bold())
                     }
-                    .foregroundColor(indigo)
+                    .foregroundColor(brand)
                 }
             }
         }
@@ -95,8 +95,8 @@ extension ContentView {
         Button(action: action) {
             Label(text, systemImage: icon).font(.subheadline.bold()).lineLimit(1)
                 .frame(maxWidth: .infinity).frame(height: 44)
-                .background(filled ? indigo : indigo.opacity(0.1))
-                .foregroundColor(filled ? .white : indigo)
+                .background(filled ? brand : brand.opacity(0.1))
+                .foregroundColor(filled ? .white : brand)
                 .clipShape(Capsule())
         }
     }
@@ -155,7 +155,7 @@ extension ContentView {
                     } label: {
                         Label(strings.stillThere, systemImage: "hand.thumbsup.fill")
                             .frame(maxWidth: .infinity).frame(height: 44)
-                            .background(indigo).foregroundColor(.white).clipShape(Capsule())
+                            .background(brand).foregroundColor(.white).clipShape(Capsule())
                     }
                     Button {
                         selectedReport = nil
@@ -213,7 +213,7 @@ extension ContentView {
 
     var searchBox: some View {
         HStack {
-            Image(systemName: model.shortcutTarget == nil ? "magnifyingglass" : "house.fill").foregroundColor(indigo)
+            Image(systemName: model.shortcutTarget == nil ? "magnifyingglass" : "house.fill").foregroundColor(brand)
             TextField(searchHint, text: $model.query)
                 .focused($searching)
                 .submitLabel(.search)
@@ -224,7 +224,7 @@ extension ContentView {
             if model.query.isEmpty && model.shortcutTarget == nil {
                 Button { listen() } label: {
                     Image(systemName: voice.listening ? "mic.fill" : "mic")
-                        .foregroundColor(voice.listening ? .red : indigo)
+                        .foregroundColor(voice.listening ? .red : brand)
                 }
                 .accessibilityLabel(strings.searchByVoice)
             }
@@ -315,7 +315,7 @@ extension ContentView {
                     } label: {
                         Text(c[1]).font(.subheadline)
                             .padding(.horizontal, 14).padding(.vertical, 8)
-                            .overlay(Capsule().stroke(indigo.opacity(0.4), lineWidth: 1)).foregroundColor(indigo)
+                            .overlay(Capsule().stroke(brand.opacity(0.4), lineWidth: 1)).foregroundColor(brand)
                     }
                 }
             }
@@ -424,7 +424,7 @@ extension ContentView {
                         }
                         .foregroundColor(.white)
                         .frame(maxWidth: .infinity).frame(height: 52)
-                        .background(indigo).clipShape(Capsule())
+                        .background(brand).clipShape(Capsule())
                     }
                 }
             }
@@ -474,7 +474,7 @@ extension ContentView {
             Text(route.tag)
                 .font(.caption2).bold()
                 .padding(.horizontal, 7).padding(.vertical, 2)
-                .background(isSelected ? indigo : Color(.systemBackground))
+                .background(isSelected ? brand : Color(.systemBackground))
                 .foregroundColor(isSelected ? .white : .secondary)
                 .clipShape(RoundedRectangle(cornerRadius: 8))
             Text(strings.duration(minutes: route.minutesWithTraffic)).font(.title2).bold()
@@ -489,8 +489,8 @@ extension ContentView {
         }
         .padding(.horizontal, 14).padding(.vertical, 10)
         .frame(width: 160, alignment: .leading)
-        .background(isSelected ? indigo.opacity(0.12) : Color(.secondarySystemBackground))
-        .overlay(RoundedRectangle(cornerRadius: 18).stroke(isSelected ? indigo : Color.clear, lineWidth: 1.5))
+        .background(isSelected ? brand.opacity(0.12) : Color(.secondarySystemBackground))
+        .overlay(RoundedRectangle(cornerRadius: 18).stroke(isSelected ? brand : Color.clear, lineWidth: 1.5))
         .clipShape(RoundedRectangle(cornerRadius: 18))
     }
 
@@ -499,7 +499,7 @@ extension ContentView {
         ScrollView {
             VStack(spacing: 10) {
                 ForEach(Array(model.routes.enumerated()), id: \.offset) { index, route in
-                    RouteListCard(route: route, selected: index == model.selected, strings: strings, indigo: indigo,
+                    RouteListCard(route: route, selected: index == model.selected, strings: strings, brand: brand,
                                   onSelect: { model.selected = index },
                                   onGo: {
                                       if let place = model.destination {

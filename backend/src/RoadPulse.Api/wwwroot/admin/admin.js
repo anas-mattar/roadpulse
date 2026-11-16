@@ -166,7 +166,7 @@
 
   function deviceItem(d) {
     return el("div", { class: "item" },
-      el("div", { class: "icon", bg: "#534AB7", text: "DEV" }),
+      el("div", { class: "icon", bg: "#0B7F78", text: "DEV" }),
       el("div", {},
         el("div", { class: "title" }, "Device ", el("span", { class: "mono", text: d.id }), d.blocked ? el("span", { class: "pill blocked", text: "Blocked" }) : null),
         el("div", { class: "meta" }, "Registered " + when(d.createdAt) + (d.blockedAt ? " · blocked " + when(d.blockedAt) : "")),

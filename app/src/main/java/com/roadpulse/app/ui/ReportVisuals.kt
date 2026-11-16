@@ -156,7 +156,7 @@ fun ReportCard(
                     Button(
                         onClick = onStillThere,
                         enabled = !busy,
-                        colors = ButtonDefaults.buttonColors(containerColor = RP.Indigo),
+                        colors = ButtonDefaults.buttonColors(containerColor = RP.Brand),
                         modifier = Modifier.weight(1f),
                     ) {
                         Icon(Icons.Filled.ThumbUp, contentDescription = null, modifier = Modifier.size(18.dp))
@@ -236,7 +236,7 @@ fun ReportPicker(
                     Spacer(Modifier.weight(1f))
                     Button(
                         onClick = { onPick(type, null, duration) },
-                        colors = ButtonDefaults.buttonColors(containerColor = RP.Indigo),
+                        colors = ButtonDefaults.buttonColors(containerColor = RP.Brand),
                         modifier = Modifier.height(52.dp),
                     ) { Text(strings.send, fontSize = 17.sp, fontWeight = FontWeight.SemiBold) }
                 }
@@ -303,7 +303,7 @@ fun StillThereCard(report: Report, onAnswer: (Boolean?) -> Unit, modifier: Modif
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth().padding(top = 12.dp)) {
                 Button(
                     onClick = { onAnswer(true) },
-                    colors = ButtonDefaults.buttonColors(containerColor = RP.Indigo),
+                    colors = ButtonDefaults.buttonColors(containerColor = RP.Brand),
                     modifier = Modifier.weight(1f).height(64.dp),
                 ) {
                     Icon(Icons.Filled.ThumbUp, contentDescription = null)

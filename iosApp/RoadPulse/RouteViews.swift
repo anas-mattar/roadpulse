@@ -36,7 +36,7 @@ struct TrafficBarView: View {
 struct MapListSwitch: View {
     @Binding var list: Bool
     let strings: AppStrings
-    let indigo: Color
+    let brand: Color
 
     var body: some View {
         HStack(spacing: 0) {
@@ -54,8 +54,8 @@ struct MapListSwitch: View {
         return Button { list = isList } label: {
             Text(label).font(.subheadline.weight(on ? .semibold : .regular))
                 .padding(.horizontal, 18).padding(.vertical, 8)
-                .background(on ? indigo.opacity(0.15) : Color.clear)
-                .foregroundColor(on ? indigo : .secondary)
+                .background(on ? brand.opacity(0.15) : Color.clear)
+                .foregroundColor(on ? brand : .secondary)
                 .clipShape(Capsule())
         }
     }
@@ -66,7 +66,7 @@ struct RouteListCard: View {
     let route: RouteSummary
     let selected: Bool
     let strings: AppStrings
-    let indigo: Color
+    let brand: Color
     let onSelect: () -> Void
     let onGo: () -> Void
 
@@ -81,7 +81,7 @@ struct RouteListCard: View {
                 Button(action: onGo) {
                     Label(strings.goShort, systemImage: "location.north.fill").font(.headline)
                         .padding(.horizontal, 18).padding(.vertical, 10)
-                        .background(indigo).foregroundColor(.white).clipShape(Capsule())
+                        .background(brand).foregroundColor(.white).clipShape(Capsule())
                 }
             }
             if let via = route.via {
@@ -96,7 +96,7 @@ struct RouteListCard: View {
         }
         .padding(16)
         .background(Color(.systemBackground))
-        .overlay(RoundedRectangle(cornerRadius: 22).stroke(selected ? indigo : Color.clear, lineWidth: 2))
+        .overlay(RoundedRectangle(cornerRadius: 22).stroke(selected ? brand : Color.clear, lineWidth: 2))
         .clipShape(RoundedRectangle(cornerRadius: 22))
         .shadow(radius: 5)
         .onTapGesture(perform: onSelect)

@@ -140,7 +140,7 @@ private fun Action(label: String, icon: ImageVector, enabled: Boolean, onClick: 
         onClick = onClick,
         enabled = enabled,
         modifier = modifier.height(48.dp),
-        colors = ButtonDefaults.filledTonalButtonColors(containerColor = RP.IndigoLight, contentColor = RP.Indigo),
+        colors = ButtonDefaults.filledTonalButtonColors(containerColor = RP.BrandLight, contentColor = RP.Brand),
     ) {
         Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp))
         Text(label, modifier = Modifier.padding(start = 6.dp), maxLines = 1)

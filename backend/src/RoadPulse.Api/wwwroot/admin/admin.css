@@ -1,5 +1,5 @@
 :root {
-  --indigo: #534AB7; --indigo-dark: #3C3489; --indigo-light: #EEEDFE;
+  --brand: #0B7F78; --brand-dark: #0A5A5C; --brand-light: #E3F5F2;
   --field: #F1EFE8; --text: #1d1c1a; --muted: #5F5E5A; --line: #e2dfd6;
   --danger: #E24B4A; --teal: #0F6E56; --amber: #633806; --amber-bg: #FDF1DC;
 }
@@ -8,7 +8,7 @@
 body { margin: 0; font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--text); background: var(--field); }
 header { display: flex; align-items: center; gap: 16px; padding: 14px 24px; background: #fff; border-bottom: 1px solid var(--line); }
 .brand { font-weight: 650; font-size: 17px; display: flex; align-items: center; gap: 8px; flex: 1; }
-.dot { width: 12px; height: 12px; border-radius: 50%; background: var(--indigo); display: inline-block; }
+.dot { width: 12px; height: 12px; border-radius: 50%; background: var(--brand); display: inline-block; }
 main { max-width: 1100px; margin: 0 auto; padding: 24px; }
 .card { background: #fff; border-radius: 18px; padding: 20px 22px; border: 1px solid var(--line); }
 .narrow { max-width: 460px; margin: 48px auto; }
@@ -16,18 +16,18 @@ h1 { margin: 0 0 6px; font-size: 22px; } h2 { margin: 0 0 6px; font-size: 18px; 
 .muted { color: var(--muted); } .small { font-size: 13px; }
 label { display: block; font-weight: 600; margin: 14px 0 6px; font-size: 14px; }
 input, textarea { width: 100%; font: inherit; padding: 10px 12px; border: 1px solid #cfccc2; border-radius: 10px; background: #fff; }
-input:focus, textarea:focus { outline: 2px solid var(--indigo); border-color: transparent; }
-button { font: inherit; font-weight: 600; border: 0; border-radius: 999px; padding: 9px 18px; background: var(--indigo); color: #fff; cursor: pointer; }
-button:hover { background: var(--indigo-dark); }
+input:focus, textarea:focus { outline: 2px solid var(--brand); border-color: transparent; }
+button { font: inherit; font-weight: 600; border: 0; border-radius: 999px; padding: 9px 18px; background: var(--brand); color: #fff; cursor: pointer; }
+button:hover { background: var(--brand-dark); }
 button:disabled { opacity: .5; cursor: default; }
-button.ghost { background: transparent; color: var(--indigo); border: 1px solid #cfccc2; }
-button.ghost:hover { background: var(--indigo-light); }
+button.ghost { background: transparent; color: var(--brand); border: 1px solid #cfccc2; }
+button.ghost:hover { background: var(--brand-light); }
 button.danger { background: var(--danger); } button.danger:hover { background: #c33a39; }
 form > button[type=submit] { margin-top: 16px; }
 .error { color: var(--danger); margin: 10px 0 0; }
 .tabs { display: flex; align-items: center; gap: 6px; margin-bottom: 14px; flex-wrap: wrap; }
 .tabs [role=tab] { background: transparent; color: var(--muted); border-radius: 10px; padding: 8px 14px; }
-.tabs [role=tab][aria-selected=true] { background: #fff; color: var(--indigo); border: 1px solid var(--line); }
+.tabs [role=tab][aria-selected=true] { background: #fff; color: var(--brand); border: 1px solid var(--line); }
 .spacer { flex: 1; }
 .badge { background: var(--danger); color: #fff; border-radius: 999px; padding: 1px 8px; font-size: 12px; margin-left: 4px; }
 .list { display: grid; gap: 10px; }
@@ -35,7 +35,7 @@ form > button[type=submit] { margin-top: 16px; }
 .icon { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; color: #fff; font-weight: 700; font-size: 13px; }
 .title { font-weight: 650; font-size: 16px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .meta { color: var(--muted); font-size: 13.5px; margin-top: 2px; }
-.meta a { color: var(--indigo); }
+.meta a { color: var(--brand); }
 .pill { font-size: 12px; font-weight: 600; border-radius: 999px; padding: 2px 9px; }
 .pill.hidden { background: var(--amber-bg); color: var(--amber); }
 .pill.active { background: #E3F4EE; color: var(--teal); }
@@ -53,5 +53,5 @@ dialog { border: 0; border-radius: 18px; padding: 22px; width: min(480px, 92vw);
 dialog::backdrop { background: rgba(20,18,40,.35); }
 .check { display: flex; gap: 8px; align-items: center; font-weight: 500; }
 .check input { width: auto; }
-#toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: #26215C; color: #fff; padding: 10px 18px; border-radius: 12px; font-weight: 500; }
+#toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: #08343A; color: #fff; padding: 10px 18px; border-radius: 12px; font-weight: 500; }
 @media (max-width: 700px) { .item { grid-template-columns: 44px 1fr; } .actions { grid-column: 1 / -1; justify-content: flex-start; } }

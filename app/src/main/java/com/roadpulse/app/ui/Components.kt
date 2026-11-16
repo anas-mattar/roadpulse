@@ -84,7 +84,7 @@ fun CircleButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     container: Color = Color.White,
-    content: Color = RP.Indigo,
+    content: Color = RP.Brand,
     size: Dp = 44.dp,
     border: BorderStroke? = null,
 ) {
@@ -108,8 +108,8 @@ fun CircleButton(
 fun Pill(
     text: String,
     modifier: Modifier = Modifier,
-    color: Color = RP.IndigoDeep,
-    contentColor: Color = RP.IndigoSoft,
+    color: Color = RP.BrandDeep,
+    contentColor: Color = RP.BrandSoft,
     icon: ImageVector? = null,
     trailing: String? = null,
 ) {
@@ -154,7 +154,7 @@ fun LaneStrip(lanes: List<com.roadpulse.app.data.Lane>, modifier: Modifier = Mod
     ) {
         androidx.compose.material3.Surface(
             shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
-            color = RP.IndigoDeep,
+            color = RP.BrandDeep,
             shadowElevation = 4.dp,
             modifier = modifier,
         ) {
@@ -162,7 +162,7 @@ fun LaneStrip(lanes: List<com.roadpulse.app.data.Lane>, modifier: Modifier = Mod
                 lanes.forEach { lane ->
                     val tint = when {
                         lane.recommended -> Color.White
-                        lane.usable -> RP.IndigoSoft.copy(alpha = 0.7f)
+                        lane.usable -> RP.BrandSoft.copy(alpha = 0.7f)
                         else -> Color.White.copy(alpha = 0.25f)
                     }
                     Icon(
@@ -180,7 +180,7 @@ fun LaneStrip(lanes: List<com.roadpulse.app.data.Lane>, modifier: Modifier = Mod
 /** Big turn card at the top while driving. */
 @Composable
 fun TurnIsland(turnType: Int?, distanceLabel: String?, instruction: String, modifier: Modifier = Modifier) {
-    Island(modifier = modifier.fillMaxWidth(), color = RP.Indigo, contentColor = Color.White) {
+    Island(modifier = modifier.fillMaxWidth(), color = RP.Brand, contentColor = Color.White) {
         Row(Modifier.padding(horizontal = 16.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(
                 TurnIcon.forType(turnType).vector(),
@@ -194,7 +194,7 @@ fun TurnIsland(turnType: Int?, distanceLabel: String?, instruction: String, modi
                 }
                 Text(
                     instruction,
-                    color = RP.IndigoSoft,
+                    color = RP.BrandSoft,
                     fontSize = 15.sp,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,

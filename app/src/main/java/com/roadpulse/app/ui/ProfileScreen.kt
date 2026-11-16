@@ -51,7 +51,7 @@ fun ProfileDialog(profile: Profile?, error: Boolean, onSaveNickname: (String) ->
                 when {
                     profile != null -> ProfileContent(profile, onSaveNickname)
                     error -> Text(strings.profileNeedsServer, color = MaterialTheme.colorScheme.error)
-                    else -> LinearProgressIndicator(Modifier.fillMaxWidth(), color = RP.Indigo, trackColor = RP.IndigoLight)
+                    else -> LinearProgressIndicator(Modifier.fillMaxWidth(), color = RP.Brand, trackColor = RP.BrandLight)
                 }
             }
         },
@@ -64,8 +64,8 @@ fun ProfileContent(profile: Profile, onSaveNickname: (String) -> Unit) {
     var name by remember { mutableStateOf(profile.nickname.orEmpty()) }
     LaunchedEffect(profile.nickname) { name = profile.nickname.orEmpty() }
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Box(Modifier.size(56.dp).background(RP.IndigoLight, CircleShape), contentAlignment = Alignment.Center) {
-            Icon(Icons.Filled.EmojiEvents, contentDescription = null, tint = RP.Indigo, modifier = Modifier.size(32.dp))
+        Box(Modifier.size(56.dp).background(RP.BrandLight, CircleShape), contentAlignment = Alignment.Center) {
+            Icon(Icons.Filled.EmojiEvents, contentDescription = null, tint = RP.Brand, modifier = Modifier.size(32.dp))
         }
         Column(Modifier.padding(start = 14.dp)) {
             Text(strings.levelName(profile.level), fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
@@ -75,8 +75,8 @@ fun ProfileContent(profile: Profile, onSaveNickname: (String) -> Unit) {
     LinearProgressIndicator(
         progress = { profile.progress() },
         modifier = Modifier.fillMaxWidth().padding(top = 12.dp).height(8.dp),
-        color = RP.Indigo,
-        trackColor = RP.IndigoLight,
+        color = RP.Brand,
+        trackColor = RP.BrandLight,
     )
     val next = profile.nextLevelPoints
     Text(
@@ -123,7 +123,7 @@ fun ProfileContent(profile: Profile, onSaveNickname: (String) -> Unit) {
 @Composable
 private fun Stat(value: Int, label: String, modifier: Modifier) {
     Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
-        Text("$value", fontSize = 22.sp, fontWeight = FontWeight.SemiBold, color = RP.IndigoDeep)
+        Text("$value", fontSize = 22.sp, fontWeight = FontWeight.SemiBold, color = RP.BrandDeep)
         Text(label, fontSize = 11.sp, color = RP.TextSecondary, textAlign = TextAlign.Center, lineHeight = 13.sp)
     }
 }
