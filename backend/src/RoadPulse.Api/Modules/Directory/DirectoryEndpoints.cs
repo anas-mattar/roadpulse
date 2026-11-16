@@ -166,13 +166,20 @@ public static class DirectoryImporter
             await copy.CompleteAsync(ct);
         }
 
+        // Loading a million rows into a table that already has its search indexes is very slow
+        // (over 30 minutes on a laptop). Empty the table, remove the indexes, load, then build
+        // the indexes once at the end. All inside one transaction: a failure leaves the old data.
         await using (var cmd = new NpgsqlCommand("""
-            DELETE FROM directory_places;
+            TRUNCATE directory_places;
+            DROP INDEX IF EXISTS ix_directory_places_location;
+            DROP INDEX IF EXISTS ix_directory_places_search_key;
             INSERT INTO directory_places (id, name, category, address, search_key, location, confidence)
             SELECT id, name, category, address, search_key,
                    ST_SetSRID(ST_MakePoint(lon, lat), 4326)::geography, confidence
             FROM overture_import;
-            """, conn, tx) { CommandTimeout = 1800 })
+            CREATE INDEX ix_directory_places_location ON directory_places USING gist (location);
+            CREATE INDEX ix_directory_places_search_key ON directory_places USING gin (search_key gin_trgm_ops);
+            """, conn, tx) { CommandTimeout = 0 })
             await cmd.ExecuteNonQueryAsync(ct);
         await tx.CommitAsync(ct);
         log.LogInformation("Loaded {Count} Overture places", count);
@@ -180,7 +187,7 @@ public static class DirectoryImporter
         // still fails the places are loaded anyway (PostgreSQL also updates statistics by itself).
         try
         {
-            await using var analyze = new NpgsqlCommand("ANALYZE directory_places", conn) { CommandTimeout = 1800 };
+            await using var analyze = new NpgsqlCommand("ANALYZE directory_places", conn) { CommandTimeout = 0 };
             await analyze.ExecuteNonQueryAsync(ct);
         }
         catch (Exception e) when (e is NpgsqlException or TimeoutException)
