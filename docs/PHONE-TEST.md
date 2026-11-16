@@ -1,4 +1,4 @@
-# Testing RoadPulse on a real phone
+# Testing Jalanna on a real phone
 
 Both apps build, but neither has been tried on a real phone. Work through this list in order and
 note anything that fails. For each problem, send: **the test number, what you did, what you saw**,
@@ -23,7 +23,7 @@ A free Apple ID signs the app for 7 days; after that it will not open until you 
 5. On the iPhone (iOS 16 or later): **Settings > Privacy & Security > Developer Mode** → on, restart
    when asked.
 6. **Settings > General > VPN & Device Management** → tap your Apple ID → **Trust**.
-7. Open RoadPulse. Allow location **While Using the App**.
+7. Open Jalanna. Allow location **While Using the App**.
 
 If any of these steps looks different on your screen, send a screenshot. Sideloadly is a third-party
 tool and was not tested by this project.

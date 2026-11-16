@@ -26,26 +26,27 @@ targets:
     info:
       path: RoadPulse/Info.plist
       properties:
-        CFBundleDisplayName: RoadPulse
+        CFBundleDisplayName: Jalanna
         CFBundleShortVersionString: "$(MARKETING_VERSION)"
         CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
         UILaunchScreen: {}
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
-        NSLocationWhenInUseUsageDescription: RoadPulse shows where you are on the map, plans routes from your position and guides you while you drive.
+        NSLocationWhenInUseUsageDescription: Jalanna shows where you are on the map, plans routes from your position and guides you while you drive.
         # Keep guiding (position and voice) when the screen is off or another app is in front.
         UIBackgroundModes: [location, audio]
         # The laptop's servers are plain HTTP on the home network (Settings > Use my laptop's server).
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true
         # Search by voice (Apple's speech recognition).
-        NSMicrophoneUsageDescription: RoadPulse listens when you tap the microphone to search for a place by voice.
-        NSSpeechRecognitionUsageDescription: RoadPulse turns what you say into a place to search for.
-        NSLocalNetworkUsageDescription: RoadPulse connects to the RoadPulse server on your laptop over your Wi-Fi.
+        NSMicrophoneUsageDescription: Jalanna listens when you tap the microphone to search for a place by voice.
+        NSSpeechRecognitionUsageDescription: Jalanna turns what you say into a place to search for.
+        NSLocalNetworkUsageDescription: Jalanna connects to the Jalanna server on your laptop over your Wi-Fi.
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.roadpulse.app
         MARKETING_VERSION: "0.1.0"
         CURRENT_PROJECT_VERSION: "1"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         TARGETED_DEVICE_FAMILY: "1"
         # The shared Kotlin logic, built by Gradle into a static framework.
         FRAMEWORK_SEARCH_PATHS: "$(inherited) $(SRCROOT)/../shared/build/xcode-frameworks/$(CONFIGURATION)/$(SDK_NAME)"

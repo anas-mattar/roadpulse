@@ -1,4 +1,4 @@
-# RoadPulse on iPhone
+# Jalanna on iPhone
 
 Status (15 November 2026): **step 7 of the iPhone app**: everything from step 5 (map, search, routes,
 turn-by-turn with voice, reports, places, tolls, traffic, drive alerts, faster route) plus saved

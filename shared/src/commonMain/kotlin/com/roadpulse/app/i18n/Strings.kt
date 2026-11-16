@@ -467,7 +467,7 @@ object EnglishStrings : AppStrings {
 
     override val musicControls = "Music controls while driving"
     override val musicControlsHelp = "Play, pause and skip in Spotify, YouTube Music and other apps from the driving screen."
-    override val musicNeedsAccess = "Android asks for notification access for this. RoadPulse uses it only to see which music is playing, not to read your notifications."
+    override val musicNeedsAccess = "Android asks for notification access for this. Jalanna uses it only to see which music is playing, not to read your notifications."
     override val play = "Play"
     override val pause = "Pause"
     override val nextTrack = "Next track"
@@ -499,7 +499,7 @@ object EnglishStrings : AppStrings {
         else -> code
     }
     override val howPointsWork = "10 points per report, 5 when another driver confirms it, 2 for checking someone's report. A report removed by moderators costs 20."
-    override val profileNeedsServer = "Your profile needs the RoadPulse server. Turn on \"Use my laptop's server\" in Settings."
+    override val profileNeedsServer = "Your profile needs the Jalanna server. Turn on \"Use my laptop's server\" in Settings."
 
     override val shareDrive = "Share drive"
     override fun shareText(destination: String, eta: String, url: String) = "I'll arrive at $eta at $destination. Follow my drive live: $url"
@@ -508,7 +508,7 @@ object EnglishStrings : AppStrings {
     override val shareFailed = "Could not share the drive. Check the connection to the server."
 
     override val helpTraffic = "Help with live traffic"
-    override val helpTrafficText = "When on, RoadPulse sends your speed and position in short anonymous pieces while you navigate: no account or device ID, nothing from the first and last 500 m of a trip, and the server keeps only average road speeds. Turn off at any time."
+    override val helpTrafficText = "When on, Jalanna sends your speed and position in short anonymous pieces while you navigate: no account or device ID, nothing from the first and last 500 m of a trip, and the server keeps only average road speeds. Turn off at any time."
 
     override val trafficConsentTitle = "Help with live traffic?"
     override val allow = "Allow"
@@ -522,10 +522,10 @@ object EnglishStrings : AppStrings {
     override val privacyPolicyText = listOf(
         "Draft for testing: to be reviewed for Malaysia's Personal Data Protection Act before public release.",
         "On your phone only: Home, Work, recent and saved places, planned drives, where you parked, and your settings.",
-        "Sent to the RoadPulse server: an anonymous device id (no name, email or phone number), the reports, votes and flags you make, and your nickname if you set one. Reports are public on the map without a name.",
+        "Sent to the Jalanna server: an anonymous device id (no name, email or phone number), the reports, votes and flags you make, and your nickname if you set one. Reports are public on the map without a name.",
         "Places you add (name, kind, note and location) are stored on the server with your anonymous device id. Only you see them until a moderator approves them; then they appear in everyone's search without your name. Export or delete them with your data.",
         "Share my drive, only when you tap Share: destination, arrival time and position, for anyone with the link, until you stop, 30 minutes after arrival, or 12 hours. You see how many people have the link open; they are counted with a random number made up by each open page, nothing about them is kept.",
-        "Searches: what you type and your approximate position go to the place search service (Photon, with OpenStreetMap data) and, when the RoadPulse server is used, to that server to search Overture Maps places and places drivers added. Searches are not stored.",
+        "Searches: what you type and your approximate position go to the place search service (Photon, with OpenStreetMap data) and, when the Jalanna server is used, to that server to search Overture Maps places and places drivers added. Searches are not stored.",
         "Live traffic, only if you turn it on: speed and position in 2-minute pieces with no device id, nothing from the first and last 500 m of a trip. Only average road speeds are kept.",
         "Kept for: reports 90 days after they expire; road speed averages 12 months (no driver information).",
         "Your choices: export or delete your data below, and turn live traffic off at any time.",
@@ -542,7 +542,7 @@ object EnglishStrings : AppStrings {
     override val navigation = "Navigation"
     override fun inMeters(meters: Int) = "In $meters m: "
     override val notificationStop = "Stop"
-    override val notificationChannel = "Shown while RoadPulse is guiding a drive"
+    override val notificationChannel = "Shown while Jalanna is guiding a drive"
 
     override val mapTab = "Map"
     override val listTab = "List"
@@ -575,7 +575,7 @@ object EnglishStrings : AppStrings {
         "Add a stop" to "Press and hold the map where you want to stop, then tap Add a stop.",
         "Plan a drive for later" to "Choose a destination, tap the clock and pick when you want to arrive. You get a reminder when it is time to leave.",
         "Share your drive" to "While driving, tap Share. Anyone with the link can follow you until you arrive.",
-        "Reports, traffic and places" to "These need the RoadPulse server. On iPhone, turn on the laptop server in Settings and use the same Wi-Fi.",
+        "Reports, traffic and places" to "These need the Jalanna server. On iPhone, turn on the laptop server in Settings and use the same Wi-Fi.",
     )
     override val sendFeedback = "Send feedback by email"
     override fun version(v: String) = "Version $v"
@@ -829,7 +829,7 @@ object ArabicStrings : AppStrings {
 
     override val musicControls = "التحكم بالموسيقى أثناء القيادة"
     override val musicControlsHelp = "شغّل وأوقف وتنقّل بين المقاطع في Spotify وYouTube Music وغيرها من شاشة القيادة."
-    override val musicNeedsAccess = "سيطلب أندرويد إذن الوصول إلى الإشعارات. يستخدمه RoadPulse فقط لمعرفة الموسيقى المشغّلة، ولا يقرأ إشعاراتك."
+    override val musicNeedsAccess = "سيطلب أندرويد إذن الوصول إلى الإشعارات. يستخدمه Jalanna فقط لمعرفة الموسيقى المشغّلة، ولا يقرأ إشعاراتك."
     override val play = "تشغيل"
     override val pause = "إيقاف مؤقت"
     override val nextTrack = "المقطع التالي"
@@ -861,7 +861,7 @@ object ArabicStrings : AppStrings {
         else -> code
     }
     override val howPointsWork = "10 نقاط لكل بلاغ، و5 عندما يؤكده سائق آخر، و2 عند التحقق من بلاغ غيرك. البلاغ الذي يحذفه المشرفون يخصم 20."
-    override val profileNeedsServer = "يحتاج ملفك الشخصي إلى خادم RoadPulse. فعّل \"Use my laptop's server\" في الإعدادات."
+    override val profileNeedsServer = "يحتاج ملفك الشخصي إلى خادم Jalanna. فعّل \"Use my laptop's server\" في الإعدادات."
 
     override val shareDrive = "شارك الرحلة"
     override fun shareText(destination: String, eta: String, url: String) = "سأصل الساعة $eta إلى $destination. تابع رحلتي مباشرة: $url"
@@ -870,7 +870,7 @@ object ArabicStrings : AppStrings {
     override val shareFailed = "تعذّرت مشاركة الرحلة. تحقق من الاتصال بالخادم."
 
     override val helpTraffic = "ساعد في معرفة حركة المرور"
-    override val helpTrafficText = "عند التفعيل، يرسل RoadPulse سرعتك وموقعك على شكل أجزاء قصيرة مجهولة الهوية أثناء الملاحة: بلا حساب أو معرّف جهاز، ولا شيء من أول وآخر 500 م من الرحلة، ويحتفظ الخادم بمتوسط سرعات الطرق فقط. يمكنك إيقافه في أي وقت."
+    override val helpTrafficText = "عند التفعيل، يرسل Jalanna سرعتك وموقعك على شكل أجزاء قصيرة مجهولة الهوية أثناء الملاحة: بلا حساب أو معرّف جهاز، ولا شيء من أول وآخر 500 م من الرحلة، ويحتفظ الخادم بمتوسط سرعات الطرق فقط. يمكنك إيقافه في أي وقت."
 
     override val trafficConsentTitle = "هل تساعد في معرفة حركة المرور؟"
     override val allow = "سماح"
@@ -884,12 +884,12 @@ object ArabicStrings : AppStrings {
     override val privacyPolicyText = listOf(
         "مسودة للاختبار: تحتاج إلى مراجعة وفق قانون حماية البيانات الشخصية الماليزي قبل الإطلاق العام.",
         "على هاتفك فقط: المنزل والعمل والأماكن الأخيرة والمحفوظة، والرحلات المخطط لها، ومكان ركن سيارتك، وإعداداتك.",
-        "يُرسل إلى خادم RoadPulse: معرّف جهاز مجهول (بلا اسم أو بريد أو رقم هاتف)، والبلاغات والتصويتات والإبلاغات التي تقوم بها، واسمك المستعار إن عيّنته. تظهر البلاغات على الخريطة بلا اسم.",
+        "يُرسل إلى خادم Jalanna: معرّف جهاز مجهول (بلا اسم أو بريد أو رقم هاتف)، والبلاغات والتصويتات والإبلاغات التي تقوم بها، واسمك المستعار إن عيّنته. تظهر البلاغات على الخريطة بلا اسم.",
         "الأماكن التي تضيفها (الاسم والنوع والملاحظة والموقع) تُحفظ على الخادم مع معرّف جهازك المجهول. لا يراها غيرك حتى يوافق عليها مشرف، ثم تظهر في بحث الجميع دون اسمك. يمكنك تصديرها أو حذفها مع بياناتك.",
         "مشاركة الرحلة، فقط عند الضغط على مشاركة: الوجهة ووقت الوصول والموقع لمن لديه الرابط، حتى تتوقف أو بعد 30 دقيقة من الوصول أو 12 ساعة. ترى عدد من يفتحون الرابط؛ يُحسبون برقم عشوائي تنشئه كل صفحة مفتوحة، ولا يُحفظ عنهم شيء.",
         "حركة المرور، فقط إذا فعّلتها: السرعة والموقع على شكل أجزاء مدتها دقيقتان بلا معرّف جهاز، ولا شيء من أول وآخر 500 م من الرحلة. يُحتفظ بمتوسط سرعات الطرق فقط.",
         "مدة الحفظ: البلاغات 90 يومًا بعد انتهائها، ومتوسط سرعات الطرق 12 شهرًا (بلا معلومات عن السائقين).",
-        "عمليات البحث: ما تكتبه وموقعك التقريبي يُرسلان إلى خدمة البحث عن الأماكن (Photon ببيانات OpenStreetMap)، وعند استخدام خادم RoadPulse إلى ذلك الخادم للبحث في أماكن Overture Maps والأماكن التي أضافها السائقون. لا تُحفظ عمليات البحث.",
+        "عمليات البحث: ما تكتبه وموقعك التقريبي يُرسلان إلى خدمة البحث عن الأماكن (Photon ببيانات OpenStreetMap)، وعند استخدام خادم Jalanna إلى ذلك الخادم للبحث في أماكن Overture Maps والأماكن التي أضافها السائقون. لا تُحفظ عمليات البحث.",
         "خياراتك: صدّر بياناتك أو احذفها أدناه، وأوقف مشاركة حركة المرور في أي وقت.",
     )
     override val exportData = "تصدير بياناتي"
@@ -904,7 +904,7 @@ object ArabicStrings : AppStrings {
     override val navigation = "الملاحة"
     override fun inMeters(meters: Int) = "بعد $meters م: "
     override val notificationStop = "إيقاف"
-    override val notificationChannel = "يظهر أثناء إرشاد RoadPulse لرحلتك"
+    override val notificationChannel = "يظهر أثناء إرشاد Jalanna لرحلتك"
 
     override val mapTab = "خريطة"
     override val listTab = "قائمة"
@@ -939,7 +939,7 @@ object ArabicStrings : AppStrings {
         "إضافة محطة توقف" to "اضغط مطولًا على الخريطة حيث تريد التوقف، ثم اختر إضافة محطة.",
         "التخطيط لرحلة لاحقة" to "اختر الوجهة، واضغط الساعة وحدد وقت الوصول. ستصلك تذكرة عندما يحين وقت الانطلاق.",
         "مشاركة رحلتك" to "أثناء القيادة اضغط مشاركة. يمكن لأي شخص لديه الرابط متابعتك حتى تصل.",
-        "البلاغات والازدحام والأماكن" to "تحتاج إلى خادم RoadPulse. على iPhone فعّل خادم الحاسوب في الإعدادات واستخدم شبكة Wi-Fi نفسها.",
+        "البلاغات والازدحام والأماكن" to "تحتاج إلى خادم Jalanna. على iPhone فعّل خادم الحاسوب في الإعدادات واستخدم شبكة Wi-Fi نفسها.",
     )
     override val sendFeedback = "أرسل ملاحظاتك بالبريد"
     override fun version(v: String) = "الإصدار $v"

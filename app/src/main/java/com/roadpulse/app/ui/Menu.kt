@@ -66,7 +66,7 @@ fun MenuPanel(
                             Icon(Icons.Filled.Person, contentDescription = null, tint = RP.Indigo, modifier = Modifier.size(30.dp))
                         }
                         Column(Modifier.padding(start = 12.dp).weight(1f)) {
-                            Text(profile?.nickname ?: "RoadPulse", fontSize = 20.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(profile?.nickname ?: "Jalanna", fontSize = 20.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             if (profile != null) Text(strings.levelName(profile.level) + " · " + strings.points(profile.points), fontSize = 13.sp, color = RP.TextSecondary)
                         }
                         Icon(Icons.Filled.Close, contentDescription = strings.close, modifier = Modifier.clickable(onClick = onDismiss))
@@ -143,7 +143,7 @@ fun HelpDialog(version: String, onDismiss: () -> Unit) {
                 }
                 TextButton(onClick = {
                     val mail = android.content.Intent(android.content.Intent.ACTION_SENDTO, android.net.Uri.parse("mailto:"))
-                        .putExtra(android.content.Intent.EXTRA_SUBJECT, "RoadPulse feedback ($version)")
+                        .putExtra(android.content.Intent.EXTRA_SUBJECT, "Jalanna feedback ($version)")
                     runCatching { context.startActivity(mail) }
                 }) { Text(strings.sendFeedback) }
                 Text(strings.version(version), fontSize = 12.sp, color = RP.TextSecondary)

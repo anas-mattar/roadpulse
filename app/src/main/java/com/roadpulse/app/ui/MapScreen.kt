@@ -840,7 +840,7 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
             onExportData = {
                 viewModel.exportMyData { json ->
                     val send = android.content.Intent(android.content.Intent.ACTION_SEND).setType("application/json")
-                        .putExtra(android.content.Intent.EXTRA_SUBJECT, "RoadPulse data")
+                        .putExtra(android.content.Intent.EXTRA_SUBJECT, "Jalanna data")
                         .putExtra(android.content.Intent.EXTRA_TEXT, json)
                     context.startActivity(android.content.Intent.createChooser(send, s.exportData))
                 }

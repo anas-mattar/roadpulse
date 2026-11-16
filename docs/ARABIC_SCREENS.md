@@ -1,6 +1,6 @@
 # Arabic screens: review sheet
 
-Every Arabic text on RoadPulse screens next to the English (`ArabicStrings` in
+Every Arabic text on Jalanna screens next to the English (`ArabicStrings` in
 `app/src/main/java/com/roadpulse/app/i18n/Strings.kt`). Voice prompts are in `ARABIC_PROMPTS.md`.
 Write corrections in the last column. Debug-only screens (simulation, field-test flags, laptop server) stay in English.
 
@@ -44,7 +44,7 @@ Regenerate: `gradlew :app:testDebugUnitTest --tests *StringsTest*` writes `app/b
 | 34 | Free | free | مجاني | |
 | 35 | GoNow | Go now | انطلق الآن | |
 | 36 | HelpTraffic | Help with live traffic | ساعد في معرفة حركة المرور | |
-| 37 | HelpTrafficText | When on, RoadPulse sends your speed and position in short anonymous pieces while you navigate: no account or device ID, nothing from the first and last 500 m of a trip, and the server keeps only average road speeds. Turn off at any time. | عند التفعيل، يرسل RoadPulse سرعتك وموقعك على شكل أجزاء قصيرة مجهولة الهوية أثناء الملاحة: بلا حساب أو معرّف جهاز، ولا شيء من أول وآخر 500 م من الرحلة، ويحتفظ الخادم بمتوسط سرعات الطرق فقط. يمكنك إيقافه في أي وقت. | |
+| 37 | HelpTrafficText | When on, Jalanna sends your speed and position in short anonymous pieces while you navigate: no account or device ID, nothing from the first and last 500 m of a trip, and the server keeps only average road speeds. Turn off at any time. | عند التفعيل، يرسل Jalanna سرعتك وموقعك على شكل أجزاء قصيرة مجهولة الهوية أثناء الملاحة: بلا حساب أو معرّف جهاز، ولا شيء من أول وآخر 500 م من الرحلة، ويحتفظ الخادم بمتوسط سرعات الطرق فقط. يمكنك إيقافه في أي وقت. | |
 | 38 | Hide | Hide | إخفاء | |
 | 39 | Home | Home | المنزل | |
 | 40 | HowLong | How long? | كم المدة؟ | |
@@ -60,7 +60,7 @@ Regenerate: `gradlew :app:testDebugUnitTest --tests *StringsTest*` writes `app/b
 | 50 | MapView | Map view | عرض الخريطة | |
 | 51 | MusicControls | Music controls while driving | التحكم بالموسيقى أثناء القيادة | |
 | 52 | MusicControlsHelp | Play, pause and skip in Spotify, YouTube Music and other apps from the driving screen. | شغّل وأوقف وتنقّل بين المقاطع في Spotify وYouTube Music وغيرها من شاشة القيادة. | |
-| 53 | MusicNeedsAccess | Android asks for notification access for this. RoadPulse uses it only to see which music is playing, not to read your notifications. | سيطلب أندرويد إذن الوصول إلى الإشعارات. يستخدمه RoadPulse فقط لمعرفة الموسيقى المشغّلة، ولا يقرأ إشعاراتك. | |
+| 53 | MusicNeedsAccess | Android asks for notification access for this. Jalanna uses it only to see which music is playing, not to read your notifications. | سيطلب أندرويد إذن الوصول إلى الإشعارات. يستخدمه Jalanna فقط لمعرفة الموسيقى المشغّلة، ولا يقرأ إشعاراتك. | |
 | 54 | MuteVoice | Mute voice | كتم الصوت | |
 | 55 | MuteVoiceSetting | Mute voice | كتم الصوت | |
 | 56 | Navigation | Navigation | الملاحة | |
@@ -70,7 +70,7 @@ Regenerate: `gradlew :app:testDebugUnitTest --tests *StringsTest*` writes `app/b
 | 60 | NorthUp | North always up | الشمال للأعلى دائمًا | |
 | 61 | NotNow | Not now | ليس الآن | |
 | 62 | NotThere | Not there | غير موجود | |
-| 63 | NotificationChannel | Shown while RoadPulse is guiding a drive | يظهر أثناء إرشاد RoadPulse لرحلتك | |
+| 63 | NotificationChannel | Shown while Jalanna is guiding a drive | يظهر أثناء إرشاد Jalanna لرحلتك | |
 | 64 | NotificationStop | Stop | إيقاف | |
 | 65 | Overview | Overview | عرض المسار | |
 | 66 | Paid | paid | مدفوع | |
@@ -86,7 +86,7 @@ Regenerate: `gradlew :app:testDebugUnitTest --tests *StringsTest*` writes `app/b
 | 76 | PrivacyPolicy | Privacy policy | سياسة الخصوصية | |
 | 77 | PrivacyText | Home, Work and recent places are stored only on this phone. | يُحفظ المنزل والعمل والأماكن الأخيرة على هذا الهاتف فقط. | |
 | 78 | Profile | Profile | الملف الشخصي | |
-| 79 | ProfileNeedsServer | Your profile needs the RoadPulse server. Turn on "Use my laptop's server" in Settings. | يحتاج ملفك الشخصي إلى خادم RoadPulse. فعّل "Use my laptop's server" في الإعدادات. | |
+| 79 | ProfileNeedsServer | Your profile needs the Jalanna server. Turn on "Use my laptop's server" in Settings. | يحتاج ملفك الشخصي إلى خادم Jalanna. فعّل "Use my laptop's server" في الإعدادات. | |
 | 80 | RemoveStop | Remove stop | إزالة التوقف | |
 | 81 | Report | Report | بلّغ | |
 | 82 | ReportAbuse | Report abuse | الإبلاغ عن إساءة | |

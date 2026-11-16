@@ -1,7 +1,10 @@
-# RoadPulse
+# Jalanna
 
-An original, community-driven navigation app for Android, built on open data and open-source
-components. "RoadPulse" is a placeholder name; check trademark availability before launch.
+An original, community-driven navigation app for Android and iPhone, built on open data and
+open-source components. The app is called **Jalanna** ("our road": Malay *jalan* + Arabic *-na*)
+on phones and web pages. The code, package IDs, folders and this repository still use the working
+name **RoadPulse**, so installed apps keep updating in place. Check the name in the app stores and
+trademark registers (MyIPO) before launch. Logo and icon sources are in `docs/brand/`.
 
 ## What works today (v0.1 scaffold)
 

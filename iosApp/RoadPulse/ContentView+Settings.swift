@@ -65,7 +65,7 @@ struct MenuView: View {
             Image(systemName: "person.crop.circle.fill").font(.system(size: 44)).foregroundColor(.accentColor)
             VStack(alignment: .leading, spacing: 2) {
                 let name = model.profile?.nickname ?? ""
-                Text(name.isEmpty ? "RoadPulse" : name).font(.title3).bold()
+                Text(name.isEmpty ? "Jalanna" : name).font(.title3).bold()
                 if let p = model.profile {
                     Text(p.levelName + " · " + p.points).font(.subheadline).foregroundColor(.secondary)
                 }
@@ -115,7 +115,7 @@ struct MenuView: View {
                 .padding(.vertical, 2)
             }
             Section {
-                if let mail = URL(string: "mailto:?subject=RoadPulse%20feedback") {
+                if let mail = URL(string: "mailto:?subject=Jalanna%20feedback") {
                     Link(strings.sendFeedback, destination: mail)
                 }
                 Text(strings.version(v: appVersion)).font(.footnote).foregroundColor(.secondary)
@@ -270,7 +270,7 @@ struct MenuView: View {
         } header: {
             Text("Server")
         } footer: {
-            Text("Routing, reports, places, tolls and traffic from the RoadPulse servers on your laptop. The iPhone and the laptop must be on the same Wi-Fi; run open-iphone-access.ps1 on the laptop once (see docs/IOS.md).")
+            Text("Routing, reports, places, tolls and traffic from the Jalanna servers on your laptop. The iPhone and the laptop must be on the same Wi-Fi; run open-iphone-access.ps1 on the laptop once (see docs/IOS.md).")
         }
     }
 
