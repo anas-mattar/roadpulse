@@ -72,6 +72,10 @@ struct MapView: UIViewRepresentable {
         context.coordinator.apply(self, to: map)
     }
 
+    static func dismantleUIView(_ map: MLNMapView, coordinator: Coordinator) {
+        coordinator.stopGlide()
+    }
+
     final class Coordinator: NSObject, MLNMapViewDelegate {
         var loadedStyleUrl = ""
         private var styleLoaded = false
@@ -80,6 +84,22 @@ struct MapView: UIViewRepresentable {
         private var lastRecenter = 0
         private var destinationPin: MLNPointAnnotation?
         private var carPin: MLNPointAnnotation?
+        // The car glides between GPS fixes (about one per second) instead of jumping: every screen
+        // frame it is drawn a little further along, and the camera moves with it.
+        private var carArrow: UIImageView?
+        private var glideLink: CADisplayLink?
+        private weak var glideMap: MLNMapView?
+        private var glideFrom = CLLocationCoordinate2D()
+        private var glideTo = CLLocationCoordinate2D()
+        private var shown = CLLocationCoordinate2D()
+        private var bearingFrom = 0.0
+        private var bearingTo = 0.0
+        private var shownBearing = 0.0
+        private var glideStart: CFTimeInterval = 0
+        private var glideSeconds = 1.0
+        private var lastFixAt: CFTimeInterval = 0
+        private var needsFrame = true
+        private var lastAreaAt: CFTimeInterval = 0
         private var reportPins: [String: ReportAnnotation] = [:]
         private var drawnKey = ""
         private var trafficKey = ""
@@ -111,6 +131,12 @@ struct MapView: UIViewRepresentable {
         }
 
         func mapView(_ mapView: MLNMapView, regionDidChangeAnimated animated: Bool) {
+            if glideLink != nil {
+                // While driving the camera moves every frame: report the visible area every 2 seconds.
+                let now = CACurrentMediaTime()
+                if now - lastAreaAt < 2 { return }
+                lastAreaAt = now
+            }
             let b = mapView.visibleCoordinateBounds
             view?.onArea(b.sw.latitude, b.sw.longitude, b.ne.latitude, b.ne.longitude)
         }
@@ -120,6 +146,80 @@ struct MapView: UIViewRepresentable {
         func mapView(_ mapView: MLNMapView, didSelect annotation: MLNAnnotation) {
             if let report = annotation as? ReportAnnotation { view?.onReportTap(report.reportId) }
             mapView.deselectAnnotation(annotation, animated: false)
+        }
+
+        /// The car while driving: an arrow that turns with the direction of travel.
+        func mapView(_ mapView: MLNMapView, viewFor annotation: MLNAnnotation) -> MLNAnnotationView? {
+            guard let pin = carPin, (annotation as AnyObject) === pin else { return nil }
+            let car = MLNAnnotationView(reuseIdentifier: "car")
+            car.bounds = CGRect(x: 0, y: 0, width: 52, height: 52)
+            car.isUserInteractionEnabled = false
+            let arrow = UIImageView(image: Coordinator.carImage())
+            arrow.frame = car.bounds
+            car.addSubview(arrow)
+            carArrow = arrow
+            return car
+        }
+
+        /// An orange arrow with a white edge on a soft halo (orange stands out on the teal route).
+        static func carImage() -> UIImage {
+            let size = CGSize(width: 52, height: 52)
+            return UIGraphicsImageRenderer(size: size).image { context in
+                UIColor.white.withAlphaComponent(0.3).setFill()
+                UIBezierPath(ovalIn: CGRect(x: 2, y: 2, width: 48, height: 48)).fill()
+                let arrow = UIBezierPath()
+                arrow.move(to: CGPoint(x: 26, y: 7))
+                arrow.addLine(to: CGPoint(x: 42, y: 42))
+                arrow.addLine(to: CGPoint(x: 26, y: 34))
+                arrow.addLine(to: CGPoint(x: 10, y: 42))
+                arrow.close()
+                arrow.lineJoinStyle = .round
+                arrow.lineWidth = 3
+                context.cgContext.setShadow(offset: CGSize(width: 0, height: 1), blur: 3,
+                                            color: UIColor.black.withAlphaComponent(0.35).cgColor)
+                UIColor(hex: "#F7931E").setFill()
+                arrow.fill()
+                context.cgContext.setShadow(offset: .zero, blur: 0, color: nil)
+                UIColor.white.setStroke()
+                arrow.stroke()
+            }
+        }
+
+        private func startGlide(on map: MLNMapView) {
+            glideMap = map
+            guard glideLink == nil else { return }
+            let link = CADisplayLink(target: self, selector: #selector(glideFrame))
+            link.add(to: .main, forMode: .common)
+            glideLink = link
+        }
+
+        func stopGlide() {
+            glideLink?.invalidate()
+            glideLink = nil
+        }
+
+        /// One screen frame: the car a little further between the last two fixes, the camera with it.
+        @objc private func glideFrame() {
+            guard let map = glideMap, let pin = carPin else { return }
+            let t = min(1, max(0, (CACurrentMediaTime() - glideStart) / glideSeconds))
+            if t >= 1 {
+                if !needsFrame { return }   // standing still: nothing to redraw
+                needsFrame = false
+            }
+            shown = CLLocationCoordinate2D(
+                latitude: glideFrom.latitude + (glideTo.latitude - glideFrom.latitude) * t,
+                longitude: glideFrom.longitude + (glideTo.longitude - glideFrom.longitude) * t)
+            var turn = (bearingTo - bearingFrom).truncatingRemainder(dividingBy: 360)
+            if turn > 180 { turn -= 360 }
+            if turn < -180 { turn += 360 }
+            shownBearing = bearingFrom + turn * t
+            pin.coordinate = shown
+            if following, let view = view {
+                let camera = MLNMapCamera(lookingAtCenter: shown, acrossDistance: 700,
+                                          pitch: view.tilted ? 45 : 0, heading: view.northUp ? 0 : shownBearing)
+                map.setCamera(camera, animated: false)
+            }
+            carArrow?.transform = CGAffineTransform(rotationAngle: CGFloat((shownBearing - map.direction) * .pi / 180))
         }
 
         func mapView(_ mapView: MLNMapView, imageFor annotation: MLNAnnotation) -> MLNAnnotationImage? {
@@ -157,6 +257,7 @@ struct MapView: UIViewRepresentable {
 
         func apply(_ view: MapView, to map: MLNMapView) {
             self.view = view
+            needsFrame = true
             if view.styleUrl != loadedStyleUrl, let url = URL(string: view.styleUrl) {
                 loadedStyleUrl = view.styleUrl
                 styleLoaded = false
@@ -195,8 +296,11 @@ struct MapView: UIViewRepresentable {
         /// Route choices (selected one in teal), the destination pin, and fitting them on screen.
         private func applyPreview(_ view: MapView, to map: MLNMapView, style: MLNStyle) {
             if let pin = carPin {
+                stopGlide()
                 map.removeAnnotation(pin)
                 carPin = nil
+                carArrow = nil
+                map.showsUserLocation = true
                 fittedKey = ""
             }
             // Redraw the choices only when they change.
@@ -256,19 +360,35 @@ struct MapView: UIViewRepresentable {
             }
             guard drive.hasPosition else { return }
             let position = CLLocationCoordinate2D(latitude: drive.lat, longitude: drive.lon)
-            if let pin = carPin {
-                pin.coordinate = position
-            } else {
+            let now = CACurrentMediaTime()
+            if carPin == nil {
+                // First fix of the drive: put the car there, and hide the system's blue dot (one cursor only).
+                shown = position
+                glideFrom = position
+                glideTo = position
+                shownBearing = drive.bearingDeg >= 0 ? drive.bearingDeg : map.direction
+                bearingFrom = shownBearing
+                bearingTo = shownBearing
+                lastFixAt = now
+                glideStart = now
                 let pin = MLNPointAnnotation()
                 pin.coordinate = position
-                map.addAnnotation(pin)
                 carPin = pin
-            }
-            if following, let view = view {
-                let direction = view.northUp ? 0 : (drive.bearingDeg >= 0 ? drive.bearingDeg : map.direction)
-                let camera = MLNMapCamera(lookingAtCenter: position, acrossDistance: 700,
-                                          pitch: view.tilted ? 45 : 0, heading: direction)
-                map.setCamera(camera, animated: true)
+                map.showsUserLocation = false
+                map.addAnnotation(pin)
+                startGlide(on: map)
+            } else if position.latitude != glideTo.latitude || position.longitude != glideTo.longitude {
+                // A new fix: glide to it from where the car is drawn now, in about the time between fixes.
+                let dLat = (position.latitude - shown.latitude) * 110_540
+                let dLon = (position.longitude - shown.longitude) * 111_320 * cos(position.latitude * .pi / 180)
+                let farJump = (dLat * dLat + dLon * dLon).squareRoot() > 300
+                glideSeconds = min(1.5, max(0.3, now - lastFixAt))
+                lastFixAt = now
+                glideFrom = farJump ? position : shown
+                glideTo = position
+                bearingFrom = shownBearing
+                if drive.bearingDeg >= 0 { bearingTo = drive.bearingDeg }
+                glideStart = now
             }
         }
 
