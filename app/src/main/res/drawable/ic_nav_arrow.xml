@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The car while driving: an orange arrow with a white edge on a soft halo, pointing up
+     (the map turns it to the direction of travel). Same shape as on iPhone. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="52dp" android:height="52dp" android:viewportWidth="52" android:viewportHeight="52">
+    <path android:pathData="M2,26 a24,24 0 1,0 48,0 a24,24 0 1,0 -48,0 z" android:fillColor="#4DFFFFFF" />
+    <path android:pathData="M26,7 L42,42 L26,34 L10,42 Z"
+        android:fillColor="#F7931E" android:strokeColor="#FFFFFF" android:strokeWidth="3" android:strokeLineJoin="round" />
+</vector>

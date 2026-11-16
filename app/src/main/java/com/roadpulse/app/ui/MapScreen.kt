@@ -111,6 +111,7 @@ import org.maplibre.android.camera.CameraUpdateFactory
 import org.maplibre.android.geometry.LatLng
 import org.maplibre.android.geometry.LatLngBounds
 import org.maplibre.android.location.LocationComponentActivationOptions
+import org.maplibre.android.location.LocationComponentOptions
 import org.maplibre.android.location.OnCameraTrackingChangedListener
 import org.maplibre.android.location.modes.CameraMode
 import org.maplibre.android.location.modes.RenderMode
@@ -1144,7 +1145,13 @@ private fun MapLibreMap.enableLocation(context: Context, style: Style) {
             // No layerAbove/layerBelow: after a style switch the location layers can be added back
             // before ours, and pointing at one of ours would then crash. addOverlayLayers puts our
             // layers below the location layers instead, so your position always stays on top.
-            LocationComponentActivationOptions.builder(context, style).useDefaultLocationEngine(false).build()
+            LocationComponentActivationOptions.builder(context, style)
+                .useDefaultLocationEngine(false)
+                // While driving (RenderMode.GPS) the car is our orange arrow, as on iPhone.
+                .locationComponentOptions(
+                    LocationComponentOptions.builder(context).gpsDrawable(com.roadpulse.app.R.drawable.ic_nav_arrow).build()
+                )
+                .build()
         )
     }
     component.isLocationComponentEnabled = true
