@@ -1,0 +1,12 @@
+# One web address for the public demo (start-public-demo.ps1):
+#   /routing/...  -> the routing server (Valhalla)
+#   everything else -> the Jalanna API (also the share, privacy and admin pages)
+# Cloudflare adds HTTPS in front of this; nothing here is opened on your router.
+:80 {
+	handle_path /routing/* {
+		reverse_proxy valhalla:8002
+	}
+	handle {
+		reverse_proxy api:8080
+	}
+}

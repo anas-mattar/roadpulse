@@ -57,6 +57,22 @@ traffic).
 The connection is plain HTTP inside your home network (allowed only for local addresses). Anyone
 on the same Wi-Fi could reach these ports; use `-Remove` on networks you do not trust.
 
+## Using the app away from home (free public address)
+
+`backend/start-public-demo.ps1` gives the laptop's servers one public HTTPS address through a
+Cloudflare quick tunnel (free, no account, no domain, nothing opened on the router):
+
+    powershell -ExecutionPolicy Bypass -File backend\start-public-demo.ps1
+
+It prints an address like `https://something.trycloudflare.com`. In the app: Menu > Settings >
+Server > "Use my laptop's server", and type that address. The API answers at the address itself and
+routing under `/routing` (see `backend/gateway/Caddyfile`); the map comes from the public map
+server. Share links ("follow my drive") use the public address while it runs.
+
+Limits: the address changes every time the script starts, it works only while the laptop is on,
+and all callers arrive from one network address, so the server's per-address rate limits are shared
+by everyone using the demo. Stop it with `-Stop`. A fixed address needs a domain name on Cloudflare.
+
 ## Plan (each step ends with a green build and something to try)
 
 1. **Done in code:** shared module; Android uses it; iPhone skeleton and build workflow.

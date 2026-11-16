@@ -248,8 +248,8 @@ struct MenuView: View {
         Section {
             Toggle("Use my laptop's server", isOn: $config.useLaptop)
             if config.useLaptop {
-                TextField("Laptop address, e.g. 192.168.1.20", text: $config.laptopAddress)
-                    .keyboardType(.numbersAndPunctuation)
+                TextField("192.168.1.20 or https://…", text: $config.laptopAddress)
+                    .keyboardType(.URL)
                     .autocorrectionDisabled()
                     .textInputAutocapitalization(.never)
                 Toggle("Maps from my laptop", isOn: $config.laptopMaps)
@@ -270,7 +270,7 @@ struct MenuView: View {
         } header: {
             Text("Server")
         } footer: {
-            Text("Routing, reports, places, tolls and traffic from the Jalanna servers on your laptop. The iPhone and the laptop must be on the same Wi-Fi; run open-iphone-access.ps1 on the laptop once (see docs/IOS.md).")
+            Text("Routing, reports, places, tolls and traffic from the Jalanna servers on your laptop. The iPhone and the laptop must be on the same Wi-Fi; run open-iphone-access.ps1 on the laptop once (see docs/IOS.md). Away from home, type the https address that start-public-demo.ps1 prints.")
         }
     }
 

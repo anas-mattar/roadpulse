@@ -29,13 +29,35 @@ final class AppConfig: ObservableObject {
         return useLaptop && !a.isEmpty ? a : nil
     }
 
-    var routingUrl: String { host.map { "http://\($0):8002" } ?? AppConfig.publicRouting }
+    /// A public HTTPS address typed instead of a home Wi-Fi address (start-public-demo.ps1 prints
+    /// one, like https://something.trycloudflare.com). One address serves the API, with routing
+    /// under /routing. Maps then come from the public map server.
+    private var publicBase: String? {
+        guard var a = host else { return nil }
+        let lower = a.lowercased()
+        if lower.hasPrefix("http://") { return nil }
+        if !lower.hasPrefix("https://") {
+            let isName = lower.contains(".") && lower.rangeOfCharacter(from: .letters) != nil && !lower.hasSuffix(".local")
+            if !isName { return nil }
+            a = "https://" + a
+        }
+        while a.hasSuffix("/") { a.removeLast() }
+        return a
+    }
+
+    var routingUrl: String {
+        if let p = publicBase { return p + "/routing" }
+        return host.map { "http://\($0):8002" } ?? AppConfig.publicRouting
+    }
     /// Empty without the laptop: reports, cameras, places, tolls and traffic are then off.
-    var backendUrl: String { host.map { "http://\($0):8080" } ?? "" }
+    var backendUrl: String {
+        if let p = publicBase { return p }
+        return host.map { "http://\($0):8080" } ?? ""
+    }
     /// Day map, or the night map ("fiord") after sunset or when chosen in settings.
     func styleUrl(dark: Bool) -> String {
         let name = dark ? "fiord" : "liberty"
-        if let h = host, laptopMaps { return "http://\(h):8090/styles/\(name)/style.json" }
+        if let h = host, laptopMaps, publicBase == nil { return "http://\(h):8090/styles/\(name)/style.json" }
         return "https://tiles.openfreemap.org/styles/\(name)"
     }
 

@@ -71,3 +71,18 @@ services:
       # laptop" on an iPhone, start with TILES_BIND=0.0.0.0 (see docs/IOS.md).
       - "${TILES_BIND:-127.0.0.1}:8090:8080"
 
+
+  # Public demo (optional, free): one HTTPS address on the internet for the API and routing,
+  # through a Cloudflare quick tunnel. Start and stop it with start-public-demo.ps1.
+  gateway:
+    image: caddy:2
+    profiles: ["public"]
+    depends_on: [api, valhalla]
+    volumes:
+      - ./gateway/Caddyfile:/etc/caddy/Caddyfile:ro
+
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    profiles: ["public"]
+    depends_on: [gateway]
+    command: tunnel --no-autoupdate --url http://gateway:80
