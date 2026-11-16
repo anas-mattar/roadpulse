@@ -247,6 +247,13 @@ struct MenuView: View {
     private var server: some View {
         Section {
             Toggle("Use my laptop's server", isOn: $config.useLaptop)
+                .onChange(of: config.useLaptop) { on in
+                    if !on { Task { await config.findServer() } }
+                }
+            if !config.useLaptop {
+                Text(config.foundServer.isEmpty ? "No server found yet." : "Server found automatically: \(config.foundServer)")
+                    .font(.footnote).foregroundColor(.secondary)
+            }
             if config.useLaptop {
                 TextField("192.168.1.20 or https://…", text: $config.laptopAddress)
                     .keyboardType(.URL)
@@ -270,7 +277,7 @@ struct MenuView: View {
         } header: {
             Text("Server")
         } footer: {
-            Text("Routing, reports, places, tolls and traffic from the Jalanna servers on your laptop. The iPhone and the laptop must be on the same Wi-Fi; run open-iphone-access.ps1 on the laptop once (see docs/IOS.md). Away from home, type the https address that start-public-demo.ps1 prints.")
+            Text("The app finds its server by itself. For development, turn this on to type an address: your laptop on the same Wi-Fi (run open-iphone-access.ps1 once, see docs/IOS.md) or the https address that start-public-demo.ps1 prints.")
         }
     }
 

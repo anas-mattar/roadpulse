@@ -124,6 +124,11 @@ struct ContentView: View {
             model.configure(config)
             applyServers()
         }
+        // Find the server (no typed address) at start and each time the app comes back to the front.
+        .task { await config.findServer() }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
+            Task { await config.findServer() }
+        }
         .onChange(of: config.helpTraffic) { on in drive.setTrafficHelp(on) }
         .onChange(of: drive.isDriving) { driving in
             // Keep the screen on and the GPS running in the background while navigating.

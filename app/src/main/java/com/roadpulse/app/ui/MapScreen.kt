@@ -1351,13 +1351,15 @@ private fun VoiceSettingsDialog(onDismiss: () -> Unit, onClearPlaces: () -> Unit
 @Composable
 private fun ServerDebugSettings() {
     val useLocal by ServerSettings.useLocal.collectAsStateWithLifecycle()
+    val found by ServerSettings.found.collectAsStateWithLifecycle()
     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
         Text("Use my laptop's server", modifier = Modifier.weight(1f))
         Switch(checked = useLocal, onCheckedChange = ServerSettings::setUseLocal)
     }
     Text(
         if (useLocal) "Routing and live reports from Docker on this computer."
-        else "Public routing; reports stay on this phone.",
+        else if (found.isNotEmpty()) "Server found automatically: $found"
+        else "No server found: public routing; reports stay on this phone.",
         style = MaterialTheme.typography.bodySmall,
         color = RP.TextSecondary,
     )

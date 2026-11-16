@@ -73,6 +73,31 @@ Limits: the address changes every time the script starts, it works only while th
 and all callers arrive from one network address, so the server's per-address rate limits are shared
 by everyone using the demo. Stop it with `-Stop`. A fixed address needs a domain name on Cloudflare.
 
+## Finding the server (no typed address)
+
+Drivers never type a server address. Both apps look it up (`ServerDirectory` in the shared code):
+
+1. Try the server that answered last time (`/health`).
+2. Otherwise read an **address book**: a small public file that lists the current servers,
+   `{"servers": ["https://..."]}`, and use the first one that answers.
+3. Otherwise run without a server (public routing and search; no reports, places or traffic).
+
+The app looks at start and each time it comes back to the front. The address book is
+`servers.json` in the public repository `anas-mattar/jalanna-config` (the list of address books
+and any built-in servers are in `ServerDirectory.kt`). One-time setup on the laptop:
+
+    cd D:\solutions
+    git clone https://github.com/anas-mattar/jalanna-config.git
+
+`start-public-demo.ps1` then writes the new tunnel address to that file and pushes it on every
+start (and an empty list on `-Stop`). GitHub serves the file with a delay of up to about 5 minutes.
+
+To survive a blocked address: list more than one server in the file, and add a second address book
+on an unrelated host to `addressBooks`. Only `https` servers are accepted. Whoever can edit an
+address book decides where the apps connect, so keep it in an account only you control.
+"Use my laptop's server" in settings (iPhone) and the debug server settings (Android) still
+override the lookup for development.
+
 ## Plan (each step ends with a green build and something to try)
 
 1. **Done in code:** shared module; Android uses it; iPhone skeleton and build workflow.

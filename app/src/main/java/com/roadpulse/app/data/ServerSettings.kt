@@ -62,6 +62,7 @@ object ServerSettings {
             ?: if (isEmulator()) LaptopLink.EMULATOR else LaptopLink.USB
         _useLocal.value = localAvailable && p.getBoolean(KEY, true)
         _useLocalMaps.value = localMapsAvailable && p.getBoolean(KEY_MAPS, false)
+        _found.value = p.getString(KEY_FOUND, "") ?: ""
     }
 
     fun setUseLocalMaps(value: Boolean) {
@@ -84,10 +85,42 @@ object ServerSettings {
         prefs?.edit()?.putBoolean(KEY, value)?.apply()
     }
 
-    fun routingUrl(): String = if (_useLocal.value) forLink(BuildConfig.LOCAL_ROUTING_URL, _link.value) else BuildConfig.ROUTING_URL
+    /**
+     * The server found through the address books ([ServerDirectory]): no address is typed by the
+     * driver. Used when the build has no fixed server and the developer's laptop link is off.
+     */
+    private val _found = MutableStateFlow("")
+    val found: StateFlow<String> = _found.asStateFlow()
+
+    /** Looks for the server (remembered one first). Call when the app comes to the front. */
+    suspend fun findServer() {
+        val server = ServerDirectory.find(_found.value)
+        if (server != _found.value) {
+            _found.value = server
+            prefs?.edit()?.putString(KEY_FOUND, server)?.apply()
+        }
+    }
+
+    /** Pure: tested. Which backend to use: the laptop (debug), else the build's server, else the found one. */
+    fun chooseBackend(useLocal: Boolean, local: String, configured: String, found: String): String = when {
+        useLocal -> local
+        configured.isNotEmpty() -> configured
+        else -> found
+    }
+
+    /** Pure: tested. Routing goes with the backend: the found server serves it under /routing. */
+    fun chooseRouting(useLocal: Boolean, local: String, configuredBackend: String, configuredRouting: String, found: String): String = when {
+        useLocal -> local
+        configuredBackend.isEmpty() && found.isNotEmpty() -> ServerDirectory.routingUrl(found)
+        else -> configuredRouting
+    }
+
+    fun routingUrl(): String = chooseRouting(
+        _useLocal.value, forLink(BuildConfig.LOCAL_ROUTING_URL, _link.value), BuildConfig.BACKEND_URL, BuildConfig.ROUTING_URL, _found.value)
 
     /** Empty when there is no reports server (reports then stay on this phone). */
-    fun backendUrl(): String = if (_useLocal.value) forLink(BuildConfig.LOCAL_BACKEND_URL, _link.value) else BuildConfig.BACKEND_URL
+    fun backendUrl(): String = chooseBackend(
+        _useLocal.value, forLink(BuildConfig.LOCAL_BACKEND_URL, _link.value), BuildConfig.BACKEND_URL, _found.value)
 
     /** Where the anonymous device token for [baseUrl] is kept (one token per server). */
     fun tokenStore(context: Context, baseUrl: String): DeviceTokenStore {
@@ -104,4 +137,5 @@ object ServerSettings {
     private const val KEY = "use_local_server"
     private const val KEY_MAPS = "use_local_maps"
     private const val KEY_LINK = "laptop_link"
+    private const val KEY_FOUND = "found_server"
 }

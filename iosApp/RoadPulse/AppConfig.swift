@@ -24,6 +24,20 @@ final class AppConfig: ObservableObject {
     static let search = "https://photon.komoot.io"
     static let publicStyle = "https://tiles.openfreemap.org/styles/liberty"
 
+    /// The server found through the address books (no typing): see ServerDirectory in the shared code.
+    @AppStorage("foundServer") var foundServer = "" { willSet { objectWillChange.send() } }
+
+    /// Looks for the server, starting with the one used last time. Skipped while an address is typed by hand.
+    @MainActor
+    func findServer() async {
+        if host != nil { return }
+        let server = (try? await ServerFinder().find(remembered: foundServer)) ?? ""
+        if server != foundServer { foundServer = server }
+    }
+
+    /// The found server, unless an address is typed by hand.
+    private var found: String? { host == nil && !foundServer.isEmpty ? foundServer : nil }
+
     private var host: String? {
         let a = laptopAddress.trimmingCharacters(in: .whitespaces)
         return useLaptop && !a.isEmpty ? a : nil
@@ -46,12 +60,12 @@ final class AppConfig: ObservableObject {
     }
 
     var routingUrl: String {
-        if let p = publicBase { return p + "/routing" }
+        if let p = publicBase ?? found { return p + "/routing" }
         return host.map { "http://\($0):8002" } ?? AppConfig.publicRouting
     }
     /// Empty without the laptop: reports, cameras, places, tolls and traffic are then off.
     var backendUrl: String {
-        if let p = publicBase { return p }
+        if let p = publicBase ?? found { return p }
         return host.map { "http://\($0):8080" } ?? ""
     }
     /// Day map, or the night map ("fiord") after sunset or when chosen in settings.

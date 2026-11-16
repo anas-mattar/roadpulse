@@ -6,7 +6,11 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.getValue
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
+import kotlinx.coroutines.launch
 import com.roadpulse.app.nav.DisplaySettings
 import com.roadpulse.app.nav.NavigationService
 import com.roadpulse.app.nav.NavigationSession
@@ -43,6 +47,10 @@ class MainActivity : ComponentActivity() {
         DisplaySettings.init(this)
         com.roadpulse.app.data.RouteSettings.init(this)
         com.roadpulse.app.data.ServerSettings.init(this)
+        // Find the server (no typed address) now and each time the app comes back to the front.
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) { com.roadpulse.app.data.ServerSettings.findServer() }
+        }
         com.roadpulse.app.nav.NowPlaying.init(this)
         com.roadpulse.app.nav.TrafficUploader.init(this)
         com.roadpulse.app.nav.LeaveReminders.rescheduleAll(this)

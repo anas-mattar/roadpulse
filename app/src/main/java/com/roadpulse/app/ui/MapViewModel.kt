@@ -33,6 +33,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
@@ -143,6 +144,10 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
         // Reports come from the server when one is configured, otherwise they stay on this phone.
         viewModelScope.launch {
             ServerSettings.useLocal.collect { useReportsSource() }
+        }
+        // The server found through the address books arrived or changed: switch to it.
+        viewModelScope.launch {
+            ServerSettings.found.drop(1).collect { useReportsSource() }
         }
         // Mirror the active drive (owned by NavigationSession, advanced by NavigationService).
         viewModelScope.launch {
