@@ -136,20 +136,42 @@ class DirectoryClient(private val baseUrl: String) {
  * its part; duplicates (same name within 50 m) are shown once.
  */
 object PlaceSearch {
+    /** The Jalanna server gets this long to answer a search; after that its part is left out. */
+    const val SERVER_BUDGET_MS = 4000L
+    /** When the server already found places, the OpenStreetMap search gets this much longer (it is often the slow one). */
+    const val OSM_GRACE_MS = 1500L
+
     suspend fun search(
         geocoder: GeocodingClient, community: CommunityPlacesClient?, query: String, near: GeoPoint?, s: AppStrings, limit: Int,
-        directory: DirectoryClient? = null,
+        directory: DirectoryClient? = null, serverBudgetMs: Long = SERVER_BUDGET_MS, osmGraceMs: Long = OSM_GRACE_MS,
     ): List<Place> = kotlinx.coroutines.coroutineScope {
         val usable = near != null && query.count { it.isLetterOrDigit() } >= 2
+        // All three searches run at the same time; a slow or failing one must not hold up the list.
         val added = if (community != null && usable) {
-            async { runCatching { community.search(query, near!!) }.getOrDefault(emptyList()).map { it.toPlace(s) } }
+            async {
+                kotlinx.coroutines.withTimeoutOrNull(serverBudgetMs) {
+                    runCatching { community.search(query, near!!) }.getOrDefault(emptyList())
+                }.orEmpty().map { it.toPlace(s) }
+            }
         } else null
         val listed = if (directory != null && usable) {
-            async { runCatching { directory.search(query, near!!) }.getOrDefault(emptyList()).map { it.toPlace(s) } }
+            async {
+                kotlinx.coroutines.withTimeoutOrNull(serverBudgetMs) {
+                    runCatching { directory.search(query, near!!) }.getOrDefault(emptyList())
+                }.orEmpty().map { it.toPlace(s) }
+            }
         } else null
-        val osm = geocoder.search(query, near, limit)
+        val osmSearch = async { runCatching { geocoder.search(query, near, limit) } }
+        val fromServer = added?.await().orEmpty() + listed?.await().orEmpty()
+        val osm = if (fromServer.isEmpty()) {
+            osmSearch.await().getOrThrow()   // the only source: wait for it, and report its failure
+        } else {
+            val result = kotlinx.coroutines.withTimeoutOrNull(osmGraceMs) { osmSearch.await() }
+            if (result == null) osmSearch.cancel()
+            result?.getOrDefault(emptyList()).orEmpty()
+        }
         // Drivers' places first inside each distance band (they were added because search missed them).
-        val all = added?.await().orEmpty() + listed?.await().orEmpty() + osm
+        val all = fromServer + osm
         val unique = mutableListOf<Place>()
         for (p in all) if (unique.none { sameSpot(it, p) }) unique += p
         GeocodingClient.rankByDistance(unique, near).take(limit)

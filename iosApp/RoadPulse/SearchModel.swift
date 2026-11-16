@@ -67,7 +67,7 @@ final class SearchModel: ObservableObject {
         let text = query.trimmingCharacters(in: .whitespaces)
         if text.count < 3 || destination?.name == query { return }
         typingTask = Task {
-            try? await Task.sleep(nanoseconds: 600_000_000)
+            try? await Task.sleep(nanoseconds: 350_000_000)
             if !Task.isCancelled && query.trimmingCharacters(in: .whitespaces) == text { await search(near: near) }
         }
     }

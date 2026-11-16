@@ -221,7 +221,7 @@ public class ModerationApiTests
 
         var page = await client.GetAsync("/admin/");
         Assert.Equal(HttpStatusCode.OK, page.StatusCode);
-        Assert.Contains("RoadPulse moderation", await page.Content.ReadAsStringAsync());
+        Assert.Contains("Jalanna moderation", await page.Content.ReadAsStringAsync());
         var csp = string.Join(";", page.Headers.GetValues("Content-Security-Policy"));
         Assert.Contains("default-src 'none'", csp);
         Assert.Contains("frame-ancestors 'none'", csp);

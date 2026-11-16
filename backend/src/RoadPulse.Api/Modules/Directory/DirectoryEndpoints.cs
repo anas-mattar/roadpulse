@@ -27,7 +27,7 @@ public static class DirectoryEndpoints
     {
         v1.MapGroup("/places").WithTags("Places").RequireRateLimiting(RateLimits.Reads)
             .MapGet("/search", Search).WithName("SearchPlaces")
-            .WithSummary("Named places (Overture Maps) whose name contains q, within 100 km of lat/lon: names starting with q first, then nearest.");
+            .WithSummary("Named places (Overture Maps) whose name contains q, within about 100 km of lat/lon: names starting with q first, then nearest.");
         return v1;
     }
 
@@ -42,18 +42,58 @@ public static class DirectoryEndpoints
         if (take is < 1 or > 30) errors["limit"] = ["Must be between 1 and 30."];
         if (errors.Count > 0) return TypedResults.ValidationProblem(errors);
 
-        var here = Geo.CreatePoint(new Coordinate(lon!.Value, lat!.Value));
-        // Names starting with the text first; then nearest, where a place Overture is unsure about
-        // (confidence under 0.5) counts as three times as far away.
-        var rows = await db.DirectoryPlaces.AsNoTracking()
-            .Where(p => p.SearchKey.Contains(key) && p.Location.IsWithinDistance(here, SearchRadiusM))
-            .Select(p => new { Place = p, Starts = p.SearchKey.StartsWith(key), Distance = p.Location.Distance(here) })
-            .OrderByDescending(x => x.Starts)
-            .ThenBy(x => x.Place.Confidence < LowConfidence ? x.Distance * 3 : x.Distance)
-            .Take(take)
-            .ToListAsync();
-        return TypedResults.Ok(rows.Select(x => new DirectoryPlaceDto(
-            x.Place.Id, x.Place.Name, x.Place.Category, x.Place.Address, x.Place.Location.Y, x.Place.Location.X, Math.Round(x.Distance))).ToList());
+        // Two steps, both cheap (a slow search here makes search-while-typing feel stuck):
+        //  1. Only the 5,000 places nearest to the driver (the map index finds those quickly). Common
+        //     words ("kl", "restoran", "99") have plenty of matches there, so this is the whole answer.
+        //  2. Otherwise every match in a box of about 100 km around the driver. The name index
+        //     makes this quick for the less common words that reach this step.
+        // Order in both: names starting with the text first; then nearest, where a place Overture is
+        // unsure about (confidence under 0.5) counts as three times as far away. "Nearest" uses flat
+        // map distance, which is much cheaper than distance on the globe and the same order this
+        // close to the equator; the true distance in metres is worked out only for the rows returned.
+        var near = await Query(db, key, lat!.Value, lon!.Value, take, NearestFirst);
+        if (near.Count < take || (key.Length >= 3 && !near.Any(h => h.Starts)))
+            near = await Query(db, key, lat.Value, lon.Value, take, nearestOnly: 0);
+        return TypedResults.Ok(near.Select(h => new DirectoryPlaceDto(
+            h.Id, h.Name, h.Category, h.Address, h.Lat, h.Lon, Math.Round(h.DistanceM))).ToList());
+    }
+
+    /// <summary>How many of the nearest places step 1 looks at.</summary>
+    public const int NearestFirst = 5000;
+    /// <summary>Half the side of the search box in degrees (about 100 km).</summary>
+    private const double BoxDegrees = 0.9;
+
+    private sealed record Hit(string Id, string Name, string? Category, string? Address, double Lat, double Lon, double DistanceM, bool Starts);
+
+    private static Task<List<Hit>> Query(RoadPulseDb db, string key, double lat, double lon, int take, int nearestOnly)
+    {
+        // key holds only letters and digits (CommunityPlaceEndpoints.Key), so it needs no LIKE escaping.
+        var contains = "%" + key + "%";
+        var prefix = key + "%";
+        var source = nearestOnly > 0
+            ? $"(SELECT * FROM directory_places ORDER BY location <-> ST_SetSRID(ST_MakePoint({{0}}, {{1}}), 4326)::geography LIMIT {nearestOnly})"
+            : "directory_places";
+        // Column names follow the database naming (snake_case), which is how they map onto Hit.
+        var sql = $"""
+            SELECT m.id, m.name, m.category, m.address,
+                   ST_Y(m.location::geometry) AS lat, ST_X(m.location::geometry) AS lon,
+                   ST_Distance(m.location, ST_SetSRID(ST_MakePoint({"{0}"}, {"{1}"}), 4326)::geography) AS distance_m,
+                   m.starts
+            FROM (
+                SELECT p.*, (p.search_key LIKE {"{3}"}) AS starts
+                FROM {source} p
+                WHERE p.search_key LIKE {"{2}"}
+                  AND p.location::geometry && ST_Expand(ST_SetSRID(ST_MakePoint({"{0}"}, {"{1}"}), 4326), {"{4}"})
+                ORDER BY (p.search_key LIKE {"{3}"}) DESC,
+                         ST_Distance(p.location::geometry, ST_SetSRID(ST_MakePoint({"{0}"}, {"{1}"}), 4326))
+                             * (CASE WHEN p.confidence < {"{5}"} THEN 3 ELSE 1 END)
+                LIMIT {"{6}"}
+            ) m
+            ORDER BY m.starts DESC,
+                     ST_Distance(m.location::geometry, ST_SetSRID(ST_MakePoint({"{0}"}, {"{1}"}), 4326))
+                         * (CASE WHEN m.confidence < {"{5}"} THEN 3 ELSE 1 END)
+            """;
+        return db.Database.SqlQueryRaw<Hit>(sql, lon, lat, contains, prefix, BoxDegrees, LowConfidence, take).ToListAsync();
     }
 }
 
