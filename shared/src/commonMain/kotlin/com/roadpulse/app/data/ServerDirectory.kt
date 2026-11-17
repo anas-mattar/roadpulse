@@ -45,7 +45,8 @@ object ServerDirectory {
     /** Routing lives under /routing on the same address. */
     fun routingUrl(server: String): String = "$server/routing"
 
-    private suspend fun answers(server: String): Boolean =
+    /** Whether [server] is a Jalanna server that answers right now. */
+    suspend fun answers(server: String): Boolean =
         runCatching { Http.execute("$server/health").contains("ok") }.getOrDefault(false)
 
     private suspend fun published(books: List<String>): List<String> {

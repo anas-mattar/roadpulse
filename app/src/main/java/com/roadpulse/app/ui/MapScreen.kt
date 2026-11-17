@@ -608,6 +608,8 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                         viewModel.selectRoute(i)
                         viewModel.startNavigation()
                     },
+                    onMenu = { showMenu = true },
+                    onSave = state.destination?.let { place -> { name -> viewModel.saveFavourite(place, name) } },
                     onPlaceProblem = state.destination?.directoryId?.takeIf { state.placesAvailable }?.let { id ->
                         { kind, here, note -> viewModel.reportPlaceProblem(id, kind, if (here) currentLocation() else null, note) }
                     },
@@ -738,7 +740,7 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
     }
 
     if (showProfile) {
-        ProfileDialog(state.profile, state.profileError, onSaveNickname = viewModel::saveNickname, onDismiss = { showProfile = false })
+        ProfileDialog(state.profile, state.profileError, onSaveNickname = viewModel::saveNickname, onBack = { showProfile = false; showMenu = true }, onDismiss = { showProfile = false })
     }
 
     // Live traffic lines in view.
@@ -849,13 +851,15 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
             planned = state.saved.planned,
             onOpen = { drive -> showPlannedList = false; viewModel.onPlaceSelected(drive.destination, currentLocation()) },
             onRemove = viewModel::removePlanned,
+            onBack = { showPlannedList = false; showMenu = true },
             onDismiss = { showPlannedList = false },
         )
     }
-    if (showHelp) HelpDialog(version = BuildConfig.VERSION_NAME, onDismiss = { showHelp = false })
+    if (showHelp) HelpDialog(version = BuildConfig.VERSION_NAME, onBack = { showHelp = false; showMenu = true }, onDismiss = { showHelp = false })
 
     if (showVoiceSettings) {
         VoiceSettingsDialog(
+            onBack = { showVoiceSettings = false; showMenu = true },
             onDismiss = { showVoiceSettings = false },
             onClearPlaces = {
                 showVoiceSettings = false
@@ -1251,7 +1255,7 @@ private fun LocationFix.toAndroidLocation(): android.location.Location =
     }
 
 @Composable
-private fun VoiceSettingsDialog(onDismiss: () -> Unit, onClearPlaces: () -> Unit, onExportData: () -> Unit = {}, onDeleteData: () -> Unit = {}) {
+private fun VoiceSettingsDialog(onBack: () -> Unit, onDismiss: () -> Unit, onClearPlaces: () -> Unit, onExportData: () -> Unit = {}, onDeleteData: () -> Unit = {}) {
     var showPolicy by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
     if (showPolicy) PrivacyPolicyDialog(onDismiss = { showPolicy = false })
@@ -1280,32 +1284,17 @@ private fun VoiceSettingsDialog(onDismiss: () -> Unit, onClearPlaces: () -> Unit
         add(Triple("alerts", strings.alertsAndReports, Icons.Filled.ReportProblem))
         add(Triple("speed", strings.speedometer, Icons.Filled.Speed))
         add(Triple("privacy", strings.privacy, Icons.Filled.Lock))
-        if (ServerSettings.localAvailable) add(Triple("server", "Server (debug builds)", Icons.Filled.Dns))
+        add(Triple("server", "Server", Icons.Filled.Dns))
     }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                if (page != null) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = strings.back,
-                        modifier = Modifier.padding(end = 12.dp).clickable { page = null })
-                }
-                Text(pages.firstOrNull { it.first == page }?.second ?: strings.settings)
-            }
-        },
-        text = {
-            Column(Modifier.verticalScroll(androidx.compose.foundation.rememberScrollState())) {
+    FullPage(
+        title = pages.firstOrNull { it.first == page }?.second ?: strings.settings,
+        onBack = { if (page != null) page = null else onBack() },
+        onDone = onDismiss,
+    ) {
+        PageCard {
+            Column(Modifier.padding(vertical = 4.dp)) {
                 when (page) {
-                    null -> pages.forEach { (id, label, icon) ->
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.fillMaxWidth().clickable { page = id }.padding(vertical = 12.dp),
-                        ) {
-                            Icon(icon, contentDescription = null, tint = RP.Brand, modifier = Modifier.size(22.dp))
-                            Text(label, fontSize = 16.sp, modifier = Modifier.padding(start = 14.dp).weight(1f))
-                            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = RP.TextSecondary)
-                        }
-                    }
+                    null -> pages.forEach { (id, label, icon) -> PageRow(label, icon) { page = id } }
                     "general" -> {
                         Text(strings.language, style = MaterialTheme.typography.labelLarge, color = RP.TextSecondary)
                         GuidanceLanguage.entries.forEach { option ->
@@ -1352,7 +1341,7 @@ private fun VoiceSettingsDialog(onDismiss: () -> Unit, onClearPlaces: () -> Unit
                     "vehicle" -> VehicleSettings()
                     "alerts" -> TrafficSettings()
                     "speed" -> SpeedometerSettings()
-                    "server" -> ServerDebugSettings()
+                    "server" -> ServerPage()
                     "privacy" -> {
                         Text(strings.privacyText, style = MaterialTheme.typography.bodySmall, color = RP.TextSecondary)
                         val noPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)
@@ -1365,9 +1354,73 @@ private fun VoiceSettingsDialog(onDismiss: () -> Unit, onClearPlaces: () -> Unit
                     }
                 }
             }
-        },
-        confirmButton = { TextButton(onClick = onDismiss) { Text(strings.done) } },
-    )
+        }
+    }
+}
+
+/**
+ * Which server the app is using (English, like on iPhone: a setting for the developer and testers).
+ * Normally found by itself; an https address can be typed instead, e.g. the one
+ * start-public-demo.ps1 prints. Debug builds also have the laptop switches below.
+ */
+@Composable
+private fun ServerPage() {
+    val useLocal by ServerSettings.useLocal.collectAsStateWithLifecycle()
+    val found by ServerSettings.found.collectAsStateWithLifecycle()
+    val manual by ServerSettings.manual.collectAsStateWithLifecycle()
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    var typed by remember { mutableStateOf(manual) }
+    var note by remember { mutableStateOf<String?>(null) }
+    var busy by remember { mutableStateOf(false) }
+
+    if (!useLocal) {
+        Text(
+            when {
+                manual.isNotEmpty() -> "Using the address you typed: $manual"
+                found.isNotEmpty() -> "Server found automatically: $found"
+                else -> "No server found yet."
+            },
+            fontWeight = FontWeight.Medium,
+        )
+        Text(
+            "The app finds its server by itself. Without one, maps, search and navigation still work; reports, added places, traffic and sharing do not.",
+            style = MaterialTheme.typography.bodySmall, color = RP.TextSecondary, modifier = Modifier.padding(top = 4.dp),
+        )
+        TextButton(enabled = !busy, onClick = {
+            busy = true; note = "Looking…"
+            scope.launch {
+                ServerSettings.findServer()
+                val now = ServerSettings.backendUrl()
+                note = if (now.isEmpty()) "No server answered." else if (com.roadpulse.app.data.ServerDirectory.answers(now)) "Connected to $now" else "No answer from $now"
+                busy = false
+            }
+        }) { Text("Look again") }
+        OutlinedTextField(
+            value = typed, onValueChange = { typed = it.trim() }, singleLine = true,
+            label = { Text("Server address (optional)") }, placeholder = { Text("https://…") },
+            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Uri),
+            modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+        )
+        Row {
+            TextButton(enabled = !busy && typed != manual, onClick = {
+                if (!ServerSettings.setManual(typed)) { note = "Type a full address that starts with https://"; return@TextButton }
+                if (typed.isEmpty()) { note = "Back to the automatic server."; return@TextButton }
+                busy = true; note = "Checking…"
+                scope.launch {
+                    note = if (com.roadpulse.app.data.ServerDirectory.answers(ServerSettings.backendUrl())) "Connected to ${ServerSettings.backendUrl()}"
+                        else "Saved, but there is no answer from ${ServerSettings.backendUrl()}"
+                    busy = false
+                }
+            }) { Text("Use this address") }
+            if (manual.isNotEmpty()) TextButton(enabled = !busy, onClick = { typed = ""; ServerSettings.setManual(""); note = "Back to the automatic server." }) { Text("Clear") }
+        }
+        note?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = RP.TextSecondary) }
+    }
+    if (ServerSettings.localAvailable) {
+        if (!useLocal) androidx.compose.material3.HorizontalDivider(Modifier.padding(vertical = 10.dp), color = RP.Field)
+        Text("For development (debug builds)", fontSize = 13.sp, color = RP.TextSecondary)
+        ServerDebugSettings()
+    }
 }
 
 /** Debug builds: use the RoadPulse servers on this laptop. */
@@ -1436,16 +1489,13 @@ private fun TrafficSettings() {
 
 @Composable
 private fun PrivacyPolicyDialog(onDismiss: () -> Unit) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(strings.privacyPolicy) },
-        text = {
-            Column(Modifier.verticalScroll(androidx.compose.foundation.rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                strings.privacyPolicyText.forEach { Text(it, fontSize = 14.sp) }
+    FullPage(title = strings.privacyPolicy, onBack = onDismiss, onDone = onDismiss) {
+        PageCard {
+            Column(Modifier.padding(vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                strings.privacyPolicyText.forEach { Text(it, fontSize = 15.sp) }
             }
-        },
-        confirmButton = { TextButton(onClick = onDismiss) { Text(strings.done) } },
-    )
+        }
+    }
 }
 
 /** Music controls while driving: needs notification access, granted in Android settings. */

@@ -251,7 +251,7 @@ class OverlayScreenshotTest {
 
     @Test
     fun previewWithLeaveLater() = shot("2d_preview_leave_later", RP.Field) {
-        PreviewOverlay(destination = place, route = route, busy = false, onBack = {}, onGo = {}, onSimulate = null, onLeaveLater = {})
+        PreviewOverlay(destination = place, route = route, busy = false, onBack = {}, onGo = {}, onSimulate = {}, onLeaveLater = {}, onMenu = {}, onSave = {})
     }
 
     @Test
@@ -265,6 +265,18 @@ class OverlayScreenshotTest {
         stats = com.roadpulse.app.data.ProfileStats(reports = 14, confirmationsReceived = 9, votes = 12),
         badges = listOf("FIRST_REPORT", "REPORTER_10"),
     )
+
+    @Test
+    fun menuPage() = shot("13_menu", Color.White) {
+        FullPageBody(title = "Menu", onBack = null, onDone = {}) { MenuRows(sampleProfile, {}, {}, {}, {}) }
+    }
+
+    @Test
+    fun profilePage() = shot("13b_profile_page", Color.White) {
+        FullPageBody(title = "Profile", onBack = {}, onDone = {}) {
+            PageCard { androidx.compose.foundation.layout.Column(Modifier.padding(vertical = 8.dp)) { ProfileContent(sampleProfile, onSaveNickname = {}) } }
+        }
+    }
 
     @Test
     fun profile() = shot("12_profile", Color.White) {

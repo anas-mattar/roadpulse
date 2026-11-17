@@ -149,6 +149,9 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             ServerSettings.found.drop(1).collect { useReportsSource() }
         }
+        viewModelScope.launch {
+            ServerSettings.manual.drop(1).collect { useReportsSource() }
+        }
         // Mirror the active drive (owned by NavigationSession, advanced by NavigationService).
         viewModelScope.launch {
             NavigationSession.state.collect { nav ->

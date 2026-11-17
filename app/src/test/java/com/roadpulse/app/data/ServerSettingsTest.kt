@@ -25,6 +25,11 @@ class ServerSettingsTest {
         // Otherwise the found server, with routing under /routing.
         assertEquals(found, ServerSettings.chooseBackend(false, "", "", found))
         assertEquals("$found/routing", ServerSettings.chooseRouting(false, "", "", "https://public.example", found))
+        // An address typed in settings comes before the build's server and the found one (not before the laptop link).
+        val typed = "https://typed.example"
+        assertEquals(typed, ServerSettings.chooseBackend(false, "", "https://api.example", found, typed))
+        assertEquals("$typed/routing", ServerSettings.chooseRouting(false, "", "https://api.example", "https://routing.example", found, typed))
+        assertEquals("http://10.0.2.2:8080", ServerSettings.chooseBackend(true, "http://10.0.2.2:8080", "", found, typed))
         // Nothing found: public routing, no backend.
         assertEquals("", ServerSettings.chooseBackend(false, "", "", ""))
         assertEquals("https://public.example", ServerSettings.chooseRouting(false, "", "", "https://public.example", ""))

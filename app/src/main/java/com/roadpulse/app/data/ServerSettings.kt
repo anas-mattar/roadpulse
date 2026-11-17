@@ -63,6 +63,7 @@ object ServerSettings {
         _useLocal.value = localAvailable && p.getBoolean(KEY, true)
         _useLocalMaps.value = localMapsAvailable && p.getBoolean(KEY_MAPS, false)
         _found.value = p.getString(KEY_FOUND, "") ?: ""
+        _manual.value = p.getString(KEY_MANUAL, "") ?: ""
     }
 
     fun setUseLocalMaps(value: Boolean) {
@@ -101,26 +102,43 @@ object ServerSettings {
         }
     }
 
-    /** Pure: tested. Which backend to use: the laptop (debug), else the build's server, else the found one. */
-    fun chooseBackend(useLocal: Boolean, local: String, configured: String, found: String): String = when {
+    /**
+     * A server address typed in Settings > Server (https only), e.g. the address
+     * start-public-demo.ps1 prints. Empty for none. It is used before the automatic lookup.
+     */
+    private val _manual = MutableStateFlow("")
+    val manual: StateFlow<String> = _manual.asStateFlow()
+
+    /** Keeps a typed address when it is a usable https address (or clears it for ""); returns false otherwise. */
+    fun setManual(text: String): Boolean {
+        val address = if (text.isBlank()) "" else ServerDirectory.clean(text) ?: return false
+        _manual.value = address
+        prefs?.edit()?.putString(KEY_MANUAL, address)?.apply()
+        return true
+    }
+
+    /** Pure: tested. Which backend to use: the laptop (debug), a typed address, the build's server, else the found one. */
+    fun chooseBackend(useLocal: Boolean, local: String, configured: String, found: String, manual: String = ""): String = when {
         useLocal -> local
+        manual.isNotEmpty() -> manual
         configured.isNotEmpty() -> configured
         else -> found
     }
 
-    /** Pure: tested. Routing goes with the backend: the found server serves it under /routing. */
-    fun chooseRouting(useLocal: Boolean, local: String, configuredBackend: String, configuredRouting: String, found: String): String = when {
+    /** Pure: tested. Routing goes with the backend: a typed or found server serves it under /routing. */
+    fun chooseRouting(useLocal: Boolean, local: String, configuredBackend: String, configuredRouting: String, found: String, manual: String = ""): String = when {
         useLocal -> local
+        manual.isNotEmpty() -> ServerDirectory.routingUrl(manual)
         configuredBackend.isEmpty() && found.isNotEmpty() -> ServerDirectory.routingUrl(found)
         else -> configuredRouting
     }
 
     fun routingUrl(): String = chooseRouting(
-        _useLocal.value, forLink(BuildConfig.LOCAL_ROUTING_URL, _link.value), BuildConfig.BACKEND_URL, BuildConfig.ROUTING_URL, _found.value)
+        _useLocal.value, forLink(BuildConfig.LOCAL_ROUTING_URL, _link.value), BuildConfig.BACKEND_URL, BuildConfig.ROUTING_URL, _found.value, _manual.value)
 
     /** Empty when there is no reports server (reports then stay on this phone). */
     fun backendUrl(): String = chooseBackend(
-        _useLocal.value, forLink(BuildConfig.LOCAL_BACKEND_URL, _link.value), BuildConfig.BACKEND_URL, _found.value)
+        _useLocal.value, forLink(BuildConfig.LOCAL_BACKEND_URL, _link.value), BuildConfig.BACKEND_URL, _found.value, _manual.value)
 
     /** Where the anonymous device token for [baseUrl] is kept (one token per server). */
     fun tokenStore(context: Context, baseUrl: String): DeviceTokenStore {
@@ -138,4 +156,5 @@ object ServerSettings {
     private const val KEY_MAPS = "use_local_maps"
     private const val KEY_LINK = "laptop_link"
     private const val KEY_FOUND = "found_server"
+    private const val KEY_MANUAL = "manual_server"
 }

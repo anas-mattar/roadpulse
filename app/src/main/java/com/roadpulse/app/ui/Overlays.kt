@@ -2,6 +2,16 @@ package com.roadpulse.app.ui
 
 import com.roadpulse.app.i18n.strings
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.material.icons.filled.Feedback
+import androidx.compose.material.icons.filled.Map
+import androidx.compose.material.icons.filled.StarBorder
+import androidx.compose.material.icons.filled.RemoveCircle
+import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.filled.Cancel
+import androidx.compose.foundation.background
+import androidx.compose.ui.draw.clip
+import androidx.compose.material.icons.filled.DirectionsCar
+import androidx.compose.material.icons.filled.Alarm
 import androidx.compose.foundation.border
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
@@ -135,27 +145,20 @@ fun ExploreOverlay(
     /** Points, level and badges; null hides the button (no server). */
     onOpenProfile: (() -> Unit)? = null,
 ) {
-    // Typing a search with results: the panel grows to the full height above the keyboard and the
+    // Laid out like the iPhone app: menu top left; Report (left) and my location (right) just above
+    // the card; in the card the search box first, then saved places as chips, categories, planned
+    // drives and recent places, or the results.
+    // Typing a search with results: the card grows to the full height above the keyboard and the
     // map buttons step aside, so the results are easy to read. (The search box keeps its place in
     // the layout, so the keyboard stays open while this changes.)
     val searching = results.isNotEmpty() && query.isNotEmpty() && categoryTitle == null
     Box(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().imePadding().padding(12.dp)) {
-        if (!searching) Column(Modifier.align(Alignment.TopEnd), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            CircleButton(
-                icon = Icons.Filled.Menu,
-                description = strings.menu,
-                onClick = onOpenSettings,
-                content = RP.TextSecondary,
-            )
-            if (onOpenProfile != null) {
-                CircleButton(icon = Icons.Filled.Person, description = strings.profile, onClick = onOpenProfile)
-            }
+        if (!searching) {
+            CircleButton(icon = Icons.Filled.Menu, description = strings.menu, onClick = onOpenSettings, modifier = Modifier.align(Alignment.TopStart))
         }
 
         Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth()) {
-            if (!searching) Column(Modifier.align(Alignment.End), horizontalAlignment = Alignment.End) {
-                CircleButton(icon = Icons.Filled.MyLocation, description = strings.showMyLocation, onClick = onRecenter)
-                Spacer(Modifier.height(10.dp))
+            if (!searching) Row(Modifier.fillMaxWidth().padding(bottom = 10.dp), verticalAlignment = Alignment.Bottom) {
                 Surface(
                     onClick = onReport,
                     shape = RoundedCornerShape(22.dp),
@@ -163,41 +166,18 @@ fun ExploreOverlay(
                     contentColor = RP.AmberDark,
                     shadowElevation = 6.dp,
                 ) {
-                    Row(Modifier.padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Row(Modifier.padding(horizontal = 16.dp, vertical = 11.dp), verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Filled.ReportProblem, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(6.dp))
                         Text(strings.report, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
                     }
                 }
-                Spacer(Modifier.height(12.dp))
+                Spacer(Modifier.weight(1f))
+                CircleButton(icon = Icons.Filled.MyLocation, description = strings.showMyLocation, onClick = onRecenter)
             }
 
-            Island(if (searching) Modifier.fillMaxSize() else Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(12.dp)) {
-                    if (categoryTitle != null) {
-                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 4.dp, bottom = 4.dp)) {
-                            Text(categoryTitle, fontWeight = FontWeight.SemiBold, fontSize = 15.sp, modifier = Modifier.weight(1f))
-                            Icon(Icons.Filled.Close, contentDescription = strings.close, tint = RP.TextSecondary,
-                                modifier = Modifier.size(20.dp).clickable(onClick = onCloseCategory))
-                        }
-                    }
-                    if (results.isNotEmpty()) {
-                        LazyColumn(if (searching) Modifier.weight(1f) else Modifier.heightIn(max = 300.dp)) {
-                            items(results) { place ->
-                                val km = if (categoryTitle == null) searchFrom?.let { com.roadpulse.app.data.Geo.distanceMeters(it, place.location) / 1000 } else null
-                                ResultRow(place, distance = km?.let { formatKm(it) }) { onSelect(place) }
-                            }
-                        }
-                        HorizontalDivider(Modifier.padding(vertical = 8.dp), color = RP.Field)
-                    }
-                    if (settingShortcut != null) {
-                        Text(
-                            strings.setShortcutHint(settingShortcut == Shortcut.HOME),
-                            fontSize = 13.sp,
-                            color = RP.Brand,
-                            modifier = Modifier.padding(start = 4.dp, bottom = 8.dp),
-                        )
-                    }
+            Island(if (searching) Modifier.fillMaxSize() else Modifier.fillMaxWidth(), radius = 22.dp) {
+                Column(Modifier.padding(14.dp)) {
                     SearchField(
                         query = query,
                         onQueryChange = onQueryChange,
@@ -207,70 +187,121 @@ fun ExploreOverlay(
                             Shortcut.WORK -> strings.yourWorkAddress
                             null -> strings.whereTo
                         },
-                        showClear = query.isNotEmpty() || settingShortcut != null,
+                        showClear = query.isNotEmpty() || settingShortcut != null || categoryTitle != null,
                         onVoice = if (settingShortcut == null) onVoiceSearch else null,
+                        leadingIcon = if (settingShortcut == null) Icons.Filled.Search else Icons.Filled.Home,
                     )
-                    if (onCategory != null && query.isEmpty() && settingShortcut == null && categoryTitle == null) {
-                        Row(
-                            Modifier.fillMaxWidth().padding(top = 10.dp).horizontalScroll(rememberScrollState()),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        ) {
-                            CATEGORY_CHIPS.forEach { (category, icon) ->
-                                Surface(onClick = { onCategory(category) }, shape = RoundedCornerShape(18.dp), color = RP.BrandLight, contentColor = RP.Brand) {
-                                    Row(Modifier.padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                                        Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp))
-                                        Text(strings.category(category), fontSize = 14.sp, fontWeight = FontWeight.Medium, modifier = Modifier.padding(start = 6.dp))
-                                    }
-                                }
+                    if (settingShortcut != null) {
+                        Text(
+                            strings.setShortcutHint(settingShortcut == Shortcut.HOME),
+                            fontSize = 13.sp,
+                            color = RP.Brand,
+                            modifier = Modifier.padding(start = 4.dp, top = 8.dp),
+                        )
+                    }
+                    if (categoryTitle != null) {
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 4.dp, top = 10.dp)) {
+                            Text(categoryTitle, fontWeight = FontWeight.SemiBold, fontSize = 17.sp, modifier = Modifier.weight(1f))
+                            Icon(Icons.Filled.Close, contentDescription = strings.close, tint = RP.TextSecondary,
+                                modifier = Modifier.size(20.dp).clickable(onClick = onCloseCategory))
+                        }
+                    }
+                    if (results.isNotEmpty()) {
+                        LazyColumn(if (searching) Modifier.weight(1f).padding(top = 6.dp) else Modifier.heightIn(max = 220.dp).padding(top = 6.dp)) {
+                            items(results) { place ->
+                                val km = if (categoryTitle == null) searchFrom?.let { com.roadpulse.app.data.Geo.distanceMeters(it, place.location) / 1000 } else null
+                                ResultRow(place, distance = km?.let { formatKm(it) }) { onSelect(place) }
                             }
                         }
                     }
                     if (query.isEmpty() && results.isEmpty() && settingShortcut == null && categoryTitle == null) {
-                        Row(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            ShortcutChip(strings.home, Icons.Filled.Home, saved.home, { onShortcut(Shortcut.HOME) }, { onChangeShortcut(Shortcut.HOME) })
-                            ShortcutChip(strings.work, Icons.Filled.Work, saved.work, { onShortcut(Shortcut.WORK) }, { onChangeShortcut(Shortcut.WORK) })
-                        }
-                        saved.parking?.let { parked ->
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.fillMaxWidth().padding(top = 8.dp).clickable(onClick = onShowParking),
-                            ) {
-                                Icon(Icons.Filled.LocalParking, contentDescription = null, tint = RP.Brand, modifier = Modifier.size(20.dp))
-                                Text(
+                        // Saved places as chips: the parked car, Home, Work, favourites. Press and hold for more.
+                        Row(
+                            Modifier.fillMaxWidth().padding(top = 10.dp).horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            saved.parking?.let { parked ->
+                                PlaceChip(
                                     strings.yourCarParked(com.roadpulse.app.data.reportAge(parked.savedAtMillis, nowMillis, strings)),
-                                    fontSize = 14.sp,
-                                    modifier = Modifier.padding(start = 10.dp).weight(1f),
+                                    Icons.Filled.DirectionsCar, onClick = onShowParking, menuLabel = strings.forgetParking, onMenu = onClearParking,
                                 )
-                                Icon(Icons.Filled.Close, contentDescription = strings.forgetParking, tint = RP.TextSecondary,
-                                    modifier = Modifier.size(18.dp).clickable(onClick = onClearParking))
+                            }
+                            PlaceChip(
+                                if (saved.home == null) "${strings.home} · ${strings.setAddress}" else strings.home, Icons.Filled.Home,
+                                onClick = { onShortcut(Shortcut.HOME) }, menuLabel = strings.setAddress, onMenu = { onChangeShortcut(Shortcut.HOME) },
+                            )
+                            PlaceChip(
+                                if (saved.work == null) "${strings.work} · ${strings.setAddress}" else strings.work, Icons.Filled.Work,
+                                onClick = { onShortcut(Shortcut.WORK) }, menuLabel = strings.setAddress, onMenu = { onChangeShortcut(Shortcut.WORK) },
+                            )
+                            saved.favourites.forEach { place ->
+                                PlaceChip(place.name, Icons.Filled.Star, onClick = { onFavourite(place) },
+                                    menuLabel = strings.remove(place.name), onMenu = { onRemoveFavourite(place) })
                             }
                         }
-                        saved.planned.filter { it.arriveByMillis > nowMillis }.forEach { drive ->
+                        if (onCategory != null) {
+                            Row(
+                                Modifier.fillMaxWidth().padding(top = 10.dp).horizontalScroll(rememberScrollState()),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                CATEGORY_CHIPS.forEach { (category, _) ->
+                                    Surface(
+                                        onClick = { onCategory(category) }, shape = RoundedCornerShape(50), color = Color.Transparent, contentColor = RP.Brand,
+                                        border = BorderStroke(1.dp, RP.Brand.copy(alpha = 0.4f)),
+                                    ) {
+                                        Text(strings.category(category), fontSize = 14.sp, modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp))
+                                    }
+                                }
+                            }
+                        }
+                        val planned = saved.planned.filter { it.arriveByMillis > nowMillis }.take(3)
+                        if (planned.isNotEmpty()) {
+                            Text(strings.plannedDrives, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = RP.TextSecondary,
+                                modifier = Modifier.padding(top = 10.dp, start = 4.dp))
+                        }
+                        planned.forEach { drive ->
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Box(Modifier.weight(1f)) {
                                     ResultRow(
                                         Place(drive.destination.name, plannedLabel(drive, nowMillis), drive.destination.location),
-                                        icon = Icons.Filled.Schedule,
+                                        icon = Icons.Filled.Alarm,
                                     ) { onPlanned(drive) }
                                 }
                                 Icon(Icons.Filled.Close, contentDescription = strings.remove(drive.destination.name), tint = RP.TextSecondary,
                                     modifier = Modifier.size(18.dp).clickable { onRemovePlanned(drive) })
                             }
                         }
-                        saved.favourites.forEach { place ->
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Box(Modifier.weight(1f)) { ResultRow(place, icon = Icons.Filled.Star) { onFavourite(place) } }
-                                Icon(Icons.Filled.Close, contentDescription = strings.remove(place.name), tint = RP.TextSecondary,
-                                    modifier = Modifier.size(18.dp).clickable { onRemoveFavourite(place) })
-                            }
-                        }
-                        saved.recent.take(if (saved.favourites.size > 2) 1 else 3).forEach { place ->
+                        if (saved.recent.isNotEmpty()) Spacer(Modifier.height(4.dp))
+                        saved.recent.take(4).forEach { place ->
                             ResultRow(place, icon = Icons.Filled.History) { onRecent(place) }
                         }
                     }
                     Text(MAP_CREDITS, fontSize = 9.sp, color = RP.TextSecondary, modifier = Modifier.padding(top = 8.dp, start = 4.dp))
                 }
             }
+        }
+    }
+}
+
+/** A saved place as a chip (tinted pill with an icon). Press and hold opens a one-line menu, as on iPhone. */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun PlaceChip(text: String, icon: ImageVector, onClick: () -> Unit, menuLabel: String, onMenu: () -> Unit) {
+    var menu by remember { mutableStateOf(false) }
+    Box {
+        Row(
+            Modifier
+                .clip(RoundedCornerShape(50))
+                .background(RP.Brand.copy(alpha = 0.12f))
+                .combinedClickable(onClick = onClick, onLongClick = { menu = true })
+                .padding(horizontal = 14.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(icon, contentDescription = null, tint = RP.Brand, modifier = Modifier.size(16.dp))
+            Text(text, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = RP.Brand, maxLines = 1, modifier = Modifier.padding(start = 5.dp))
+        }
+        androidx.compose.material3.DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+            androidx.compose.material3.DropdownMenuItem(text = { Text(menuLabel) }, onClick = { menu = false; onMenu() })
         }
     }
 }
@@ -283,16 +314,17 @@ private fun SearchField(
     placeholder: String = strings.whereTo,
     showClear: Boolean = query.isNotEmpty(),
     onVoice: (() -> Unit)? = null,
+    leadingIcon: ImageVector = Icons.Filled.Search,
 ) {
     Row(
         Modifier.fillMaxWidth().fieldBackground().padding(horizontal = 14.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(Icons.Filled.Search, contentDescription = null, tint = RP.Brand, modifier = Modifier.size(20.dp))
+        Icon(leadingIcon, contentDescription = null, tint = RP.Brand, modifier = Modifier.size(20.dp))
         Spacer(Modifier.width(10.dp))
         Box(Modifier.weight(1f)) {
             if (query.isEmpty()) {
-                Text(placeholder, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = Color.Black)
+                Text(placeholder, fontSize = 16.sp, color = RP.TextSecondary)
             }
             BasicTextField(
                 value = query,
@@ -324,13 +356,10 @@ private fun SearchField(
 @Composable
 private fun ResultRow(place: Place, icon: ImageVector = Icons.Filled.LocationOn, distance: String? = null, onClick: () -> Unit) {
     Row(
-        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 8.dp, horizontal = 4.dp),
+        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 7.dp, horizontal = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(
-            Modifier.size(36.dp).fieldBackground(),
-            contentAlignment = Alignment.Center,
-        ) { Icon(icon, contentDescription = null, tint = RP.Brand, modifier = Modifier.size(18.dp)) }
+        Icon(icon, contentDescription = null, tint = RP.TextSecondary, modifier = Modifier.size(22.dp))
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
             Text(place.name, fontSize = 15.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -373,6 +402,10 @@ fun PreviewOverlay(
     onGoRoute: (Int) -> Unit = {},
     /** "Report a problem with this place" (kind, use my position, note); null hides it. */
     onPlaceProblem: ((com.roadpulse.app.data.PlaceProblemKind, Boolean, String) -> Unit)? = null,
+    /** Opens the menu (top left, as on the map screen). */
+    onMenu: (() -> Unit)? = null,
+    /** Saves the destination as a favourite under the given name; null hides the star. */
+    onSave: ((String) -> Unit)? = null,
 ) {
     val context = LocalContext.current
     var listMode by remember { mutableStateOf(false) }
@@ -381,14 +414,27 @@ fun PreviewOverlay(
         PlaceProblemDialog(destination.name, onSend = { kind, here, note -> showPlaceProblem = false; onPlaceProblem(kind, here, note) },
             onDismiss = { showPlaceProblem = false })
     }
-    Box(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(12.dp)) {
-        CircleButton(
-            icon = Icons.AutoMirrored.Filled.ArrowBack,
-            description = strings.back,
-            onClick = onBack,
-            modifier = Modifier.align(Alignment.TopStart),
-            content = Color.Black,
+    var askName by remember { mutableStateOf(false) }
+    if (askName && destination != null && onSave != null) {
+        var name by remember { mutableStateOf(destination.name) }
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { askName = false },
+            title = { Text(strings.savePlace) },
+            text = { androidx.compose.material3.OutlinedTextField(value = name, onValueChange = { name = it.take(60) }, singleLine = true, label = { Text(strings.placeNameHint) }) },
+            confirmButton = { androidx.compose.material3.TextButton(enabled = name.isNotBlank(), onClick = { askName = false; onSave(name.trim()) }) { Text(strings.save) } },
+            dismissButton = { androidx.compose.material3.TextButton(onClick = { askName = false }) { Text(strings.cancel) } },
         )
+    }
+    // Laid out like the iPhone app: menu top left, Map/List switch top centre; in the card the
+    // search box with the destination (X clears the route), then route options, stops, the route
+    // choices side by side, and one row: save, leave later, (try the drive), Go now.
+    Box(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(12.dp)) {
+        if (onMenu != null) {
+            CircleButton(icon = Icons.Filled.Menu, description = strings.menu, onClick = onMenu, modifier = Modifier.align(Alignment.TopStart))
+        } else {
+            CircleButton(icon = Icons.AutoMirrored.Filled.ArrowBack, description = strings.back, onClick = onBack,
+                modifier = Modifier.align(Alignment.TopStart), content = Color.Black)
+        }
         if (choices.size > 1) {
             MapListSwitch(listMode, { listMode = it }, Modifier.align(Alignment.TopCenter))
         }
@@ -399,20 +445,42 @@ fun PreviewOverlay(
                 onSelect = onSelectRoute, onGo = onGoRoute,
                 modifier = Modifier.align(Alignment.TopCenter).padding(top = 60.dp),
             )
-        } else Island(Modifier.align(Alignment.BottomCenter).fillMaxWidth()) {
-            Column(Modifier.padding(16.dp)) {
-                Text(destination?.name ?: strings.destination, fontSize = 18.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                if (!destination?.description.isNullOrBlank()) {
-                    Text(destination!!.description, fontSize = 13.sp, color = RP.TextSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                }
-                stops.forEachIndexed { i, stop ->
-                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 6.dp)) {
-                        Text(strings.stop(i + 1, stop.name), fontSize = 14.sp, color = RP.Brand, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-                        Icon(Icons.Filled.Close, contentDescription = strings.removeStop, tint = RP.TextSecondary, modifier = Modifier.size(18.dp).clickable { onRemoveStop(stop) })
-                    }
+        } else Island(Modifier.align(Alignment.BottomCenter).fillMaxWidth(), radius = 22.dp) {
+            Column(Modifier.padding(14.dp)) {
+                // The search box, holding the destination; the X (or a tap) goes back to searching.
+                Row(
+                    Modifier.fillMaxWidth().fieldBackground().clickable(onClick = onBack).padding(horizontal = 14.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(Icons.Filled.Search, contentDescription = null, tint = RP.Brand, modifier = Modifier.size(20.dp))
+                    Text(destination?.name ?: strings.destination, fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(start = 10.dp).weight(1f))
+                    Icon(Icons.Filled.Cancel, contentDescription = strings.clear, tint = RP.TextSecondary, modifier = Modifier.size(20.dp))
                 }
                 if (optionsSummary != null) {
-                    Text(optionsSummary, fontSize = 13.sp, color = RP.TextSecondary, modifier = Modifier.padding(top = 4.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 10.dp)) {
+                        Icon(Icons.Filled.Tune, contentDescription = null, tint = RP.TextSecondary, modifier = Modifier.size(14.dp))
+                        Text(optionsSummary, fontSize = 12.sp, color = RP.TextSecondary, modifier = Modifier.padding(start = 6.dp))
+                    }
+                }
+                stops.forEachIndexed { i, stop ->
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 8.dp)) {
+                        Icon(Icons.Filled.Flag, contentDescription = null, tint = ROUTE_ORANGE, modifier = Modifier.size(18.dp))
+                        Text(strings.stop(i + 1, stop.name), fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.padding(start = 8.dp).weight(1f))
+                        Icon(Icons.Filled.RemoveCircle, contentDescription = strings.removeStop, tint = RP.TextSecondary,
+                            modifier = Modifier.size(20.dp).clickable { onRemoveStop(stop) })
+                    }
+                }
+                if (stops.isEmpty()) {
+                    Text(strings.tipAddStop, fontSize = 12.sp, color = RP.TextSecondary, modifier = Modifier.padding(top = 10.dp))
+                    // Only for places from the server's own data, which a moderator can correct.
+                    if (onPlaceProblem != null && destination?.directoryId != null) {
+                        Text(
+                            strings.reportPlaceProblem, fontSize = 12.sp, color = RP.Brand,
+                            modifier = Modifier.padding(top = 6.dp).clickable { showPlaceProblem = true },
+                        )
+                    }
                 }
                 if (parkingNearby.isNotEmpty()) {
                     var open by remember { mutableStateOf(false) }
@@ -430,17 +498,7 @@ fun PreviewOverlay(
                     }
                     if (open) parkingNearby.forEach { p -> ResultRow(p, icon = Icons.Filled.LocalParking) { onChooseParking(p) } }
                 }
-                if (stops.isEmpty() && parkingNearby.isEmpty()) {
-                    Text(strings.tipAddStop, fontSize = 12.sp, color = RP.TextSecondary, modifier = Modifier.padding(top = 4.dp))
-                }
-                // Only for places from the server's own data, which a moderator can correct.
-                if (onPlaceProblem != null && destination?.directoryId != null) {
-                    Text(
-                        strings.reportPlaceProblem, fontSize = 13.sp, color = RP.Brand,
-                        modifier = Modifier.padding(top = 6.dp).clickable { showPlaceProblem = true },
-                    )
-                }
-                Spacer(Modifier.height(12.dp))
+                Spacer(Modifier.height(10.dp))
 
                 if (route == null) {
                     if (busy) LinearProgressIndicator(Modifier.fillMaxWidth(), color = RP.Brand, trackColor = RP.BrandLight)
@@ -456,40 +514,17 @@ fun PreviewOverlay(
                                 route = r,
                                 choice = labels.getOrNull(i),
                                 selected = i == selected,
-                                single = cards.size == 1,
-                                arrival = formatArrival(context, r.timeSeconds + (traffic.getOrNull(i)?.delaySeconds ?: 0.0)),
                                 toll = com.roadpulse.app.data.TollClient.label(r.hasToll, tolls.getOrNull(i), strings),
                                 traffic = traffic.getOrNull(i),
                                 onClick = { onSelectRoute(i) },
                             )
                         }
                     }
-                    Spacer(Modifier.height(14.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        if (onSimulate != null) {
-                            CircleButton(
-                                icon = Icons.Filled.PlayArrow,
-                                description = strings.simulateDrive,
-                                onClick = onSimulate,
-                                container = Color.White,
-                                content = Color.Black,
-                                size = 52.dp,
-                                border = BorderStroke(1.dp, RP.Field),
-                            )
-                            Spacer(Modifier.width(10.dp))
-                        }
-                        if (onLeaveLater != null) {
-                            CircleButton(
-                                icon = Icons.Filled.Schedule,
-                                description = strings.leaveLater,
-                                onClick = onLeaveLater,
-                                container = Color.White,
-                                content = RP.Brand,
-                                size = 52.dp,
-                                border = BorderStroke(1.dp, RP.Field),
-                            )
-                            Spacer(Modifier.width(10.dp))
-                        }
+                    Spacer(Modifier.height(10.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        if (onSave != null) SmallRoundButton(Icons.Filled.StarBorder, strings.savePlace) { askName = true }
+                        if (onLeaveLater != null) SmallRoundButton(Icons.Filled.Alarm, strings.leaveLater, onLeaveLater)
+                        if (onSimulate != null) SmallRoundButton(Icons.Filled.PlayArrow, strings.simulateDrive, onSimulate)
                         Button(
                             onClick = onGo,
                             modifier = Modifier.weight(1f).height(52.dp),
@@ -507,6 +542,18 @@ fun PreviewOverlay(
         }
     }
 }
+
+/** A round grey button with a dark icon (save, leave later, try the drive), as on iPhone. */
+@Composable
+private fun SmallRoundButton(icon: ImageVector, description: String, onClick: () -> Unit) {
+    Box(
+        Modifier.size(48.dp).clip(androidx.compose.foundation.shape.CircleShape).background(RP.Field).clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) { Icon(icon, contentDescription = description, tint = Color.Black, modifier = Modifier.size(22.dp)) }
+}
+
+/** Orange for stops and tolls, as on iPhone. */
+private val ROUTE_ORANGE = Color(0xFFE8830C)
 
 // ---------------------------------------------------------------- Driving
 
@@ -563,6 +610,15 @@ fun DrivingOverlay(
             Spacer(Modifier.height(8.dp))
             Row(verticalAlignment = Alignment.Top) {
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    if (sharing) {
+                        Surface(onClick = onStopSharing, shape = RoundedCornerShape(14.dp), color = RP.TealDark, contentColor = Color.White, shadowElevation = 4.dp) {
+                            Row(Modifier.padding(horizontal = 12.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Filled.Share, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(Modifier.width(6.dp))
+                                Text(strings.sharingLive + " · " + strings.viewers(shareViewers), fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                            }
+                        }
+                    }
                     val gap = state.thenGapMeters
                     if (state.thenType != null && gap != null && gap <= THEN_HINT_MAX_GAP_M) {
                         Pill(
@@ -599,15 +655,6 @@ fun DrivingOverlay(
                         )
                     }
                     state.navStatus?.let { Pill(text = it, color = RP.Amber, contentColor = RP.AmberDark) }
-                    if (sharing) {
-                        Surface(onClick = onStopSharing, shape = RoundedCornerShape(14.dp), color = RP.TealDark, contentColor = Color.White, shadowElevation = 4.dp) {
-                            Row(Modifier.padding(horizontal = 12.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Filled.Share, contentDescription = null, modifier = Modifier.size(16.dp))
-                                Spacer(Modifier.width(6.dp))
-                                Text(strings.sharingLive + " · " + strings.viewers(shareViewers), fontSize = 13.sp, fontWeight = FontWeight.Medium)
-                            }
-                        }
-                    }
                     if (onFlag != null) {
                         Surface(onClick = onFlag, shape = RoundedCornerShape(14.dp), color = Color.White, contentColor = RP.Danger, shadowElevation = 4.dp) {
                             Row(Modifier.padding(horizontal = 12.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -619,15 +666,16 @@ fun DrivingOverlay(
                     }
                 }
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    // Same four buttons, in the same order, as on iPhone.
                     CircleButton(
                         icon = if (muted) Icons.AutoMirrored.Filled.VolumeOff else Icons.AutoMirrored.Filled.VolumeUp,
                         description = if (muted) strings.unmuteVoice else strings.muteVoice,
                         onClick = onToggleMute,
-                        container = RP.NightPanel,
-                        content = Color.White,
                     )
+                    CircleButton(icon = Icons.Filled.MyLocation, description = strings.showMyLocation, onClick = onRecenter)
+                    CircleButton(icon = Icons.Filled.Map, description = strings.overview, onClick = onOverview)
                     if (onShare != null && !sharing) {
-                        CircleButton(icon = Icons.Filled.Share, description = strings.shareDrive, onClick = onShare, container = Color.White, content = RP.Brand)
+                        CircleButton(icon = Icons.Filled.Share, description = strings.shareDrive, onClick = onShare)
                     }
                 }
             }
@@ -646,40 +694,14 @@ fun DrivingOverlay(
                 }
                 if (showLimit) state.speedLimitKph?.let { SpeedLimitSign(it, Modifier.padding(start = 8.dp, bottom = 4.dp)) }
                 Spacer(Modifier.weight(1f))
-                Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    if (following) {
-                        CircleButton(
-                            icon = Icons.Filled.Route,
-                            description = strings.overview,
-                            onClick = onOverview,
-                            container = Color.White,
-                            content = RP.Brand,
-                        )
-                    } else {
-                        // Shown after the driver moves the map; brings the camera back to the car.
-                        Surface(
-                            onClick = onRecenter,
-                            shape = RoundedCornerShape(22.dp),
-                            color = Color.White,
-                            contentColor = RP.Brand,
-                            shadowElevation = 6.dp,
-                        ) {
-                            Row(Modifier.padding(horizontal = 14.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Filled.MyLocation, contentDescription = null, modifier = Modifier.size(18.dp))
-                                Spacer(Modifier.width(6.dp))
-                                Text(narrator.recenter, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
-                            }
-                        }
-                    }
-                    CircleButton(
-                        icon = Icons.Filled.ReportProblem,
-                        description = strings.report,
-                        onClick = onReport,
-                        container = RP.Amber,
-                        content = RP.AmberDark,
-                        size = 56.dp,
-                    )
-                }
+                CircleButton(
+                    icon = Icons.Filled.Feedback,
+                    description = strings.report,
+                    onClick = onReport,
+                    container = RP.Amber,
+                    content = RP.AmberDark,
+                    size = 56.dp,
+                )
             }
             val total = state.route?.lengthKm ?: 0.0
             val left = state.remainingKm ?: total
@@ -793,8 +815,6 @@ private fun RouteCard(
     route: Route,
     choice: RouteChoice?,
     selected: Boolean,
-    single: Boolean,
-    arrival: String,
     toll: String? = null,
     traffic: com.roadpulse.app.nav.RouteTrafficInfo? = null,
     onClick: () -> Unit,
@@ -804,7 +824,7 @@ private fun RouteCard(
         shape = RoundedCornerShape(18.dp),
         color = if (selected) RP.BrandLight else RP.Field,
         border = if (selected) BorderStroke(1.5.dp, RP.Brand) else null,
-        modifier = if (single) Modifier.width(320.dp) else Modifier.width(160.dp),
+        modifier = Modifier.width(160.dp),
     ) {
         Column(Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
             choice?.tag?.let { tag ->
@@ -818,20 +838,15 @@ private fun RouteCard(
                 formatDuration(route.timeSeconds + (traffic?.delaySeconds ?: 0.0)),
                 fontSize = 24.sp,
                 fontWeight = FontWeight.SemiBold,
-                color = if (selected) RP.BrandDeep else Color.Black,
+                color = Color.Black,
                 modifier = Modifier.padding(top = 4.dp),
             )
-            Text(
-                "${formatKm(route.lengthKm)} · $arrival",
-                fontSize = 13.sp,
-                color = if (selected) RP.Brand else RP.TextSecondary,
-                maxLines = 1,
-            )
+            Text(formatKm(route.lengthKm), fontSize = 13.sp, color = RP.TextSecondary, maxLines = 1)
             choice?.via?.let {
                 Text(strings.via(it), fontSize = 12.sp, color = RP.TextSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             toll?.let {
-                Text(it, fontSize = 12.sp, fontWeight = FontWeight.Medium, color = RP.AmberDark, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(it, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = ROUTE_ORANGE, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             if (traffic != null) TrafficBar(traffic.pieces, Modifier.padding(top = 6.dp), track = Color.White)
         }

@@ -42,21 +42,18 @@ import com.roadpulse.app.i18n.strings
 
 /** Points, level, statistics and badges for this (anonymous) device, with an optional nickname. */
 @Composable
-fun ProfileDialog(profile: Profile?, error: Boolean, onSaveNickname: (String) -> Unit, onDismiss: () -> Unit) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(strings.profile) },
-        text = {
-            Column(Modifier.verticalScroll(rememberScrollState())) {
+fun ProfileDialog(profile: Profile?, error: Boolean, onSaveNickname: (String) -> Unit, onBack: () -> Unit, onDismiss: () -> Unit) {
+    FullPage(title = strings.profile, onBack = onBack, onDone = onDismiss) {
+        PageCard {
+            Column(Modifier.padding(vertical = 8.dp)) {
                 when {
                     profile != null -> ProfileContent(profile, onSaveNickname)
                     error -> Text(strings.profileNeedsServer, color = MaterialTheme.colorScheme.error)
                     else -> LinearProgressIndicator(Modifier.fillMaxWidth(), color = RP.Brand, trackColor = RP.BrandLight)
                 }
             }
-        },
-        confirmButton = { TextButton(onClick = onDismiss) { Text(strings.done) } },
-    )
+        }
+    }
 }
 
 @Composable
