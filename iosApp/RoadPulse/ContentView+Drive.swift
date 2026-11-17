@@ -76,6 +76,10 @@ extension ContentView {
                          background: Color(red: 0.06, green: 0.43, blue: 0.34))
                 }
             }
+            if let label = s.thenLabel, s.thenGapM >= 0 {
+                pill(label, icon: turnSymbol(s.thenIcon), trailing: strings.distance(km: s.thenGapM / 1000),
+                     background: Color(red: 0.031, green: 0.204, blue: 0.227))
+            }
             if let label = s.reportLabel, s.reportAheadM >= 0 {
                 pill(label, icon: "exclamationmark.triangle.fill", trailing: strings.distance(km: s.reportAheadM / 1000),
                      background: Color(hex: s.reportColorHex ?? "#4C4F69"))
@@ -94,6 +98,12 @@ extension ContentView {
         }
     }
 
+    /// How far round the speed ring is filled: speed against the limit, or against 120 km/h when no limit is known.
+    func speedFraction(_ s: DriveSnapshot) -> CGFloat {
+        let scale = s.speedLimitKph > 0 ? Double(s.speedLimitKph) : 120
+        return CGFloat(min(max(Double(s.speedKmh) / scale, 0), 1))
+    }
+
     func speedRow(_ s: DriveSnapshot) -> some View {
         HStack(alignment: .bottom, spacing: 8) {
             if prefs.showSpeedometer && s.speedKmh >= 0 {
@@ -102,8 +112,17 @@ extension ContentView {
                     Text(strings.kmh).font(.system(size: 10))
                 }
                 .foregroundColor(isSpeeding(s) ? Color.red : Color.white)
-                .frame(width: 64, height: 64)
+                .frame(width: 68, height: 68)
                 .background(Color(white: 0.17)).clipShape(Circle())
+                // A ring that fills towards the limit (or 120 km/h), red when speeding: the same as on Android.
+                .overlay(Circle().inset(by: 3).stroke(Color(white: 0.27), lineWidth: 6))
+                .overlay(
+                    Circle().inset(by: 3)
+                        .trim(from: 0, to: speedFraction(s))
+                        .stroke(isSpeeding(s) ? Color.red : Color(red: 0.36, green: 0.79, blue: 0.65),
+                                style: StrokeStyle(lineWidth: 6, lineCap: .round))
+                        .rotationEffect(.degrees(-90))
+                )
             }
             if s.speedLimitKph > 0 && Choices.shared.showLimit(limitDisplayName: prefs.limitDisplay, speeding: isSpeeding(s)) {
                 Text("\(s.speedLimitKph)").font(.system(size: 17, weight: .bold)).foregroundColor(.black)

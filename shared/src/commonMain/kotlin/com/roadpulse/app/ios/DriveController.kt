@@ -59,6 +59,10 @@ class DriveSnapshot(
     val cameraAheadM: Double,
     val schoolLabel: String?,
     val schoolAheadM: Double,
+    /** The turn after the next one, shown as "Then ↰ 200 m" when it follows closely; null otherwise. */
+    val thenLabel: String?,
+    val thenIcon: String,
+    val thenGapM: Double,
     val reportLabel: String?,
     val reportColorHex: String?,
     val reportAheadM: Double,
@@ -358,6 +362,9 @@ class DriveController(var routingUrl: String) {
             cameraAheadM = s.cameraAhead?.metersAhead ?: -1.0,
             schoolLabel = s.schoolAhead?.let { n.schoolZone },
             schoolAheadM = s.schoolAhead?.metersAhead ?: -1.0,
+            thenLabel = n.thenLabel.takeIf { s.thenType != null && (s.thenGapMeters ?: Double.MAX_VALUE) <= THEN_HINT_MAX_GAP_M },
+            thenIcon = TurnIcon.forType(s.thenType ?: 0).name,
+            thenGapM = s.thenGapMeters ?: -1.0,
             reportLabel = s.reportAhead?.let { n.reportName(it.report.type) },
             reportColorHex = s.reportAhead?.report?.type?.colorHex,
             reportAheadM = s.reportAhead?.metersAhead ?: -1.0,
@@ -409,3 +416,6 @@ class DriveController(var routingUrl: String) {
         const val STILL_THERE_SHOWN_MS = 12_000L
     }
 }
+
+/** Show the "Then" hint only when the following turn comes within this distance of the next one. */
+private const val THEN_HINT_MAX_GAP_M = 300.0
