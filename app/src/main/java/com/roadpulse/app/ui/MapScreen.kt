@@ -225,6 +225,8 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
             source.start { location ->
                 if (DriveReplay.active.value) return@start // simulated drive owns the position
                 deviceFix = GeoPoint(location.latitude, location.longitude)
+                com.roadpulse.app.data.TravelHeading.update(location.latitude, location.longitude,
+                    if (location.hasBearing()) location.bearing.toDouble() else -1.0, if (location.hasSpeed()) location.speed.toDouble() else -1.0)
                 if (!navigatingNow) map?.locationComponent?.takeIf { it.isLocationComponentActivated }?.forceLocationUpdate(location)
             }
         }

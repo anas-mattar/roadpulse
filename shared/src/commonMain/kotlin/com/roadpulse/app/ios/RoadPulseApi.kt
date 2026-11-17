@@ -162,8 +162,13 @@ class RoadPulseApi(geocodingUrl: String, routingUrl: String, private val backend
     @Throws(Exception::class, CancellationException::class)
     suspend fun routes(fromLat: Double, fromLon: Double, toLat: Double, toLon: Double, stops: List<SearchResult>,
                        options: RouteOptions, language: GuidanceLanguage): List<RouteSummary> {
-        val routes = router.routes(GeoPoint(fromLat, fromLon), GeoPoint(toLat, toLon),
-            stops = stops.map { GeoPoint(it.lat, it.lon) }, options = options)
+        val from = GeoPoint(fromLat, fromLon)
+        val to = GeoPoint(toLat, toLon)
+        val via = stops.map { GeoPoint(it.lat, it.lon) }
+        // Start the way the car is already going, and plan around roads reported as closed.
+        val routes = router.routes(from, to, stops = via, options = options,
+            heading = com.roadpulse.app.data.TravelHeading.from(from),
+            closures = com.roadpulse.app.data.Closures.around(backendUrl, from, to, via))
         val strings = stringsFor(language)
         val choices = RouteChoices.describe(routes, strings)
         val traffic = com.roadpulse.app.nav.RouteTraffic.forRoutes(backendUrl, routes)
@@ -313,4 +318,11 @@ class RoadPulseApi(geocodingUrl: String, routingUrl: String, private val backend
         val info = listOfNotNull(detail, if (r.confirmations > 0) s.confirmations(r.confirmations) else null).joinToString(" · ")
         return ReportPin(r.id, r.type.name, s.reportType(r.type), info, r.type.colorHex, r.location.lat, r.location.lon, r.id in OwnReports.ids)
     }
+}
+
+/** For the iPhone app: tells the shared code which way the phone is travelling (every GPS fix). */
+object HeadingFeed {
+    /** [bearingDeg] and [speedMps] as iOS gives them: negative when not known. */
+    fun update(lat: Double, lon: Double, bearingDeg: Double, speedMps: Double) =
+        com.roadpulse.app.data.TravelHeading.update(lat, lon, bearingDeg, speedMps)
 }

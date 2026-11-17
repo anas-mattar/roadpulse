@@ -397,7 +397,12 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
         val stops = _state.value.stops.map { it.location }
         viewModelScope.launch {
             _state.update { it.copy(busy = true) }
-            runCatching { router.routes(from, to, stops = stops, options = com.roadpulse.app.data.RouteSettings.options.value) }
+            runCatching {
+                // Start the way the car is already going, and plan around roads reported as closed.
+                router.routes(from, to, stops = stops, options = com.roadpulse.app.data.RouteSettings.options.value,
+                    heading = com.roadpulse.app.data.TravelHeading.from(from),
+                    closures = com.roadpulse.app.data.Closures.around(ServerSettings.backendUrl(), from, to, stops))
+            }
                 .onSuccess { routes ->
                     _state.update {
                         it.copy(route = routes.first(), routeChoices = routes, selectedRoute = 0, tollEstimates = emptyList(),

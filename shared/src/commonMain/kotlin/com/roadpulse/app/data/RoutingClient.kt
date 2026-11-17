@@ -19,6 +19,7 @@ class RoutingClient(private val baseUrl: String) {
         alternates: Int? = null,
         avoid: List<List<GeoPoint>> = emptyList(),
         heading: Double? = null,
+        closures: List<GeoPoint> = emptyList(),
     ): String = Http.json.encodeToString(
         RouteRequest(
             // With a heading (rerouting while moving), the route starts in the direction the car is
@@ -30,6 +31,12 @@ class RoutingClient(private val baseUrl: String) {
             // The server offers alternatives only for trips without stops.
             alternates = if (stops.isEmpty()) alternates else null,
             excludePolygons = avoid.takeIf { it.isNotEmpty() }?.map { ring -> ring.map { listOf(it.lon, it.lat) } },
+            // Roads drivers reported as closed: the road nearest each point is left out.
+            excludeLocations = closures.takeIf { it.isNotEmpty() }?.map { Location(it.lat, it.lon) },
+            // Leaving now: the server then respects restrictions that apply at this time of day
+            // (e.g. a turn banned in peak hours). It cannot do this together with alternative
+            // routes, so the time is sent only when a single route is asked for.
+            dateTime = if (stops.isEmpty() && (alternates ?: 0) > 0) null else DateTime(),
         )
     )
 
@@ -40,9 +47,26 @@ class RoutingClient(private val baseUrl: String) {
         alternates: Int = 2,
         stops: List<GeoPoint> = emptyList(),
         options: RouteOptions = RouteOptions(),
-    ): List<Route> {
-        val payload = requestBody(from, to, stops, options, alternates)
-        return parseRoutes(Http.execute("$baseUrl/route", "POST", payload, Http.USER_AGENT), stops)
+        heading: Double? = null,
+        closures: List<GeoPoint> = emptyList(),
+    ): List<Route> = aroundClosures(closures) { closed ->
+        val payload = requestBody(from, to, stops, options, alternates, heading = heading, closures = closed)
+        parseRoutes(Http.execute("$baseUrl/route", "POST", payload, Http.USER_AGENT), stops)
+    }
+
+    /**
+     * Plans around the closed roads; when that gives no route (a closure may block the only way
+     * in, or the report may be wrong), plans again without them: a route is better than none.
+     */
+    private suspend fun <T> aroundClosures(closures: List<GeoPoint>, plan: suspend (List<GeoPoint>) -> T): T {
+        if (closures.isEmpty()) return plan(emptyList())
+        return try {
+            plan(closures)
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            plan(emptyList())
+        }
     }
 
     /** Parses the main route and any alternates (visible for tests). */
@@ -82,9 +106,10 @@ class RoutingClient(private val baseUrl: String) {
         options: RouteOptions = RouteOptions(),
         avoid: List<List<GeoPoint>> = emptyList(),
         heading: Double? = null,
-    ): Route {
-        val payload = requestBody(from, to, stops, options, avoid = avoid, heading = heading)
-        return parseRoute(Http.execute("$baseUrl/route", "POST", payload, Http.USER_AGENT), stops)
+        closures: List<GeoPoint> = emptyList(),
+    ): Route = aroundClosures(closures) { closed ->
+        val payload = requestBody(from, to, stops, options, avoid = avoid, heading = heading, closures = closed)
+        parseRoute(Http.execute("$baseUrl/route", "POST", payload, Http.USER_AGENT), stops)
     }
 
     /** Parses a routing-server response body (visible for tests). */
@@ -217,7 +242,15 @@ class RoutingClient(private val baseUrl: String) {
         @SerialName("turn_lanes") val turnLanes: Boolean = true,
         /** Areas to avoid, each a closed ring of [lon, lat] pairs (jammed roads). Omitted when null. */
         @SerialName("exclude_polygons") val excludePolygons: List<List<List<Double>>>? = null,
+        /** Points whose nearest road is left out (closed roads). Omitted when null. */
+        @SerialName("exclude_locations") val excludeLocations: List<Location>? = null,
+        /** When the trip starts (type 0 = now). Omitted when null. */
+        @SerialName("date_time") val dateTime: DateTime? = null,
     )
+
+    /** Valhalla's date_time: type 0 is "leaving now". */
+    @Serializable
+    private data class DateTime(val type: Int = 0)
 
     @Serializable
     private data class Location(

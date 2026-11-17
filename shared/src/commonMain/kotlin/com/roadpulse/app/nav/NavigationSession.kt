@@ -187,7 +187,8 @@ object NavigationSession {
         if (delaySeconds < FASTER_ROUTE_MIN_SAVING_S || current.fasterRoute != null || now() < fasterRouteSuppressedUntil) return
         val avoid = TrafficDelay.avoidAreas(hit)
         if (avoid.isEmpty()) return
-        val alt = router.route(position, current.destination.location, remainingStops(), platform.routeOptions(), avoid)
+        val alt = router.route(position, current.destination.location, remainingStops(), platform.routeOptions(), avoid,
+            closures = closures(position, current.destination.location, remainingStops()))
         val altDelay = TrafficDelay.estimate(TrafficDelay.ahead(alt.shape, null), lines).first
         val stay = (_state.value?.remainingSeconds ?: return) + delaySeconds
         val saved = stay - (alt.timeSeconds + altDelay)
@@ -213,7 +214,8 @@ object NavigationSession {
     suspend fun alternatives(): List<Route> {
         val current = _state.value ?: return emptyList()
         val from = current.displayPosition ?: return emptyList()
-        return router.routes(from, current.destination.location, alternates = 2, stops = remainingStops(), options = platform.routeOptions())
+        return router.routes(from, current.destination.location, alternates = 2, stops = remainingStops(), options = platform.routeOptions(),
+            closures = closures(from, current.destination.location, remainingStops()))
     }
 
     /** The driver picked another route during the drive. */
@@ -463,6 +465,10 @@ object NavigationSession {
         }
     }
 
+    /** Roads drivers reported as closed around the trip, to plan around (empty without a server). */
+    private suspend fun closures(from: GeoPoint, to: GeoPoint, stops: List<GeoPoint>, budgetMs: Long = 1500): List<GeoPoint> =
+        com.roadpulse.app.data.Closures.around(platform.backendUrl(), from, to, stops, budgetMs)
+
     private fun reroute(from: GeoPoint, heading: Double? = null) {
         val current = _state.value ?: return
         val t = now()
@@ -473,7 +479,9 @@ object NavigationSession {
         if (!current.offline) speak(platform.narrator().rerouting)
         rerouteJob = scope.launch {
             try {
-                val route = router.route(from, current.destination.location, remainingStops(), platform.routeOptions(), heading = heading)
+                // Short wait for the closed roads: a reroute must be quick.
+                val route = router.route(from, current.destination.location, remainingStops(), platform.routeOptions(), heading = heading,
+                    closures = closures(from, current.destination.location, remainingStops(), budgetMs = 800))
                 if (_state.value == null) return@launch
                 log?.event(now(), "reroute_done", "route_km=${route.lengthKm}")
                 applyRoute(route, current.destination, resumed = false)
@@ -572,7 +580,8 @@ object NavigationSession {
         log?.event(now(), "stop_added", "stops=${stops.size}")
         rerouteJob = scope.launch {
             try {
-                val route = router.route(from, current.destination.location, stops, platform.routeOptions())
+                val route = router.route(from, current.destination.location, stops, platform.routeOptions(),
+                    closures = closures(from, current.destination.location, stops))
                 if (_state.value == null) return@launch
                 applyRoute(route, current.destination, resumed = false)
                 speak(route.maneuvers.firstOrNull()?.let(platform.narrator()::atTurn))
