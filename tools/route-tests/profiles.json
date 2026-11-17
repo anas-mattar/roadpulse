@@ -1,0 +1,5 @@
+{
+  "current": { "exclude_unpaved": true },
+  "calm_light": { "exclude_unpaved": true, "maneuver_penalty": 8, "service_penalty": 30, "private_access_penalty": 900 },
+  "calmer": { "exclude_unpaved": true, "maneuver_penalty": 10, "service_penalty": 45, "private_access_penalty": 900, "gate_penalty": 600, "use_living_streets": 0 }
+}
