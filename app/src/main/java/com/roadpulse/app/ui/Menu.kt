@@ -14,6 +14,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Alarm
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.IconButton
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -92,6 +93,68 @@ fun FullPageBody(title: String, onBack: (() -> Unit)?, onDone: () -> Unit, conte
             }
         }
     }
+}
+
+/**
+ * A full-screen form with Cancel on one side, the title in the middle and the action ("Save",
+ * "Send") on the other: the same shape as the forms on iPhone.
+ */
+@Composable
+fun FormPage(title: String, action: String, actionEnabled: Boolean, onAction: () -> Unit, onCancel: () -> Unit, content: @Composable ColumnScope.() -> Unit) {
+    Dialog(onDismissRequest = onCancel, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        FormPageBody(title, action, actionEnabled, onAction, onCancel, content)
+    }
+}
+
+/** The form itself, without its window (also what the screenshot tests draw). */
+@Composable
+fun FormPageBody(title: String, action: String, actionEnabled: Boolean, onAction: () -> Unit, onCancel: () -> Unit, content: @Composable ColumnScope.() -> Unit) {
+    Surface(color = PageGrey, modifier = Modifier.fillMaxSize()) {
+        Column(Modifier.systemBarsPadding().imePadding()) {
+            Box(Modifier.fillMaxWidth().height(52.dp).padding(horizontal = 8.dp)) {
+                TextButton(onClick = onCancel, modifier = Modifier.align(Alignment.CenterStart)) { Text(strings.cancel, fontSize = 17.sp, color = RP.Brand) }
+                Text(title, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.align(Alignment.Center).padding(horizontal = 84.dp))
+                TextButton(onClick = onAction, enabled = actionEnabled, modifier = Modifier.align(Alignment.CenterEnd)) {
+                    Text(action, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, color = if (actionEnabled) RP.Brand else Color(0xFFB0B0B5))
+                }
+            }
+            Column(
+                Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+                content = content,
+            )
+        }
+    }
+}
+
+/** The small grey caption above a group of rows. */
+@Composable
+fun PageCaption(text: String) {
+    Text(text.uppercase(), fontSize = 13.sp, color = RP.TextSecondary, modifier = Modifier.padding(start = 16.dp, bottom = 0.dp))
+}
+
+/** One choice in a list: the chosen one carries a tick. */
+@Composable
+fun PickRow(label: String, selected: Boolean, onClick: () -> Unit) {
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 12.dp)) {
+        Text(label, fontSize = 17.sp, modifier = Modifier.weight(1f))
+        if (selected) Icon(Icons.Filled.Check, contentDescription = null, tint = RP.Brand, modifier = Modifier.size(22.dp))
+    }
+}
+
+/** A text box without a frame, for use inside a [PageCard]. */
+@Composable
+fun PageField(value: String, onChange: (String) -> Unit, hint: String, singleLine: Boolean = true) {
+    val clear = Color.Transparent
+    androidx.compose.material3.TextField(
+        value = value, onValueChange = onChange, singleLine = singleLine, maxLines = if (singleLine) 1 else 3,
+        placeholder = { Text(hint, color = Color(0xFFA0A0A5)) },
+        colors = androidx.compose.material3.TextFieldDefaults.colors(
+            focusedContainerColor = clear, unfocusedContainerColor = clear, focusedIndicatorColor = clear, unfocusedIndicatorColor = clear,
+        ),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 0.dp),
+    )
 }
 
 /** One white rounded group of rows on a [FullPage]. */

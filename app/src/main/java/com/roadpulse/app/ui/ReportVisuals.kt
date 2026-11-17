@@ -194,53 +194,73 @@ fun ReportPicker(
 ) {
     var chosen by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(initialType) }
     var duration by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<Int?>(null) }
+    var detail by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<String?>(null) }
     if (autoCloseMillis != null) {
         // Restarts on every step, so the driver always has the full time to tap.
-        androidx.compose.runtime.LaunchedEffect(chosen, duration) {
+        androidx.compose.runtime.LaunchedEffect(chosen, duration, detail) {
             kotlinx.coroutines.delay(autoCloseMillis)
             onDismiss()
         }
     }
     Island(modifier = modifier.fillMaxWidth()) {
-        Column(Modifier.padding(16.dp)) {
+        Column(Modifier.padding(20.dp)) {
             val type = chosen
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(type?.let { strings.reportType(it) } ?: strings.report, fontWeight = FontWeight.SemiBold, fontSize = 20.sp, modifier = Modifier.weight(1f))
-                IconButton(onClick = onDismiss) { Icon(Icons.Filled.Close, contentDescription = strings.close) }
-            }
             if (type == null) {
+                // Step 1, as on iPhone: the title, the coloured tiles, Cancel.
+                Text(strings.report, fontWeight = FontWeight.Bold, fontSize = 22.sp)
                 ReportType.entries.chunked(3).forEach { row ->
-                    TileRow(row.size) { i -> BigTile(strings.reportType(row[i]), row[i].icon, row[i].color) { chosen = row[i] } }
+                    TileRow(row.size, height = 100.dp) { i -> BigTile(strings.reportType(row[i]), row[i].icon, row[i].color) { detail = null; duration = null; chosen = row[i] } }
                 }
+                TextButton(onClick = onDismiss, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) { Text(strings.cancel, fontSize = 17.sp, color = RP.Brand) }
             } else {
+                // Step 2, as on iPhone: the type, optional details to tick, then Back and Send.
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    androidx.compose.foundation.layout.Box(
+                        Modifier.size(40.dp).background(type.color, androidx.compose.foundation.shape.CircleShape), contentAlignment = Alignment.Center,
+                    ) { Icon(type.icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(22.dp)) }
+                    Text(strings.reportType(type), fontWeight = FontWeight.Bold, fontSize = 22.sp, modifier = Modifier.padding(start = 10.dp))
+                }
                 val details = com.roadpulse.app.data.ReportDetails.subtypes[type].orEmpty()
+                ChipGrid(details.map { it.first to (strings.reportDetail(type, it.first) ?: it.second) }, detail) { code -> detail = if (detail == code) null else code }
                 if (type == ReportType.ROAD_CLOSED) {
-                    Text(strings.howLong, color = RP.TextSecondary, fontSize = 14.sp, modifier = Modifier.padding(top = 6.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 6.dp)) {
-                        com.roadpulse.app.data.ReportDetails.closureDurations.forEach { (minutes, _) ->
-                            androidx.compose.material3.FilterChip(
-                                selected = duration == minutes,
-                                onClick = { duration = minutes },
-                                label = { Text(strings.closureDuration(minutes)) },
-                            )
-                        }
-                    }
+                    Text(strings.howLong, fontWeight = FontWeight.SemiBold, fontSize = 17.sp, modifier = Modifier.padding(top = 14.dp))
+                    ChipGrid(com.roadpulse.app.data.ReportDetails.closureDurations.map { (minutes, _) -> minutes to strings.closureDuration(minutes) }, duration) { duration = it }
                 }
-                details.chunked(3).forEach { row ->
-                    TileRow(row.size, height = 76.dp) { i ->
-                        BigTile(strings.reportDetail(type, row[i].first) ?: row[i].second, null, type.color, small = true) { onPick(type, row[i].first, duration) }
-                    }
-                }
-                Row(Modifier.fillMaxWidth().padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                    TextButton(onClick = { chosen = null; duration = null }) { Text(strings.back) }
-                    Spacer(Modifier.weight(1f))
+                Row(Modifier.fillMaxWidth().padding(top = 16.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    androidx.compose.material3.OutlinedButton(
+                        onClick = { chosen = null; duration = null; detail = null },
+                        modifier = Modifier.weight(1f).height(48.dp),
+                    ) { Text(strings.back, fontSize = 17.sp, color = Color(0xFF2C2C2A)) }
                     Button(
-                        onClick = { onPick(type, null, duration) },
-                        colors = ButtonDefaults.buttonColors(containerColor = RP.Brand),
-                        modifier = Modifier.height(52.dp),
-                    ) { Text(strings.send, fontSize = 17.sp, fontWeight = FontWeight.SemiBold) }
+                        onClick = { onPick(type, detail, duration) },
+                        colors = ButtonDefaults.buttonColors(containerColor = type.color),
+                        modifier = Modifier.weight(1f).height(48.dp),
+                    ) { Text(strings.send, fontSize = 17.sp, fontWeight = FontWeight.Bold) }
                 }
             }
+        }
+    }
+}
+
+/** Choices as rounded chips, three to a row; the chosen one is filled with the brand colour. */
+@Composable
+private fun <T> ChipGrid(items: List<Pair<T, String>>, selected: T?, onTap: (T) -> Unit) {
+    items.chunked(3).forEach { row ->
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
+            row.forEach { (value, label) ->
+                val on = value == selected
+                androidx.compose.material3.Surface(
+                    onClick = { onTap(value) },
+                    shape = androidx.compose.foundation.shape.RoundedCornerShape(50),
+                    color = if (on) RP.Brand else RP.Field,
+                    contentColor = if (on) Color.White else Color(0xFF2C2C2A),
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Text(label, fontSize = 15.sp, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center, modifier = Modifier.padding(vertical = 10.dp, horizontal = 6.dp))
+                }
+            }
+            repeat(3 - row.size) { Spacer(Modifier.weight(1f)) }
         }
     }
 }

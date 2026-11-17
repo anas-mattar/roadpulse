@@ -102,36 +102,32 @@ fun PinnedPlaceCard(
     }
 }
 
-/** Name, kind and an optional note for a place search does not know. */
-@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+/** Name, kind and an optional note for a place search does not know. Laid out like iPhone. */
 @Composable
-private fun AddPlaceDialog(initialName: String, onAdd: (String, com.roadpulse.app.data.CommunityPlaceKind, String) -> Unit, onDismiss: () -> Unit) {
+fun AddPlaceDialog(initialName: String, onAdd: (String, com.roadpulse.app.data.CommunityPlaceKind, String) -> Unit, onDismiss: () -> Unit) {
     var name by remember { mutableStateOf(initialName) }
     var note by remember { mutableStateOf("") }
     var kind by remember { mutableStateOf<com.roadpulse.app.data.CommunityPlaceKind?>(null) }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(strings.addPlace) },
-        text = {
-            Column(Modifier.verticalScroll(rememberScrollState())) {
-                OutlinedTextField(value = name, onValueChange = { name = it.take(80) }, label = { Text(strings.placeName) }, singleLine = true)
-                Text(strings.whatKindOfPlace, fontSize = 14.sp, color = RP.TextSecondary, modifier = Modifier.padding(top = 12.dp, bottom = 4.dp))
-                androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    com.roadpulse.app.data.CommunityPlaceKind.entries.forEach { k ->
-                        androidx.compose.material3.FilterChip(selected = kind == k, onClick = { kind = k }, label = { Text(strings.placeKind(k)) })
-                    }
-                }
-                OutlinedTextField(value = note, onValueChange = { note = it.take(120) }, label = { Text(strings.placeNoteHint) },
-                    modifier = Modifier.padding(top = 8.dp))
-            }
-        },
-        confirmButton = {
-            TextButton(enabled = name.count { it.isLetterOrDigit() } >= 2 && kind != null, onClick = { onAdd(name.trim(), kind!!, note.trim()) }) {
-                Text(strings.save)
-            }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(strings.cancel) } },
-    )
+    FormPage(
+        title = strings.addPlace, action = strings.save,
+        actionEnabled = name.count { it.isLetterOrDigit() } >= 2 && kind != null,
+        onAction = { kind?.let { onAdd(name.trim(), it, note.trim()) } }, onCancel = onDismiss,
+    ) { AddPlaceForm(name, { name = it.take(80) }, kind, { kind = it }, note, { note = it.take(120) }) }
+}
+
+/** What the add-place form holds. */
+@Composable
+fun AddPlaceForm(
+    name: String, onName: (String) -> Unit,
+    kind: com.roadpulse.app.data.CommunityPlaceKind?, onKind: (com.roadpulse.app.data.CommunityPlaceKind) -> Unit,
+    note: String, onNote: (String) -> Unit,
+) {
+    PageCard { PageField(name, onName, strings.placeName) }
+    Column {
+        PageCaption(strings.whatKindOfPlace)
+        PageCard { com.roadpulse.app.data.CommunityPlaceKind.entries.forEach { k -> PickRow(strings.placeKind(k), kind == k) { onKind(k) } } }
+    }
+    PageCard { PageField(note, onNote, strings.placeNoteHint, singleLine = false) }
 }
 
 @Composable

@@ -896,7 +896,7 @@ private val CATEGORY_CHIPS = listOf(
 )
 
 
-/** "Report a problem with this place": what is wrong, whether it is where the driver is now, and a note. */
+/** "Report a problem with this place": what is wrong, whether it is where the driver is now, and a note. Laid out like iPhone. */
 @Composable
 private fun PlaceProblemDialog(
     placeName: String, onSend: (com.roadpulse.app.data.PlaceProblemKind, Boolean, String) -> Unit, onDismiss: () -> Unit,
@@ -905,38 +905,32 @@ private fun PlaceProblemDialog(
     var here by remember { mutableStateOf(false) }
     var note by remember { mutableStateOf("") }
     val moving = kind == com.roadpulse.app.data.PlaceProblemKind.WRONG_POSITION
-    androidx.compose.material3.AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(strings.reportPlaceProblem) },
-        text = {
-            Column {
-                Text(placeName, fontWeight = FontWeight.Medium)
-                Text(strings.whatIsWrong, fontSize = 14.sp, color = RP.TextSecondary, modifier = Modifier.padding(top = 12.dp))
-                com.roadpulse.app.data.PlaceProblemKind.entries.forEach { k ->
-                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable { kind = k }) {
-                        androidx.compose.material3.RadioButton(selected = kind == k, onClick = null)
-                        Text(strings.placeProblem(k), modifier = Modifier.padding(start = 8.dp, top = 10.dp, bottom = 10.dp))
-                    }
-                }
-                if (moving) {
-                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable { here = !here }) {
-                        androidx.compose.material3.Checkbox(checked = here, onCheckedChange = null)
-                        Text(strings.placeIsWhereIAm, modifier = Modifier.padding(start = 8.dp, top = 10.dp, bottom = 10.dp))
-                    }
-                }
-                androidx.compose.material3.OutlinedTextField(
-                    value = note, onValueChange = { note = it.take(200) },
-                    label = { Text(if (moving) strings.placeProblemNoteHint else strings.placeNoteHint) },
-                    modifier = Modifier.padding(top = 8.dp),
-                )
-            }
-        },
-        confirmButton = {
-            androidx.compose.material3.TextButton(
-                enabled = com.roadpulse.app.data.PlaceProblemsClient.canSend(kind, moving && here, note),
-                onClick = { onSend(kind!!, moving && here, note.trim()) },
-            ) { Text(strings.send) }
-        },
-        dismissButton = { androidx.compose.material3.TextButton(onClick = onDismiss) { Text(strings.cancel) } },
-    )
+    FormPage(
+        title = strings.reportPlaceProblem, action = strings.send,
+        actionEnabled = com.roadpulse.app.data.PlaceProblemsClient.canSend(kind, moving && here, note),
+        onAction = { kind?.let { onSend(it, moving && here, note.trim()) } }, onCancel = onDismiss,
+    ) { PlaceProblemForm(placeName, kind, { kind = it }, here, { here = it }, note, { note = it.take(200) }) }
+}
+
+/** What the place-problem form holds. */
+@Composable
+fun PlaceProblemForm(
+    placeName: String,
+    kind: com.roadpulse.app.data.PlaceProblemKind?, onKind: (com.roadpulse.app.data.PlaceProblemKind) -> Unit,
+    here: Boolean, onHere: (Boolean) -> Unit,
+    note: String, onNote: (String) -> Unit,
+) {
+    val moving = kind == com.roadpulse.app.data.PlaceProblemKind.WRONG_POSITION
+    PageCard { Text(placeName, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(vertical = 8.dp)) }
+    Column {
+        PageCaption(strings.whatIsWrong)
+        PageCard { com.roadpulse.app.data.PlaceProblemKind.entries.forEach { k -> PickRow(strings.placeProblem(k), kind == k) { onKind(k) } } }
+    }
+    if (moving) PageCard {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            Text(strings.placeIsWhereIAm, fontSize = 17.sp, modifier = Modifier.weight(1f))
+            androidx.compose.material3.Switch(checked = here, onCheckedChange = onHere)
+        }
+    }
+    PageCard { PageField(note, onNote, if (moving) strings.placeProblemNoteHint else strings.placeNoteHint, singleLine = false) }
 }

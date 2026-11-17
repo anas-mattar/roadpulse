@@ -267,6 +267,20 @@ class OverlayScreenshotTest {
     )
 
     @Test
+    fun addPlaceForm() = shot("14_add_place", Color.White) {
+        FormPageBody(title = "Add a missing place", action = "Save", actionEnabled = true, onAction = {}, onCancel = {}) {
+            AddPlaceForm("Kedai Pak Ali", {}, com.roadpulse.app.data.CommunityPlaceKind.entries.first(), {}, "", {})
+        }
+    }
+
+    @Test
+    fun placeProblemForm() = shot("15_place_problem", Color.White) {
+        FormPageBody(title = "Report a problem", action = "Send", actionEnabled = false, onAction = {}, onCancel = {}) {
+            PlaceProblemForm("IMAS International School", com.roadpulse.app.data.PlaceProblemKind.WRONG_POSITION, {}, true, {}, "", {})
+        }
+    }
+
+    @Test
     fun menuPage() = shot("13_menu", Color.White) {
         FullPageBody(title = "Menu", onBack = null, onDone = {}) { MenuRows(sampleProfile, {}, {}, {}, {}) }
     }
