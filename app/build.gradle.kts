@@ -29,6 +29,19 @@ android {
         buildConfigField("String", "LOCAL_MAP_STYLE_DARK_URL", "\"\"")
     }
 
+    signingConfigs {
+        // For test builds handed to testers only (the "beta" build below). This key is in the
+        // repository on purpose, so a test build made on any computer installs over an earlier
+        // one. It is NOT the key for the app stores: make a private one for that and keep it out
+        // of the repository.
+        create("tester") {
+            storeFile = file("tester.keystore")
+            storePassword = "jalanna-tester"
+            keyAlias = "tester"
+            keyPassword = "jalanna-tester"
+        }
+    }
+
     buildTypes {
         debug {
             buildConfigField("String", "LOCAL_ROUTING_URL", prop("roadpulse.local.routingUrl"))
@@ -38,6 +51,16 @@ android {
         }
         release {
             isMinifyEnabled = false
+        }
+        // The build for testers: behaves like a release build (no developer switches, HTTPS only,
+        // finds the server by itself), installs next to a debug build, and is called "Jalanna beta".
+        //   gradlew.bat :app:assembleBeta   ->  app/build/outputs/apk/beta/app-beta.apk
+        create("beta") {
+            initWith(getByName("release"))
+            signingConfig = signingConfigs.getByName("tester")
+            applicationIdSuffix = ".beta"
+            versionNameSuffix = "-beta"
+            matchingFallbacks += "release"
         }
     }
     compileOptions {
