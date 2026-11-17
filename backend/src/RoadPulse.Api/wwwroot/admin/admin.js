@@ -86,11 +86,11 @@
     });
   }
 
-  async function act(label, hint, path, withRemoveAll = false) {
+  async function act(label, hint, path, withRemoveAll = false, extra = null) {
     const answer = await askReason(label, hint, withRemoveAll);
     if (!answer) return;
     try {
-      const body = withRemoveAll ? answer : { reason: answer.reason };
+      const body = withRemoveAll ? answer : Object.assign({ reason: answer.reason }, extra || {});
       await api(path, { method: "POST", body: JSON.stringify(body) });
       toast(label + ": done");
       await load();
@@ -160,6 +160,61 @@
           act("Reject place", "\"" + p.name + "\" stays hidden. It is deleted after 90 days.", "/places/" + p.id + "/reject") })));
   }
 
+  const PROBLEMS = { WRONG_POSITION: "Wrong position", CLOSED: "Closed for good", NOT_THERE: "Not there" };
+  const osm = (lat, lon) => "https://www.openstreetmap.org/?mlat=" + lat + "&mlon=" + lon + "#map=18/" + lat + "/" + lon;
+
+  // "3.1720, 101.7150" typed by the moderator -> { lat, lon }, or null.
+  function askPosition() {
+    const text = window.prompt("The right position as latitude, longitude (copy it from a map), for example 3.1720, 101.7150");
+    if (text === null) return null;
+    const parts = text.split(",").map((t) => Number(t.trim()));
+    if (parts.length !== 2 || parts.some((n) => !Number.isFinite(n)) || Math.abs(parts[0]) > 90 || Math.abs(parts[1]) > 180) {
+      toast("That is not a position. Use latitude, longitude.");
+      return null;
+    }
+    return { lat: parts[0], lon: parts[1] };
+  }
+
+  function problemItem(item) {
+    const p = item.problem;
+    const path = "/place-problems/" + p.id;
+    const moving = p.kind === "WRONG_POSITION";
+    const hasSuggestion = p.suggestedLat !== null && p.suggestedLat !== undefined;
+    const actions = el("div", { class: "actions" });
+    if (moving) {
+      if (hasSuggestion)
+        actions.append(el("button", { text: "Move it there", onclick: () =>
+          act("Move place", "\"" + p.placeName + "\" moves to where the driver says it is, for everyone.", path + "/approve") }));
+      actions.append(el("button", { class: hasSuggestion ? "ghost" : "", text: "Move to a position…", onclick: () => {
+        const to = askPosition();
+        if (to) act("Move place", "\"" + p.placeName + "\" moves to " + to.lat + ", " + to.lon + " for everyone.", path + "/approve", false, to);
+      } }));
+    } else {
+      actions.append(el("button", { text: "Hide place", onclick: () =>
+        act("Hide place", "\"" + p.placeName + "\" is removed from everyone's search.", path + "/approve") }));
+    }
+    actions.append(el("button", { class: "danger", text: "Reject", onclick: () =>
+      act("Reject report", "\"" + p.placeName + "\" stays as it is.", path + "/reject") }));
+
+    const gone = item.currentLat === null || item.currentLat === undefined;
+    return el("div", { class: "item" },
+      el("div", { class: "icon", bg: "#B45309", text: "FIX" }),
+      el("div", {},
+        el("div", { class: "title" }, p.placeName, el("span", { class: "pill hidden", text: PROBLEMS[p.kind] || p.kind })),
+        item.address ? el("div", { class: "meta", text: "Address in the data: " + item.address }) : null,
+        p.note ? el("div", { class: "meta", text: "Driver's note: " + p.note }) : null,
+        el("div", { class: "meta" },
+          gone ? "The place is no longer in search" : el("a", { href: osm(item.currentLat, item.currentLon), target: "_blank", rel: "noopener noreferrer", text: "Where it is now" }),
+          hasSuggestion ? " · " : null,
+          hasSuggestion ? el("a", { href: osm(p.suggestedLat, p.suggestedLon), target: "_blank", rel: "noopener noreferrer", text: "Where the driver says it is" }) : null,
+          item.moveM !== null && item.moveM !== undefined ? " (" + Math.round(item.moveM) + " m away)" : null,
+          moving && !hasSuggestion ? " · the driver gave no position" : null),
+        el("div", { class: "meta" }, "Reported " + ago(item.createdAt) + " by ", el("span", { class: "mono", text: shortId(item.deviceId) }),
+          ": " + item.deviceProblems + (item.deviceProblems === 1 ? " report, " : " reports, ") + item.deviceRejected + " rejected · ",
+          el("span", { class: "mono", text: "ID " + p.id }))),
+      actions);
+  }
+
   function renderList(container, items, emptyText) {
     container.replaceChildren(...(items.length ? items.map(reportItem) : [el("div", { class: "empty", text: emptyText })]));
   }
@@ -184,6 +239,11 @@
         renderList($("queueList"), items, "Nothing to review. Reports appear here when drivers flag them.");
         const hidden = items.filter((i) => i.status === "PendingReview").length;
         $("queueCount").hidden = hidden === 0; $("queueCount").textContent = hidden;
+      } else if (tab === "problems") {
+        const items = await api("/place-problems");
+        $("problemsList").replaceChildren(...(items.length ? items.map(problemItem)
+          : [el("div", { class: "empty", text: "No place problems to check. They appear here when drivers report a problem with a place." })]));
+        $("problemsCount").hidden = items.length === 0; $("problemsCount").textContent = items.length;
       } else if (tab === "places") {
         const items = await api("/places");
         $("placesList").replaceChildren(...(items.length ? items.map(placeItem)
@@ -222,7 +282,7 @@
   function signedIn(isIn) {
     $("login").hidden = isIn; $("app").hidden = !isIn; $("signOut").hidden = !isIn;
     clearInterval(timer);
-    if (isIn) { show(tab); timer = setInterval(() => { if (tab === "queue" || tab === "recent" || tab === "places") load(); }, 30000); }
+    if (isIn) { show(tab); timer = setInterval(() => { if (tab === "queue" || tab === "recent" || tab === "places" || tab === "problems") load(); }, 30000); }
   }
 
   function signOut(message) {

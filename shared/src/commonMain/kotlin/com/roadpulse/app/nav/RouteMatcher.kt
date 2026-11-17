@@ -169,7 +169,7 @@ class RouteMatcher(
  */
 class OffRouteDetector(
     private val minBadFixes: Int = 3,
-    private val minBadMillis: Long = 4_000,
+    private val minBadMillis: Long = 3_000,
 ) {
     private var badCount = 0
     private var badSinceMillis: Long? = null

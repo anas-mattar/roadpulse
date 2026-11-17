@@ -217,6 +217,10 @@ public static class DirectoryImporter
             SELECT id, name, category, address, search_key,
                    ST_SetSRID(ST_MakePoint(lon, lat), 4326)::geography, confidence
             FROM overture_import;
+            -- Fixes moderators approved ("Report a problem with this place") are applied to the new data.
+            UPDATE directory_places p SET location = c.location FROM place_corrections c
+              WHERE c.place_id = p.id AND c.location IS NOT NULL AND NOT c.hidden;
+            DELETE FROM directory_places p USING place_corrections c WHERE c.place_id = p.id AND c.hidden;
             CREATE INDEX ix_directory_places_location ON directory_places USING gist (location);
             CREATE INDEX ix_directory_places_search_key ON directory_places USING gin (search_key gin_trgm_ops);
             """, conn, tx) { CommandTimeout = 0 })

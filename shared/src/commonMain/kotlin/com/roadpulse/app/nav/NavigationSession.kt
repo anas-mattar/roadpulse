@@ -331,7 +331,10 @@ object NavigationSession {
             return
         }
         if (progress.offRoute) {
-            if (!current.rerouting) reroute(fix.position)
+            if (!current.rerouting) {
+                // The direction of travel, when the car is clearly moving (a standing car's heading is unreliable).
+                reroute(fix.position, fix.bearingDeg?.takeIf { (fix.speedMps ?: 0.0) >= REROUTE_HEADING_MIN_MPS })
+            }
             _state.update {
                 it?.copy(displayPosition = progress.displayPosition, poorSignal = progress.poorSignal, speedMps = fix.speedMps)
             }
@@ -460,7 +463,7 @@ object NavigationSession {
         }
     }
 
-    private fun reroute(from: GeoPoint) {
+    private fun reroute(from: GeoPoint, heading: Double? = null) {
         val current = _state.value ?: return
         val t = now()
         if (t - lastRerouteAttemptMillis < REROUTE_MIN_INTERVAL_MS) return
@@ -470,7 +473,7 @@ object NavigationSession {
         if (!current.offline) speak(platform.narrator().rerouting)
         rerouteJob = scope.launch {
             try {
-                val route = router.route(from, current.destination.location, remainingStops(), platform.routeOptions())
+                val route = router.route(from, current.destination.location, remainingStops(), platform.routeOptions(), heading = heading)
                 if (_state.value == null) return@launch
                 log?.event(now(), "reroute_done", "route_km=${route.lengthKm}")
                 applyRoute(route, current.destination, resumed = false)
@@ -613,6 +616,7 @@ object NavigationSession {
     private const val PASS_NEAR_M = 80.0
     private const val SPEEDING_ALERT_GAP_MS = 20_000L
     private const val REROUTE_MIN_INTERVAL_MS = 10_000L
+    private const val REROUTE_HEADING_MIN_MPS = 3.0
 
     /** Reports this far ahead on the route are shown as a hint (and warned about from 800 m). */
     private const val REPORT_HINT_M = 1000.0

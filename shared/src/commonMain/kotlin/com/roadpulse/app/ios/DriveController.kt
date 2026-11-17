@@ -52,6 +52,8 @@ class DriveSnapshot(
     val bearingDeg: Double,
     val lanes: List<LaneArrow>,
     val routeShape: List<GeoPoint>,
+    /** The route still ahead of the car (the part already driven is not drawn). */
+    val aheadShape: List<GeoPoint>,
     /** Hints on the route ahead (text in the guidance language), or null. Distances in metres, -1 when none. */
     val cameraLabel: String?,
     val cameraAheadM: Double,
@@ -113,6 +115,7 @@ class DriveController(var routingUrl: String) {
     private var stillThereJob: Job? = null
     private val askedAbout = mutableSetOf<String>()
     private var linesFor: List<com.roadpulse.app.nav.TrafficPiece>? = null
+    private var linesAhead: List<com.roadpulse.app.nav.TrafficPiece> = emptyList()
     private var linesCache: List<TrafficPolyline> = emptyList()
     private var viaFor: com.roadpulse.app.data.Route? = null
     private var viaCache: String? = null
@@ -348,6 +351,7 @@ class DriveController(var routingUrl: String) {
                 s.lanes.map { LaneArrow(TurnIcon.forLane(it.arrow).name, it.recommended, it.usable) }
             } else emptyList(),
             routeShape = s.route.shape,
+            aheadShape = com.roadpulse.app.nav.RouteGeometry.ahead(s.route.shape, s.remainingKm * 1000),
             cameraLabel = s.cameraAhead?.let { c -> n.speedCamera + (c.maxSpeedKph?.let { " $it" } ?: "") },
             cameraAheadM = s.cameraAhead?.metersAhead ?: -1.0,
             schoolLabel = s.schoolAhead?.let { n.schoolZone },
@@ -374,10 +378,15 @@ class DriveController(var routingUrl: String) {
         )
     }
 
+    /** Slow and jammed stretches still ahead of the car. */
     private fun trafficLines(s: NavState): List<TrafficPolyline> {
-        if (linesFor !== s.trafficPieces) {
+        if (s.trafficPieces.isEmpty()) return emptyList()
+        val progress = if (s.route.lengthKm > 0) (1 - s.remainingKm / s.route.lengthKm).coerceIn(0.0, 1.0) else 0.0
+        val ahead = com.roadpulse.app.nav.RouteTraffic.ahead(s.trafficPieces, progress)
+        if (linesFor !== s.trafficPieces || ahead != linesAhead) {
             linesFor = s.trafficPieces
-            linesCache = trafficLinesFor(s.route.shape, s.trafficPieces)
+            linesAhead = ahead
+            linesCache = trafficLinesFor(s.route.shape, ahead)
         }
         return linesCache
     }

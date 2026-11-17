@@ -377,6 +377,7 @@ struct MapView: UIViewRepresentable {
                 map.showsUserLocation = false
                 map.addAnnotation(pin)
                 startGlide(on: map)
+                drawAhead(drive, style: style)
             } else if position.latitude != glideTo.latitude || position.longitude != glideTo.longitude {
                 // A new fix: glide to it from where the car is drawn now, in about the time between fixes.
                 let dLat = (position.latitude - shown.latitude) * 110_540
@@ -389,6 +390,7 @@ struct MapView: UIViewRepresentable {
                 bearingFrom = shownBearing
                 if drive.bearingDeg >= 0 { bearingTo = drive.bearingDeg }
                 glideStart = now
+                drawAhead(drive, style: style)
             }
         }
 
@@ -455,6 +457,14 @@ struct MapView: UIViewRepresentable {
             // Under the route lines, so the route stays visible.
             addLine(to: style, id: "traffic-slow", lines: slow, color: UIColor(hex: "#F59F00"), width: 5, belowRoutes: true)
             addLine(to: style, id: "traffic-jam", lines: jams, color: UIColor(hex: "#D20F39"), width: 5, belowRoutes: true)
+        }
+
+        /// Only the route still ahead is drawn (the part already driven would be confusing). The line
+        /// starts where the arrow is drawn now, so no gap opens in front of it while it glides.
+        private func drawAhead(_ drive: DriveSnapshot, style: MLNStyle) {
+            guard drive.aheadShape.count >= 2, let source = style.source(withIdentifier: "route-main") as? MLNShapeSource else { return }
+            var coordinates = [shown] + drive.aheadShape.map { CLLocationCoordinate2D(latitude: $0.lat, longitude: $0.lon) }
+            source.shape = MLNPolylineFeature(coordinates: &coordinates, count: UInt(coordinates.count))
         }
 
         private func polyline(_ points: [GeoPoint]) -> MLNPolylineFeature {

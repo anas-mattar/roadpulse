@@ -14,6 +14,8 @@ public class RoadPulseDb(DbContextOptions<RoadPulseDb> options) : DbContext(opti
     public DbSet<TrafficEdge> TrafficEdges => Set<TrafficEdge>();
     public DbSet<TrafficObservation> TrafficObservations => Set<TrafficObservation>();
     public DbSet<CommunityPlace> CommunityPlaces => Set<CommunityPlace>();
+    public DbSet<PlaceProblem> PlaceProblems => Set<PlaceProblem>();
+    public DbSet<PlaceCorrection> PlaceCorrections => Set<PlaceCorrection>();
     public DbSet<DirectoryPlace> DirectoryPlaces => Set<DirectoryPlace>();
 
     protected override void OnModelCreating(ModelBuilder b)
@@ -95,6 +97,28 @@ public class RoadPulseDb(DbContextOptions<RoadPulseDb> options) : DbContext(opti
             e.HasIndex(p => p.Location).HasMethod("gist");
             // "contains" search on names is fast with a trigram index.
             e.HasIndex(p => p.SearchKey).HasMethod("gin").HasOperators("gin_trgm_ops");
+        });
+
+        b.Entity<PlaceProblem>(e =>
+        {
+            e.ToTable("place_problems");
+            e.Property(p => p.PlaceId).HasMaxLength(64);
+            e.Property(p => p.PlaceName).HasMaxLength(200);
+            e.Property(p => p.Note).HasMaxLength(200);
+            e.Property(p => p.Kind).HasConversion<string>().HasMaxLength(20);
+            e.Property(p => p.Status).HasConversion<string>().HasMaxLength(20);
+            e.Property(p => p.Suggested).HasColumnType("geography (point, 4326)");
+            e.HasIndex(p => p.Status);
+            e.HasIndex(p => p.DeviceId);
+            e.HasOne<Device>().WithMany().HasForeignKey(p => p.DeviceId);
+        });
+
+        b.Entity<PlaceCorrection>(e =>
+        {
+            e.ToTable("place_corrections");
+            e.HasKey(c => c.PlaceId);
+            e.Property(c => c.PlaceId).HasMaxLength(64);
+            e.Property(c => c.Location).HasColumnType("geography (point, 4326)");
         });
 
         b.Entity<CommunityPlace>(e =>

@@ -184,6 +184,13 @@ final class SearchModel: ObservableObject {
         message = strings.removed(name: place.name)
     }
 
+    /// "Report a problem with this place": [at] is where the place really is, when the driver gave their position.
+    func reportPlaceProblem(place: SearchResult, kind: String, at: CLLocationCoordinate2D?, note: String, strings: AppStrings) async {
+        let ok = (try? await api.reportPlaceProblem(placeId: place.directoryId, kindName: kind, hasPosition: at != nil,
+                                                    lat: at?.latitude ?? 0, lon: at?.longitude ?? 0, note: note))?.boolValue ?? false
+        message = ok ? strings.placeProblemSent : strings.placeProblemFailed
+    }
+
     /// "Add a missing place": the driver finds it in search at once, others after review.
     func addPlace(name: String, kind: String, at point: SearchResult, note: String, strings: AppStrings) async {
         let ok = (try? await api.addPlace(name: name, kindName: kind, lat: point.lat, lon: point.lon, note: note))?.boolValue ?? false

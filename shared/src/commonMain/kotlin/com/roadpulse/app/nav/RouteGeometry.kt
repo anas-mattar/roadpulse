@@ -18,4 +18,27 @@ object RouteGeometry {
         }
         return listOf(position) + shape.drop(nearest + 1)
     }
+
+    /**
+     * The last [remainingMeters] of [shape]: the route still ahead of the car, starting exactly
+     * where the car is on the line (so the part already driven is not drawn).
+     */
+    fun ahead(shape: List<GeoPoint>, remainingMeters: Double): List<GeoPoint> {
+        if (shape.size < 2) return shape
+        var left = remainingMeters
+        if (left <= 0) return listOf(shape.last())
+        for (i in shape.lastIndex downTo 1) {
+            val segment = com.roadpulse.app.data.Geo.distanceMeters(shape[i - 1], shape[i])
+            if (segment >= left) {
+                val back = if (segment > 0) left / segment else 0.0
+                val start = GeoPoint(
+                    shape[i].lat + (shape[i - 1].lat - shape[i].lat) * back,
+                    shape[i].lon + (shape[i - 1].lon - shape[i].lon) * back,
+                )
+                return listOf(start) + shape.subList(i, shape.size)
+            }
+            left -= segment
+        }
+        return shape
+    }
 }

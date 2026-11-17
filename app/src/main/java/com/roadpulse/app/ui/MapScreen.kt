@@ -272,11 +272,29 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
     }
 
     // Push view-model state into the map's GeoJSON sources.
-    LaunchedEffect(style, state.route) {
-        style?.getSourceAs<GeoJsonSource>(ROUTE_SOURCE)?.setGeoJson(state.route.toFeatureCollection())
+    // While driving only the route still ahead is drawn (the part already driven would be confusing).
+    // The line starts at the previous position: the arrow glides there, so no gap opens in front of it.
+    val lineStart = remember { arrayOfNulls<GeoPoint>(1) }
+    val drivenFraction = state.route?.takeIf { state.navigating && it.lengthKm > 0 }
+        ?.let { r -> state.remainingKm?.let { (1 - it / r.lengthKm).coerceIn(0.0, 1.0) } }
+    LaunchedEffect(style, state.route, state.navigating, state.remainingKm) {
+        val route = state.route
+        val remainingKm = state.remainingKm
+        val features = if (route != null && state.navigating && remainingKm != null) {
+            val ahead = com.roadpulse.app.nav.RouteGeometry.ahead(route.shape, remainingKm * 1000)
+            val points = listOfNotNull(lineStart[0]) + ahead
+            lineStart[0] = ahead.firstOrNull()
+            if (points.size < 2) FeatureCollection.fromFeatures(emptyList())
+            else FeatureCollection.fromFeature(Feature.fromGeometry(LineString.fromLngLats(points.map { Point.fromLngLat(it.lon, it.lat) })))
+        } else {
+            lineStart[0] = null
+            route.toFeatureCollection()
+        }
+        style?.getSourceAs<GeoJsonSource>(ROUTE_SOURCE)?.setGeoJson(features)
     }
-    // Traffic colours on the route line itself: the drive's stretches, or the selected choice's in the preview.
-    val routePieces = if (state.navigating) state.trafficPieces else state.routeTraffic.getOrNull(state.selectedRoute)?.pieces.orEmpty()
+    // Traffic colours on the route line itself: the drive's stretches still ahead, or the selected choice's in the preview.
+    val routePieces = if (state.navigating) com.roadpulse.app.nav.RouteTraffic.ahead(state.trafficPieces, drivenFraction ?: 0.0)
+        else state.routeTraffic.getOrNull(state.selectedRoute)?.pieces.orEmpty()
     LaunchedEffect(style, state.route, routePieces) {
         val shape = state.route?.shape.orEmpty()
         style?.getSourceAs<GeoJsonSource>(ROUTE_TRAFFIC_SOURCE)?.setGeoJson(
@@ -587,6 +605,9 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                     onGoRoute = { i ->
                         viewModel.selectRoute(i)
                         viewModel.startNavigation()
+                    },
+                    onPlaceProblem = state.destination?.directoryId?.takeIf { state.placesAvailable }?.let { id ->
+                        { kind, here, note -> viewModel.reportPlaceProblem(id, kind, if (here) currentLocation() else null, note) }
                     },
                 )
 

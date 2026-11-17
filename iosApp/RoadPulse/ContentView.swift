@@ -26,6 +26,7 @@ struct ContentView: View {
     @State var shareUrl: String?
     /// "Add a missing place" form for this long-pressed point.
     @State var showAddPlace = false
+    @State var showPlaceProblem = false
     @State var addPlacePoint: SearchResult?
     @State var showLeaveLater = false
     @State var askFavouriteName = false
@@ -172,6 +173,18 @@ struct ContentView: View {
                                   Task { await model.addPlace(name: name, kind: kind, at: point, note: note, strings: strings) }
                               },
                               onCancel: { showAddPlace = false })
+            }
+        }
+        .sheet(isPresented: $showPlaceProblem) {
+            if let place = model.destination {
+                PlaceProblemSheet(api: model.api, language: language, strings: strings, placeName: place.name,
+                                  onSend: { kind, useMyPosition, note in
+                                      showPlaceProblem = false
+                                      // "Where I am now" only counts with a real GPS position.
+                                      let position = useMyPosition ? location.coordinate : nil
+                                      Task { await model.reportPlaceProblem(place: place, kind: kind, at: position, note: note, strings: strings) }
+                                  },
+                                  onCancel: { showPlaceProblem = false })
             }
         }
         .sheet(isPresented: $showSharedPanel) { sharedPanel }

@@ -1,4 +1,5 @@
 using RoadPulse.Api.Modules.CommunityPlaces;
+using RoadPulse.Api.Modules.PlaceProblems;
 using RoadPulse.Api.Modules.Directory;
 using System.Text.Json.Serialization;
 using Microsoft.EntityFrameworkCore;
@@ -128,6 +129,7 @@ v1.MapReportEndpoints();
 v1.MapModerationEndpoints();
 v1.MapPlaceEndpoints();
 v1.MapCommunityPlaceEndpoints();
+v1.MapPlaceProblemEndpoints();
 v1.MapDirectoryEndpoints();
 v1.MapTollEndpoints();
 v1.MapProfileEndpoints();

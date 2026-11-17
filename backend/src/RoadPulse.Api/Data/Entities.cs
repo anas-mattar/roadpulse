@@ -144,6 +144,43 @@ public class CommunityPlace
     public DateTimeOffset? ReviewedAt { get; set; }
 }
 
+/// <summary>What a driver says is wrong with a place from the Overture data.</summary>
+public enum PlaceProblemKind { WRONG_POSITION, CLOSED, NOT_THERE }
+
+/// <summary>
+/// A driver's report that a place in search is wrong (pin in the wrong spot, closed for good, not
+/// there). A moderator checks it; approving it creates or changes a <see cref="PlaceCorrection"/>.
+/// </summary>
+public class PlaceProblem
+{
+    public Guid Id { get; set; }
+    public Guid DeviceId { get; set; }
+    /// <summary>Overture id of the place (directory_places.id).</summary>
+    public required string PlaceId { get; set; }
+    /// <summary>The place's name when it was reported (the place itself may later be hidden).</summary>
+    public required string PlaceName { get; set; }
+    public PlaceProblemKind Kind { get; set; }
+    /// <summary>Where the driver says the place really is (WRONG_POSITION), if they gave a position.</summary>
+    public Point? Suggested { get; set; }
+    public string? Note { get; set; }
+    public DateTimeOffset CreatedAt { get; set; }
+    public CommunityPlaceStatus Status { get; set; } = CommunityPlaceStatus.Pending;
+    public DateTimeOffset? ReviewedAt { get; set; }
+}
+
+/// <summary>
+/// An approved fix to a place from the Overture data: moved to the right position, or hidden.
+/// Kept apart from directory_places, so it is applied again after every monthly import.
+/// </summary>
+public class PlaceCorrection
+{
+    /// <summary>Overture id of the place.</summary>
+    public required string PlaceId { get; set; }
+    public bool Hidden { get; set; }
+    public Point? Location { get; set; }
+    public DateTimeOffset UpdatedAt { get; set; }
+}
+
 /// <summary>Append-only record of every moderator action. Holds IDs only, no locations or tokens.</summary>
 public class AuditEntry
 {

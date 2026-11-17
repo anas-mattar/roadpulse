@@ -435,6 +435,12 @@ extension ContentView {
     @ViewBuilder var stopsList: some View {
         if model.stops.isEmpty {
             Text(strings.tipAddStop).font(.caption).foregroundColor(.secondary)
+            // Only for places from the server's own data, which a moderator can correct.
+            if model.hasServer, let place = model.destination, !place.directoryId.isEmpty {
+                Button(strings.reportPlaceProblem) { showPlaceProblem = true }
+                    .font(.caption)
+                    .foregroundColor(brand)
+            }
         } else {
             ForEach(Array(model.stops.enumerated()), id: \.offset) { index, stop in
                 HStack {

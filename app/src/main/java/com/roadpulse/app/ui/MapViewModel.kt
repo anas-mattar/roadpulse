@@ -356,6 +356,20 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    /** "Report a problem with this place": [at] is where the place really is, when the driver gives a position. */
+    fun reportPlaceProblem(placeId: String, kind: com.roadpulse.app.data.PlaceProblemKind, at: GeoPoint?, note: String) {
+        val url = ServerSettings.backendUrl()
+        if (url.isEmpty()) return
+        viewModelScope.launch {
+            val s = com.roadpulse.app.i18n.currentStrings()
+            runCatching {
+                com.roadpulse.app.data.PlaceProblemsClient(com.roadpulse.app.data.DeviceApi(url, ServerSettings.tokenStore(getApplication(), url)))
+                    .report(placeId, kind, at, note)
+            }.onSuccess { _state.update { it.copy(message = s.placeProblemSent) } }
+                .onFailure { _state.update { it.copy(message = s.placeProblemFailed) } }
+        }
+    }
+
     /** "Routes" during a drive: loads other ways from the car's position. */
     fun loadAlternatives() {
         if (!_state.value.navigating || _state.value.loadingAlternatives) return

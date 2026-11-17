@@ -50,6 +50,10 @@ object RouteTraffic {
     }
 
     /** The coloured stretches as lines on the map: (level, points). */
+    /** The stretches not yet passed at [progress] (0..1 of the route); one being driven is cut at the car. */
+    fun ahead(pieces: List<TrafficPiece>, progress: Double): List<TrafficPiece> =
+        pieces.filter { it.to > progress }.map { if (it.from < progress) it.copy(from = progress) else it }
+
     fun polylines(shape: List<GeoPoint>, pieces: List<TrafficPiece>): List<Pair<String, List<GeoPoint>>> {
         if (shape.size < 2 || pieces.isEmpty()) return emptyList()
         val cumulative = DoubleArray(shape.size)

@@ -29,7 +29,10 @@ import kotlin.coroutines.cancellation.CancellationException
 expect fun tokenStoreFor(baseUrl: String): DeviceTokenStore
 
 /** A search hit, in simple types for the iPhone app. */
-class SearchResult(val name: String, val detail: String, val lat: Double, val lon: Double)
+class SearchResult(val name: String, val detail: String, val lat: Double, val lon: Double) {
+    /** The server's id for a place from the Overture data ("" for others): drivers can report a problem with it. */
+    var directoryId: String = ""
+}
 
 /** One route choice: its tag ("Fastest", "No tolls", "+5 min"), main road, time, length and tolls. */
 class RouteSummary(
@@ -112,7 +115,31 @@ class RoadPulseApi(geocodingUrl: String, routingUrl: String, private val backend
     suspend fun search(query: String, nearLat: Double, nearLon: Double, language: GuidanceLanguage): List<SearchResult> =
         com.roadpulse.app.data.PlaceSearch.search(geocoder, community, query, GeoPoint(nearLat, nearLon), stringsFor(language), limit = 8,
             directory = backendUrl.takeIf { it.isNotEmpty() }?.let { com.roadpulse.app.data.DirectoryClient(it) })
-            .map { SearchResult(it.name, it.description, it.location.lat, it.location.lon) }
+            .map { place -> SearchResult(place.name, place.description, place.location.lat, place.location.lon).also { it.directoryId = place.directoryId.orEmpty() } }
+
+    /** What can be wrong with a place: (name, label in the app language). */
+    fun placeProblemKinds(language: GuidanceLanguage): List<List<String>> {
+        val s = stringsFor(language)
+        return com.roadpulse.app.data.PlaceProblemKind.entries.map { listOf(it.name, s.placeProblem(it)) }
+    }
+
+    /** Whether the report has enough to send (a wrong position needs the position or a note). */
+    fun canSendPlaceProblem(kindName: String, hasPosition: Boolean, note: String): Boolean =
+        com.roadpulse.app.data.PlaceProblemsClient.canSend(
+            com.roadpulse.app.data.PlaceProblemKind.entries.firstOrNull { it.name == kindName }, hasPosition, note)
+
+    /**
+     * "Report a problem with this place". With [hasPosition], ([lat], [lon]) is where the place really is.
+     * Returns false when the server refused or could not be reached.
+     */
+    @Throws(Exception::class, CancellationException::class)
+    suspend fun reportPlaceProblem(placeId: String, kindName: String, hasPosition: Boolean, lat: Double, lon: Double, note: String): Boolean {
+        val api = device ?: return false
+        val kind = com.roadpulse.app.data.PlaceProblemKind.entries.firstOrNull { it.name == kindName } ?: return false
+        return runCatching {
+            com.roadpulse.app.data.PlaceProblemsClient(api).report(placeId, kind, if (hasPosition) GeoPoint(lat, lon) else null, note)
+        }.isSuccess
+    }
 
     /** Kinds for "Add a missing place": (name, label in the app language). */
     fun placeKinds(language: GuidanceLanguage): List<List<String>> {

@@ -17,7 +17,9 @@ public record ExportedPlace(Guid Id, string Name, CommunityPlaceKind Kind, strin
     DateTimeOffset CreatedAt, CommunityPlaceStatus Status);
 public record DataExport(Guid DeviceId, DateTimeOffset RegisteredAt, string? Nickname, bool Blocked,
     List<ExportedReport> Reports, List<ExportedVote> Votes, List<ExportedFlag> Flags, string Note,
-    List<ExportedPlace>? AddedPlaces = null);
+    List<ExportedPlace>? AddedPlaces = null, List<ExportedPlaceProblem>? PlaceProblems = null);
+public record ExportedPlaceProblem(Guid Id, string PlaceId, string PlaceName, PlaceProblemKind Kind, string? Note,
+    double? Lat, double? Lon, DateTimeOffset CreatedAt, CommunityPlaceStatus Status);
 
 /// <summary>How long data is kept. Pure values, shown in the privacy policy too.</summary>
 public static class Retention
@@ -76,7 +78,9 @@ public static class PrivacyEndpoints
         var places = (await db.CommunityPlaces.AsNoTracking().Where(p => p.DeviceId == id).OrderBy(p => p.CreatedAt).ToListAsync())
             .Select(p => new ExportedPlace(p.Id, p.Name, p.Kind, p.Note, p.Location.Y, p.Location.X, p.CreatedAt, p.Status)).ToList();
         return TypedResults.Ok(new DataExport(id, device.CreatedAt, device.Nickname, device.Blocked, reports, votes, flags,
-            "Live traffic samples are anonymous and not linked to this device; only road speed averages are kept.", places));
+            "Live traffic samples are anonymous and not linked to this device; only road speed averages are kept.", places,
+            (await db.PlaceProblems.AsNoTracking().Where(p => p.DeviceId == id).OrderBy(p => p.CreatedAt).ToListAsync())
+                .Select(p => new ExportedPlaceProblem(p.Id, p.PlaceId, p.PlaceName, p.Kind, p.Note, p.Suggested?.Y, p.Suggested?.X, p.CreatedAt, p.Status)).ToList()));
     }
 
     private static async Task<NoContent> Delete(HttpContext http, RoadPulseDb db, ShareStore shares, LiveReports live)
@@ -104,6 +108,8 @@ public static class PrivacyEndpoints
         await db.IdempotencyRecords.Where(i => i.DeviceId == id).ExecuteDeleteAsync();
         await db.Reports.Where(r => r.DeviceId == id).ExecuteDeleteAsync();
         await db.CommunityPlaces.Where(p => p.DeviceId == id).ExecuteDeleteAsync();
+        // Approved corrections stay (they hold no personal data); the driver's reports of them go.
+        await db.PlaceProblems.Where(p => p.DeviceId == id).ExecuteDeleteAsync();
         await db.Devices.Where(d => d.Id == id).ExecuteDeleteAsync();
         await tx.CommitAsync();
 
@@ -127,6 +133,8 @@ public sealed class PrivacyRetention(IServiceScopeFactory scopes, TimeProvider c
         n += await db.AuditLog.Where(a => a.At < auditCutoff).ExecuteDeleteAsync(ct);
         // Places a moderator rejected are kept a while (in case of appeal), then deleted.
         n += await db.CommunityPlaces.Where(p => p.Status == CommunityPlaceStatus.Rejected && p.ReviewedAt < reportCutoff).ExecuteDeleteAsync(ct);
+        // Checked place problems (approved ones live on as corrections) are deleted after the same time.
+        n += await db.PlaceProblems.Where(p => p.Status != CommunityPlaceStatus.Pending && p.ReviewedAt < reportCutoff).ExecuteDeleteAsync(ct);
         return n;
     }
 

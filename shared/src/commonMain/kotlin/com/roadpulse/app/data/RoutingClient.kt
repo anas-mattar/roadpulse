@@ -1,5 +1,6 @@
 package com.roadpulse.app.data
 
+import com.roadpulse.app.util.mathRound
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
@@ -17,9 +18,13 @@ class RoutingClient(private val baseUrl: String) {
         options: RouteOptions = RouteOptions(),
         alternates: Int? = null,
         avoid: List<List<GeoPoint>> = emptyList(),
+        heading: Double? = null,
     ): String = Http.json.encodeToString(
         RouteRequest(
-            locations = (listOf(from) + stops + to).map { Location(it.lat, it.lon) },
+            // With a heading (rerouting while moving), the route starts in the direction the car is
+            // already going where the road allows it, instead of asking for a U-turn.
+            locations = listOf(Location(from.lat, from.lon, heading?.let { mathRound(it).toInt().mod(360) }, heading?.let { HEADING_TOLERANCE_DEG })) +
+                (stops + to).map { Location(it.lat, it.lon) },
             costing = options.vehicle.costing,
             costingOptions = options.costingOptions(),
             // The server offers alternatives only for trips without stops.
@@ -76,8 +81,9 @@ class RoutingClient(private val baseUrl: String) {
         stops: List<GeoPoint> = emptyList(),
         options: RouteOptions = RouteOptions(),
         avoid: List<List<GeoPoint>> = emptyList(),
+        heading: Double? = null,
     ): Route {
-        val payload = requestBody(from, to, stops, options, avoid = avoid)
+        val payload = requestBody(from, to, stops, options, avoid = avoid, heading = heading)
         return parseRoute(Http.execute("$baseUrl/route", "POST", payload, Http.USER_AGENT), stops)
     }
 
@@ -164,6 +170,8 @@ class RoutingClient(private val baseUrl: String) {
         }
 
     companion object {
+        /** How far (degrees) a road may differ from the car's heading and still count as "the way it is going". */
+        private const val HEADING_TOLERANCE_DEG = 60
         private const val ROUNDABOUT_ENTER = 26
         private const val ROUNDABOUT_EXIT = 27
         /** RoadPulse's own maneuver type: arriving at a stop on the way (not a Valhalla code). */
@@ -212,7 +220,11 @@ class RoutingClient(private val baseUrl: String) {
     )
 
     @Serializable
-    private data class Location(val lat: Double, val lon: Double)
+    private data class Location(
+        val lat: Double, val lon: Double,
+        val heading: Int? = null,
+        @SerialName("heading_tolerance") val headingTolerance: Int? = null,
+    )
 
     @Serializable
     private data class RouteResponse(val trip: Trip, val alternates: List<Alternate> = emptyList())

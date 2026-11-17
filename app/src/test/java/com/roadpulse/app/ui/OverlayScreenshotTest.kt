@@ -238,6 +238,12 @@ class OverlayScreenshotTest {
         PreviewOverlay(destination = place, route = route, busy = false, onBack = {}, onGo = {}, onSimulate = null, onLeaveLater = {})
     }
 
+    @Test
+    fun previewWithPlaceProblemLink() = shot("2e_preview_place_problem", RP.Field) {
+        PreviewOverlay(destination = place.copy(directoryId = "o1"), route = route, busy = false, onBack = {}, onGo = {}, onSimulate = null,
+            onPlaceProblem = { _, _, _ -> })
+    }
+
     private val sampleProfile = com.roadpulse.app.data.Profile(
         nickname = "Ahmad", points = 215, level = "ROAD_SCOUT", levelIndex = 1, nextLevelPoints = 500,
         stats = com.roadpulse.app.data.ProfileStats(reports = 14, confirmationsReceived = 9, votes = 12),

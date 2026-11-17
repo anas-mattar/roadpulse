@@ -326,6 +326,95 @@ namespace RoadPulse.Api.Data.Migrations
                     b.ToTable("places", (string)null);
                 });
 
+            modelBuilder.Entity("RoadPulse.Api.Data.PlaceCorrection", b =>
+                {
+                    b.Property<string>("PlaceId")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("place_id");
+
+                    b.Property<bool>("Hidden")
+                        .HasColumnType("boolean")
+                        .HasColumnName("hidden");
+
+                    b.Property<Point>("Location")
+                        .HasColumnType("geography (point, 4326)")
+                        .HasColumnName("location");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("PlaceId")
+                        .HasName("pk_place_corrections");
+
+                    b.ToTable("place_corrections", (string)null);
+                });
+
+            modelBuilder.Entity("RoadPulse.Api.Data.PlaceProblem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("DeviceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("device_id");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("kind");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("note");
+
+                    b.Property<string>("PlaceId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("place_id");
+
+                    b.Property<string>("PlaceName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("place_name");
+
+                    b.Property<DateTimeOffset?>("ReviewedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("reviewed_at");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("status");
+
+                    b.Property<Point>("Suggested")
+                        .HasColumnType("geography (point, 4326)")
+                        .HasColumnName("suggested");
+
+                    b.HasKey("Id")
+                        .HasName("pk_place_problems");
+
+                    b.HasIndex("DeviceId")
+                        .HasDatabaseName("ix_place_problems_device_id");
+
+                    b.HasIndex("Status")
+                        .HasDatabaseName("ix_place_problems_status");
+
+                    b.ToTable("place_problems", (string)null);
+                });
+
             modelBuilder.Entity("RoadPulse.Api.Data.Report", b =>
                 {
                     b.Property<Guid>("Id")
@@ -525,6 +614,16 @@ namespace RoadPulse.Api.Data.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_community_places_devices_device_id");
+                });
+
+            modelBuilder.Entity("RoadPulse.Api.Data.PlaceProblem", b =>
+                {
+                    b.HasOne("RoadPulse.Api.Data.Device", null)
+                        .WithMany()
+                        .HasForeignKey("DeviceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_place_problems_devices_device_id");
                 });
 
             modelBuilder.Entity("RoadPulse.Api.Data.Report", b =>

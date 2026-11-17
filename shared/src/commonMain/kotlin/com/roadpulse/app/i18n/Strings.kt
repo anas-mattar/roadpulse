@@ -289,6 +289,14 @@ interface AppStrings {
     fun placeKind(kind: com.roadpulse.app.data.CommunityPlaceKind): String
     val placeNoteHint: String
     val placeAdded: String
+    /** "Report a problem with this place" (a place from search that is wrong). */
+    val reportPlaceProblem: String
+    val whatIsWrong: String
+    fun placeProblem(kind: com.roadpulse.app.data.PlaceProblemKind): String
+    val placeIsWhereIAm: String
+    val placeProblemNoteHint: String
+    val placeProblemSent: String
+    val placeProblemFailed: String
     val placeAddFailed: String
     val addedByDrivers: String
     val waitingForReview: String
@@ -298,6 +306,15 @@ interface AppStrings {
 fun stringsFor(language: GuidanceLanguage): AppStrings = when (language) {
     GuidanceLanguage.AR -> ArabicStrings
     GuidanceLanguage.EN, GuidanceLanguage.MS -> EnglishStrings
+}
+
+/**
+ * Metres in steps of 5 for distances under a kilometre (120, 125, 130… easier to read at a glance
+ * than 122), never below 5; null when the distance is shown in kilometres. Pure: tested.
+ */
+fun stepMetres(km: Double): Long? {
+    val metres = (mathRound(km * 1000 / 5) * 5).coerceAtLeast(5)
+    return if (km >= 1 || metres >= 1000) null else metres
 }
 
 object EnglishStrings : AppStrings {
@@ -314,7 +331,7 @@ object EnglishStrings : AppStrings {
     override val clear = "Clear"
 
     override fun distance(km: Double) =
-        if (km < 1) "${mathRound(km * 1000)} m" else "${oneDecimal(km)} km"
+        stepMetres(km)?.let { "$it m" } ?: "${oneDecimal(km)} km"
     override fun duration(minutes: Int) = if (minutes < 60) "$minutes min" else "${minutes / 60} h ${minutes % 60} min"
     override fun justNow() = "just now"
     override fun minutesAgo(minutes: Long) = "$minutes min ago"
@@ -524,6 +541,7 @@ object EnglishStrings : AppStrings {
         "On your phone only: Home, Work, recent and saved places, planned drives, where you parked, and your settings.",
         "Sent to the Jalanna server: an anonymous device id (no name, email or phone number), the reports, votes and flags you make, and your nickname if you set one. Reports are public on the map without a name.",
         "Places you add (name, kind, note and location) are stored on the server with your anonymous device id. Only you see them until a moderator approves them; then they appear in everyone's search without your name. Export or delete them with your data.",
+        "Problems you report with a place (which place, what is wrong, your note, and your position only if you choose \"It is where I am now\") are stored with your anonymous device id until a moderator has checked them. The correction to the place is kept without any link to you.",
         "Share my drive, only when you tap Share: destination, arrival time and position, for anyone with the link, until you stop, 30 minutes after arrival, or 12 hours. You see how many people have the link open; they are counted with a random number made up by each open page, nothing about them is kept.",
         "Searches: what you type and your approximate position go to the place search service (Photon, with OpenStreetMap data) and, when the Jalanna server is used, to that server to search Overture Maps places and places drivers added. Searches are not stored.",
         "Live traffic, only if you turn it on: speed and position in 2-minute pieces with no device id, nothing from the first and last 500 m of a trip. Only average road speeds are kept.",
@@ -605,6 +623,17 @@ object EnglishStrings : AppStrings {
     }
     override val placeNoteHint = "Note (optional), e.g. Level 2, next to the lifts"
     override val placeAdded = "Thanks! You can find it in search now; others will after a quick check."
+    override val reportPlaceProblem = "Report a problem with this place"
+    override val whatIsWrong = "What is wrong?"
+    override fun placeProblem(kind: com.roadpulse.app.data.PlaceProblemKind) = when (kind) {
+        com.roadpulse.app.data.PlaceProblemKind.WRONG_POSITION -> "The pin is in the wrong spot"
+        com.roadpulse.app.data.PlaceProblemKind.CLOSED -> "It has closed for good"
+        com.roadpulse.app.data.PlaceProblemKind.NOT_THERE -> "It is not there"
+    }
+    override val placeIsWhereIAm = "It is where I am now"
+    override val placeProblemNoteHint = "Where is it really? (street, building, landmark)"
+    override val placeProblemSent = "Thanks! We will check it and fix the place."
+    override val placeProblemFailed = "Could not send the report. Please try again later."
     override val placeAddFailed = "Could not add the place. Check the connection and try again."
     override val addedByDrivers = "Added by drivers"
     override val waitingForReview = "Waiting for review"
@@ -625,7 +654,7 @@ object ArabicStrings : AppStrings {
     override val clear = "مسح"
 
     override fun distance(km: Double) =
-        if (km < 1) "${mathRound(km * 1000)} م" else "${oneDecimal(km)} كم"
+        stepMetres(km)?.let { "$it م" } ?: "${oneDecimal(km)} كم"
     override fun duration(minutes: Int) = if (minutes < 60) "$minutes د" else "${minutes / 60} س ${minutes % 60} د"
     override fun justNow() = "الآن"
     override fun minutesAgo(minutes: Long) = "منذ $minutes د"
@@ -886,6 +915,7 @@ object ArabicStrings : AppStrings {
         "على هاتفك فقط: المنزل والعمل والأماكن الأخيرة والمحفوظة، والرحلات المخطط لها، ومكان ركن سيارتك، وإعداداتك.",
         "يُرسل إلى خادم Jalanna: معرّف جهاز مجهول (بلا اسم أو بريد أو رقم هاتف)، والبلاغات والتصويتات والإبلاغات التي تقوم بها، واسمك المستعار إن عيّنته. تظهر البلاغات على الخريطة بلا اسم.",
         "الأماكن التي تضيفها (الاسم والنوع والملاحظة والموقع) تُحفظ على الخادم مع معرّف جهازك المجهول. لا يراها غيرك حتى يوافق عليها مشرف، ثم تظهر في بحث الجميع دون اسمك. يمكنك تصديرها أو حذفها مع بياناتك.",
+        "المشكلات التي تبلّغ عنها في مكان (أي مكان، ما المشكلة، ملاحظتك، وموقعك فقط إذا اخترت «المكان حيث أنا الآن») تُحفظ مع معرّف جهازك المجهول حتى يراجعها مشرف. يبقى تصحيح المكان دون أي ربط بك.",
         "مشاركة الرحلة، فقط عند الضغط على مشاركة: الوجهة ووقت الوصول والموقع لمن لديه الرابط، حتى تتوقف أو بعد 30 دقيقة من الوصول أو 12 ساعة. ترى عدد من يفتحون الرابط؛ يُحسبون برقم عشوائي تنشئه كل صفحة مفتوحة، ولا يُحفظ عنهم شيء.",
         "حركة المرور، فقط إذا فعّلتها: السرعة والموقع على شكل أجزاء مدتها دقيقتان بلا معرّف جهاز، ولا شيء من أول وآخر 500 م من الرحلة. يُحتفظ بمتوسط سرعات الطرق فقط.",
         "مدة الحفظ: البلاغات 90 يومًا بعد انتهائها، ومتوسط سرعات الطرق 12 شهرًا (بلا معلومات عن السائقين).",
@@ -969,6 +999,17 @@ object ArabicStrings : AppStrings {
     }
     override val placeNoteHint = "ملاحظة (اختيارية)، مثل: الطابق 2 بجانب المصاعد"
     override val placeAdded = "شكرًا! يمكنك إيجاده في البحث الآن، وسيراه الآخرون بعد مراجعة سريعة."
+    override val reportPlaceProblem = "الإبلاغ عن مشكلة في هذا المكان"
+    override val whatIsWrong = "ما المشكلة؟"
+    override fun placeProblem(kind: com.roadpulse.app.data.PlaceProblemKind) = when (kind) {
+        com.roadpulse.app.data.PlaceProblemKind.WRONG_POSITION -> "الموقع على الخريطة خاطئ"
+        com.roadpulse.app.data.PlaceProblemKind.CLOSED -> "أُغلق نهائيًا"
+        com.roadpulse.app.data.PlaceProblemKind.NOT_THERE -> "غير موجود هناك"
+    }
+    override val placeIsWhereIAm = "المكان حيث أنا الآن"
+    override val placeProblemNoteHint = "أين هو فعلًا؟ (الشارع، المبنى، معلم قريب)"
+    override val placeProblemSent = "شكرًا! سنتحقق ونصحّح المكان."
+    override val placeProblemFailed = "تعذّر إرسال البلاغ. حاول مرة أخرى لاحقًا."
     override val placeAddFailed = "تعذّرت إضافة المكان. تحقق من الاتصال وحاول مجددًا."
     override val addedByDrivers = "أضافه السائقون"
     override val waitingForReview = "بانتظار المراجعة"

@@ -55,6 +55,26 @@ class CommunityPlacesClient(private val api: DeviceApi) {
     @Serializable private data class AddBody(val name: String, val kind: CommunityPlaceKind, val lat: Double, val lon: Double, val note: String?)
 }
 
+/** What a driver says is wrong with a place from search (same names as the server's PlaceProblemKind). */
+enum class PlaceProblemKind { WRONG_POSITION, CLOSED, NOT_THERE }
+
+/** "Report a problem with this place" on the server (needs the device token). A moderator checks each report. */
+class PlaceProblemsClient(private val api: DeviceApi) {
+    /** [at] is where the place really is (for WRONG_POSITION), when the driver knows it. */
+    suspend fun report(placeId: String, kind: PlaceProblemKind, at: GeoPoint?, note: String?) {
+        val body = Http.json.encodeToString(Body.serializer(), Body(placeId, kind, at?.lat, at?.lon, note?.trim()?.ifEmpty { null }))
+        api.call("POST", "/v1/places/problems", body)
+    }
+
+    /** A wrong position needs the right position or a note saying where the place is. Pure: tested. */
+    companion object {
+        fun canSend(kind: PlaceProblemKind?, hasPosition: Boolean, note: String): Boolean =
+            kind != null && (kind != PlaceProblemKind.WRONG_POSITION || hasPosition || note.trim().length >= 3)
+    }
+
+    @Serializable private data class Body(val placeId: String, val kind: PlaceProblemKind, val lat: Double?, val lon: Double?, val note: String?)
+}
+
 /** A named place from Overture Maps on the RoadPulse server (shops, clinics, condos…). */
 @Serializable
 data class DirectoryPlace(
@@ -69,7 +89,7 @@ data class DirectoryPlace(
     /** "Clinic · Jalan Ampang, Kuala Lumpur" (no kind when Overture's category is unclear or wrong). */
     fun toPlace(s: AppStrings): Place {
         val kind = OvertureCategories.kind(category, name)?.let(s::placeKind)
-        return Place(name, listOfNotNull(kind, address?.takeIf { it.isNotBlank() }).joinToString(" · "), GeoPoint(lat, lon))
+        return Place(name, listOfNotNull(kind, address?.takeIf { it.isNotBlank() }).joinToString(" · "), GeoPoint(lat, lon), directoryId = id)
     }
 }
 

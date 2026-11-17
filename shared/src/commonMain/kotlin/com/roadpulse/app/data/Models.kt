@@ -6,7 +6,11 @@ import kotlinx.serialization.Serializable
 data class GeoPoint(val lat: Double, val lon: Double)
 
 @Serializable
-data class Place(val name: String, val description: String, val location: GeoPoint)
+data class Place(
+    val name: String, val description: String, val location: GeoPoint,
+    /** Set for places from the server's Overture data: drivers can report a problem with these. */
+    val directoryId: String? = null,
+)
 
 @Serializable
 data class Maneuver(

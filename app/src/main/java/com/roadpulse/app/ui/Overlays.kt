@@ -366,9 +366,16 @@ fun PreviewOverlay(
     traffic: List<com.roadpulse.app.nav.RouteTrafficInfo> = emptyList(),
     /** Go with route [index] (from the list view). */
     onGoRoute: (Int) -> Unit = {},
+    /** "Report a problem with this place" (kind, use my position, note); null hides it. */
+    onPlaceProblem: ((com.roadpulse.app.data.PlaceProblemKind, Boolean, String) -> Unit)? = null,
 ) {
     val context = LocalContext.current
     var listMode by remember { mutableStateOf(false) }
+    var showPlaceProblem by remember { mutableStateOf(false) }
+    if (showPlaceProblem && destination != null && onPlaceProblem != null) {
+        PlaceProblemDialog(destination.name, onSend = { kind, here, note -> showPlaceProblem = false; onPlaceProblem(kind, here, note) },
+            onDismiss = { showPlaceProblem = false })
+    }
     Box(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(12.dp)) {
         CircleButton(
             icon = Icons.AutoMirrored.Filled.ArrowBack,
@@ -420,6 +427,13 @@ fun PreviewOverlay(
                 }
                 if (stops.isEmpty() && parkingNearby.isEmpty()) {
                     Text(strings.tipAddStop, fontSize = 12.sp, color = RP.TextSecondary, modifier = Modifier.padding(top = 4.dp))
+                }
+                // Only for places from the server's own data, which a moderator can correct.
+                if (onPlaceProblem != null && destination?.directoryId != null) {
+                    Text(
+                        strings.reportPlaceProblem, fontSize = 13.sp, color = RP.Brand,
+                        modifier = Modifier.padding(top = 6.dp).clickable { showPlaceProblem = true },
+                    )
                 }
                 Spacer(Modifier.height(12.dp))
 
@@ -860,3 +874,48 @@ private val CATEGORY_CHIPS = listOf(
     com.roadpulse.app.data.PlaceCategory.REST_AREA to Icons.Filled.LocalCafe,
 )
 
+
+/** "Report a problem with this place": what is wrong, whether it is where the driver is now, and a note. */
+@Composable
+private fun PlaceProblemDialog(
+    placeName: String, onSend: (com.roadpulse.app.data.PlaceProblemKind, Boolean, String) -> Unit, onDismiss: () -> Unit,
+) {
+    var kind by remember { mutableStateOf<com.roadpulse.app.data.PlaceProblemKind?>(null) }
+    var here by remember { mutableStateOf(false) }
+    var note by remember { mutableStateOf("") }
+    val moving = kind == com.roadpulse.app.data.PlaceProblemKind.WRONG_POSITION
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(strings.reportPlaceProblem) },
+        text = {
+            Column {
+                Text(placeName, fontWeight = FontWeight.Medium)
+                Text(strings.whatIsWrong, fontSize = 14.sp, color = RP.TextSecondary, modifier = Modifier.padding(top = 12.dp))
+                com.roadpulse.app.data.PlaceProblemKind.entries.forEach { k ->
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable { kind = k }) {
+                        androidx.compose.material3.RadioButton(selected = kind == k, onClick = null)
+                        Text(strings.placeProblem(k), modifier = Modifier.padding(start = 8.dp, top = 10.dp, bottom = 10.dp))
+                    }
+                }
+                if (moving) {
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable { here = !here }) {
+                        androidx.compose.material3.Checkbox(checked = here, onCheckedChange = null)
+                        Text(strings.placeIsWhereIAm, modifier = Modifier.padding(start = 8.dp, top = 10.dp, bottom = 10.dp))
+                    }
+                }
+                androidx.compose.material3.OutlinedTextField(
+                    value = note, onValueChange = { note = it.take(200) },
+                    label = { Text(if (moving) strings.placeProblemNoteHint else strings.placeNoteHint) },
+                    modifier = Modifier.padding(top = 8.dp),
+                )
+            }
+        },
+        confirmButton = {
+            androidx.compose.material3.TextButton(
+                enabled = com.roadpulse.app.data.PlaceProblemsClient.canSend(kind, moving && here, note),
+                onClick = { onSend(kind!!, moving && here, note.trim()) },
+            ) { Text(strings.send) }
+        },
+        dismissButton = { androidx.compose.material3.TextButton(onClick = onDismiss) { Text(strings.cancel) } },
+    )
+}
