@@ -61,6 +61,8 @@ interface Narrator {
     val schoolZone: String
     /** Spoken when a route around heavy traffic would save time. */
     fun fasterRouteFound(savedMinutes: Int): String
+    /** Spoken when a road on the route ahead was reported as closed and a route around it is ready. */
+    val closureAheadNewRoute: String
 }
 
 fun narratorFor(language: GuidanceLanguage): Narrator = when (language) {
@@ -122,6 +124,7 @@ object EnglishNarrator : Narrator {
     override fun schoolZoneAhead(meters: Int) = "School zone in $meters meters. Watch for children."
     override val schoolZone = "School zone"
     override fun fasterRouteFound(savedMinutes: Int) = "Heavy traffic ahead. A faster route saves $savedMinutes minutes."
+    override val closureAheadNewRoute = "Road closed ahead. A new route is ready."
 }
 
 /**
@@ -232,6 +235,7 @@ object MalayNarrator : Narrator {
     override fun schoolZoneAhead(meters: Int) = "Zon sekolah dalam $meters meter. Berhati-hati dengan kanak-kanak."
     override val schoolZone = "Zon sekolah"
     override fun fasterRouteFound(savedMinutes: Int) = "Kesesakan teruk di hadapan. Laluan lebih pantas menjimatkan $savedMinutes minit."
+    override val closureAheadNewRoute = "Jalan ditutup di hadapan. Laluan baharu tersedia."
 
     private val ordinals = listOf(
         "pertama", "kedua", "ketiga", "keempat", "kelima",
@@ -368,6 +372,7 @@ object ArabicNarrator : Narrator {
     override fun schoolZoneAhead(meters: Int) = "منطقة مدرسة بعد ${meters(meters)}. انتبه للأطفال."
     override val schoolZone = "منطقة مدرسة"
     override fun fasterRouteFound(savedMinutes: Int) = "ازدحام شديد أمامك. يوجد مسار أسرع يوفّر $savedMinutes ${if (savedMinutes in 3..10) "دقائق" else "دقيقة"}."
+    override val closureAheadNewRoute = "الطريق مغلق أمامك. يوجد مسار جديد جاهز."
 
     private val ordinals = listOf("الأول", "الثاني", "الثالث", "الرابع", "الخامس", "السادس", "السابع", "الثامن", "التاسع", "العاشر")
 

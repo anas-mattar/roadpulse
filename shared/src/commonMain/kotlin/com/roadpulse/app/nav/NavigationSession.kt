@@ -77,8 +77,12 @@ data class NavState(
     val upcomingStreet: String? = null,
 )
 
-/** A route that avoids jammed roads and saves [savedSeconds] compared with staying on the current one. */
-data class FasterRoute(val route: Route, val savedSeconds: Double)
+/**
+ * A route offered during the drive. Either one that avoids jammed roads and saves [savedSeconds]
+ * compared with staying on the current one, or ([closureAhead]) one that goes around a road
+ * reported as closed on the current route: then [savedSeconds] is usually negative (it takes longer).
+ */
+data class FasterRoute(val route: Route, val savedSeconds: Double, val closureAhead: Boolean = false)
 
 /**
  * The single active drive. Shared by [NavigationService] (feeds GPS fixes, speaks prompts,
@@ -150,6 +154,9 @@ object NavigationSession {
     }
 
     private var trafficJob: Job? = null
+    private var closureJob: Job? = null
+    /** Closures already offered a way around (or with no way around): asked once per drive. */
+    private val closuresHandled = HashSet<String>()
     private var fasterRouteSuppressedUntil = 0L
 
     /** Every few minutes: how much traffic slows the route ahead, and whether a detour is worth it. */
@@ -166,6 +173,49 @@ object NavigationSession {
                 delay(TRAFFIC_CHECK_MS)
             }
         }
+        // More often than traffic: a closed road ahead needs an answer before the car gets there.
+        closureJob?.cancel()
+        closureJob = scope.launch {
+            while (_state.value != null) {
+                delay(CLOSURE_CHECK_MS)
+                runCatching { checkClosures() }.onFailure { e ->
+                    if (e is CancellationException) throw e
+                    log?.event(now(), "closure_check", "failed: ${e::class.simpleName}")
+                }
+            }
+        }
+    }
+
+    /**
+     * A road on the route ahead was reported as closed (after the route was planned): offers a
+     * route around it, once per closure. Nothing is offered when no route goes around it.
+     */
+    suspend fun checkClosures() {
+        val url = platform.backendUrl()
+        val current = _state.value ?: return
+        if (url.isEmpty() || current.rerouting || current.fasterRoute != null) return
+        val onRoute = routeReports ?: return
+        val position = current.displayPosition ?: return
+        val to = current.destination.location
+        val stops = remainingStops()
+        val closed = com.roadpulse.app.data.Closures.around(url, position, to, stops, maxAgeMs = CLOSURE_CHECK_MS)
+        fun key(p: GeoPoint) = "closure:${p.lat},${p.lon}"
+        val ahead = closed.filter { c ->
+            val along = onRoute.alongOfPoint(key(c), c)
+            along != null && along - carAlongM > CLOSURE_MIN_AHEAD_M && key(c) !in closuresHandled
+        }
+        if (ahead.isEmpty()) return
+        closuresHandled += ahead.map(::key)
+        log?.event(now(), "closure_ahead", "count=${ahead.size}")
+        val alt = router.route(position, to, stops, platform.routeOptions(),
+            heading = com.roadpulse.app.data.TravelHeading.from(position), closures = closed)
+        // Still through the closed road: there is no way around it, so there is nothing to offer.
+        val altReports = RouteReports(alt.shape)
+        if (ahead.any { altReports.alongOfPoint(key(it), it) != null }) return
+        val latest = _state.value ?: return
+        if (latest.route !== current.route || latest.rerouting || latest.fasterRoute != null) return
+        _state.update { it?.copy(fasterRoute = FasterRoute(alt, latest.remainingSeconds - alt.timeSeconds, closureAhead = true)) }
+        speak(platform.narrator().closureAheadNewRoute)
     }
 
     private suspend fun checkTraffic() {
@@ -235,8 +285,10 @@ object NavigationSession {
 
     /** The driver kept the current route: no new offer for a while. */
     fun declineFasterRoute() {
+        val wasClosure = _state.value?.fasterRoute?.closureAhead == true
         _state.update { it?.copy(fasterRoute = null) }
-        fasterRouteSuppressedUntil = now() + FASTER_ROUTE_QUIET_MS
+        // Keeping the route past a closure says nothing about traffic offers.
+        if (!wasClosure) fasterRouteSuppressedUntil = now() + FASTER_ROUTE_QUIET_MS
     }
 
     /** Restores a saved drive if one exists and none is active. Returns true if a drive is now active. */
@@ -297,6 +349,8 @@ object NavigationSession {
         announcedCameras.clear()
         platform.driveEnded()
         trafficJob?.cancel()
+        closureJob?.cancel()
+        closuresHandled.clear()
         schoolsJob?.cancel()
         schools = emptyList()
         schoolRoute = null
@@ -621,6 +675,9 @@ object NavigationSession {
     private const val TRAFFIC_CHECK_MS = 180_000L
     private const val FASTER_ROUTE_MIN_SAVING_S = 180.0
     private const val FASTER_ROUTE_QUIET_MS = 10 * 60_000L
+    private const val CLOSURE_CHECK_MS = 45_000L
+    /** A closure nearer than this is too close to turn away from in time: the spoken warning covers it. */
+    private const val CLOSURE_MIN_AHEAD_M = 300.0
     private const val SCHOOL_HINT_M = 600.0
     private const val PASS_NEAR_M = 80.0
     private const val SPEEDING_ALERT_GAP_MS = 20_000L

@@ -728,7 +728,8 @@ private fun FasterRouteCard(faster: com.roadpulse.app.nav.FasterRoute, onTake: (
     }
     Surface(shape = RoundedCornerShape(20.dp), color = RP.TealDark, contentColor = Color.White, shadowElevation = 6.dp, modifier = modifier.fillMaxWidth()) {
         Column(Modifier.padding(14.dp)) {
-            Text(strings.fasterRoute(Math.round(faster.savedSeconds / 60).toInt()), fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+            val minutes = Math.round(faster.savedSeconds / 60).toInt()
+            Text(if (faster.closureAhead) strings.closureDetour(-minutes) else strings.fasterRoute(minutes), fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
             Row(Modifier.fillMaxWidth().padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Button(onClick = onTake, modifier = Modifier.weight(1f).height(48.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = RP.TealDark)) {

@@ -230,6 +230,8 @@ interface AppStrings {
     val allow: String
     val notNow: String
     fun fasterRoute(savedMinutes: Int): String
+    /** The offer of a route around a road reported as closed; [extraMinutes] longer (0 or less: no longer). */
+    fun closureDetour(extraMinutes: Int): String
     val takeRoute: String
     val keepRoute: String
     fun trafficDelay(minutes: Int): String
@@ -531,6 +533,8 @@ object EnglishStrings : AppStrings {
     override val allow = "Allow"
     override val notNow = "Not now"
     override fun fasterRoute(savedMinutes: Int) = "Faster route found · saves $savedMinutes min"
+    override fun closureDetour(extraMinutes: Int) =
+        if (extraMinutes > 0) "Road closed ahead · new route, +$extraMinutes min" else "Road closed ahead · new route ready"
     override val takeRoute = "Take it"
     override val keepRoute = "No thanks"
     override fun trafficDelay(minutes: Int) = "+$minutes min traffic"
@@ -905,6 +909,8 @@ object ArabicStrings : AppStrings {
     override val allow = "سماح"
     override val notNow = "ليس الآن"
     override fun fasterRoute(savedMinutes: Int) = "وُجد مسار أسرع · يوفّر $savedMinutes د"
+    override fun closureDetour(extraMinutes: Int) =
+        if (extraMinutes > 0) "الطريق مغلق أمامك · مسار جديد، +$extraMinutes د" else "الطريق مغلق أمامك · مسار جديد جاهز"
     override val takeRoute = "اسلكه"
     override val keepRoute = "لا، شكرًا"
     override fun trafficDelay(minutes: Int) = "+$minutes د بسبب الازدحام"

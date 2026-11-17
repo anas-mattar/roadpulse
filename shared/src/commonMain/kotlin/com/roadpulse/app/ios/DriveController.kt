@@ -66,6 +66,8 @@ class DriveSnapshot(
     val trafficDelayMinutes: Int,
     /** A faster route around heavy traffic: minutes it saves, or 0 when none is offered. */
     val fasterRouteSavesMinutes: Int,
+    /** The route offer to show ("Faster route found…" or "Road closed ahead…"), or "" for none. */
+    val routeOfferTitle: String,
     /** The car just passed a report: ask "Police still there?" (null when not asking). */
     val stillThereId: String?,
     val stillThereQuestion: String?,
@@ -361,6 +363,10 @@ class DriveController(var routingUrl: String) {
             reportAheadM = s.reportAhead?.metersAhead ?: -1.0,
             trafficDelayMinutes = mathRound(s.trafficDelaySeconds / 60).toInt(),
             fasterRouteSavesMinutes = s.fasterRoute?.let { mathRound(it.savedSeconds / 60).toInt() } ?: 0,
+            routeOfferTitle = s.fasterRoute?.let {
+                val minutes = mathRound(it.savedSeconds / 60).toInt()
+                if (it.closureAhead) stringsFor(language).closureDetour(-minutes) else stringsFor(language).fasterRoute(minutes)
+            }.orEmpty(),
             stillThereId = stillThere?.id,
             stillThereQuestion = stillThere?.let { stringsFor(language).stillThereQuestion(it.type) },
             stillThereColorHex = stillThere?.type?.colorHex,

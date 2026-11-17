@@ -27,7 +27,7 @@ extension ContentView {
             if let point = model.pinned { pinnedCard(point, driving: true) }
             speedRow(s)
             if let question = s.stillThereQuestion { stillThereCard(question, colorHex: s.stillThereColorHex ?? "#4C4F69") }
-            if s.fasterRouteSavesMinutes > 0 { fasterRouteCard(s) }
+            if !s.routeOfferTitle.isEmpty { fasterRouteCard(s) }
             tripCard(s)
         }
     }
@@ -154,7 +154,7 @@ extension ContentView {
 
     func fasterRouteCard(_ s: DriveSnapshot) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text(strings.fasterRoute(savedMinutes: s.fasterRouteSavesMinutes)).font(.headline)
+            Text(s.routeOfferTitle).font(.headline)
             HStack(spacing: 10) {
                 Button { drive.takeFasterRoute() } label: {
                     Text(strings.takeRoute).bold().frame(maxWidth: .infinity).frame(height: 46)
@@ -170,11 +170,10 @@ extension ContentView {
         .padding(14)
         .background(Color(red: 0.06, green: 0.43, blue: 0.34))
         .clipShape(RoundedRectangle(cornerRadius: 20))
-        .task(id: s.fasterRouteSavesMinutes) {
+        .task(id: s.routeOfferTitle) {
             // Closes by itself (keeping the route) after 20 seconds.
             try? await Task.sleep(nanoseconds: 20_000_000_000)
-            let saves = drive.snapshot?.fasterRouteSavesMinutes ?? 0
-            if saves > 0 { drive.keepRoute() }
+            if !(drive.snapshot?.routeOfferTitle ?? "").isEmpty { drive.keepRoute() }
         }
     }
 

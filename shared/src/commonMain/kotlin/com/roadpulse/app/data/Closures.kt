@@ -55,10 +55,11 @@ object Closures {
      * server, when the server is slow (more than [budgetMs]) or cannot be reached: routing never
      * waits long for this. A recent answer that covers the trip is reused.
      */
-    suspend fun around(backendUrl: String, from: GeoPoint, to: GeoPoint, stops: List<GeoPoint> = emptyList(), budgetMs: Long = 1500): List<GeoPoint> {
+    suspend fun around(backendUrl: String, from: GeoPoint, to: GeoPoint, stops: List<GeoPoint> = emptyList(), budgetMs: Long = 1500,
+                       maxAgeMs: Long = FRESH_MS): List<GeoPoint> {
         if (backendUrl.isEmpty()) return emptyList()
         val now = wallClockMillis()
-        val recent = last?.takeIf { f -> abs(now - f.atMillis) < FRESH_MS && listOf(from, to).all { p -> f.areas.any { it.contains(p) } } }
+        val recent = last?.takeIf { f -> abs(now - f.atMillis) < maxAgeMs && listOf(from, to).all { p -> f.areas.any { it.contains(p) } } }
         val closures = recent?.closures ?: withTimeoutOrNull(budgetMs) {
             runCatching {
                 val areas = areas(from, to)
