@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Tester build: without the notification-access service (music controls), so that Google Play
+     Protect lets testers install the APK from a chat app or a browser. See app/build.gradle.kts. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+    <application>
+        <service android:name="com.roadpulse.app.nav.MediaAccessService" tools:node="remove" />
+    </application>
+</manifest>

@@ -82,6 +82,22 @@ class OverlayScreenshotTest {
     }
 
     @Test
+    fun exploreWithManyResults() = shot("1h_explore_search_many", RP.Field) {
+        ExploreOverlay(
+            query = "mcity",
+            results = listOf(
+                place, Place("M City Kopitiam", "Jalan MR 1/3, Selayang, Selangor, Malaysia", GeoPoint(3.25, 101.65)),
+                Place("Mcity Inn", "Jalan South Yu Seng, Miri, Sarawak, Malaysia", GeoPoint(4.39, 113.99)),
+                Place("MCity Plastic & Packaging", "Jalan Haji Lampam, Miri, Sarawak, Malaysia", GeoPoint(4.40, 113.98)),
+                Place("M City Dental Clinic", "Clinic · Jalan Ampang, Kuala Lumpur", GeoPoint(3.1587, 101.748)),
+                Place("Sky Gym at M-City Residence", "Gym · Jalan Ampang, Kuala Lumpur", GeoPoint(3.1589, 101.7474)),
+            ),
+            searchFrom = GeoPoint(3.21, 101.75),
+            onQueryChange = {}, onClear = {}, onSelect = {}, onOpenSettings = {}, onRecenter = {}, onReport = {},
+        )
+    }
+
+    @Test
     fun exploreWithResults() = shot("1b_explore_search", RP.Field) {
         ExploreOverlay(
             query = "M City",

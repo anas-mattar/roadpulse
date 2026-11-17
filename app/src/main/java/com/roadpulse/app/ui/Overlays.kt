@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -134,8 +135,12 @@ fun ExploreOverlay(
     /** Points, level and badges; null hides the button (no server). */
     onOpenProfile: (() -> Unit)? = null,
 ) {
-    Box(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(12.dp)) {
-        Column(Modifier.align(Alignment.TopEnd), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    // Typing a search with results: the panel grows to the full height above the keyboard and the
+    // map buttons step aside, so the results are easy to read. (The search box keeps its place in
+    // the layout, so the keyboard stays open while this changes.)
+    val searching = results.isNotEmpty() && query.isNotEmpty() && categoryTitle == null
+    Box(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().imePadding().padding(12.dp)) {
+        if (!searching) Column(Modifier.align(Alignment.TopEnd), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             CircleButton(
                 icon = Icons.Filled.Menu,
                 description = strings.menu,
@@ -148,7 +153,7 @@ fun ExploreOverlay(
         }
 
         Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth()) {
-            Column(Modifier.align(Alignment.End), horizontalAlignment = Alignment.End) {
+            if (!searching) Column(Modifier.align(Alignment.End), horizontalAlignment = Alignment.End) {
                 CircleButton(icon = Icons.Filled.MyLocation, description = strings.showMyLocation, onClick = onRecenter)
                 Spacer(Modifier.height(10.dp))
                 Surface(
@@ -167,7 +172,7 @@ fun ExploreOverlay(
                 Spacer(Modifier.height(12.dp))
             }
 
-            Island(Modifier.fillMaxWidth()) {
+            Island(if (searching) Modifier.fillMaxSize() else Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(12.dp)) {
                     if (categoryTitle != null) {
                         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 4.dp, bottom = 4.dp)) {
@@ -177,7 +182,7 @@ fun ExploreOverlay(
                         }
                     }
                     if (results.isNotEmpty()) {
-                        LazyColumn(Modifier.heightIn(max = 300.dp)) {
+                        LazyColumn(if (searching) Modifier.weight(1f) else Modifier.heightIn(max = 300.dp)) {
                             items(results) { place ->
                                 val km = if (categoryTitle == null) searchFrom?.let { com.roadpulse.app.data.Geo.distanceMeters(it, place.location) / 1000 } else null
                                 ResultRow(place, distance = km?.let { formatKm(it) }) { onSelect(place) }

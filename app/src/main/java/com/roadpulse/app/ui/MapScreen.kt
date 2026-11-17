@@ -625,7 +625,7 @@ fun MapScreen(viewModel: MapViewModel = viewModel()) {
                     onCloseRoutes = viewModel::closeAlternatives,
                     following = following,
                     onRecenter = { following = true },
-                    track = if (musicOn) track else null,
+                    track = if (musicOn && BuildConfig.MUSIC_CONTROLS) track else null,
                     onPlayPause = com.roadpulse.app.nav.NowPlaying::playPause,
                     onNextTrack = com.roadpulse.app.nav.NowPlaying::next,
                     onPreviousTrack = com.roadpulse.app.nav.NowPlaying::previous,
@@ -1346,7 +1346,7 @@ private fun VoiceSettingsDialog(onDismiss: () -> Unit, onClearPlaces: () -> Unit
                     }
                     "voice" -> {
                         SettingSwitch(strings.muteVoiceSetting, muted, VoiceSettings::setMuted)
-                        MusicSettings()
+                        if (BuildConfig.MUSIC_CONTROLS) MusicSettings() // not in tester builds (see app/build.gradle.kts)
                     }
                     "navigation" -> NavigationSettings()
                     "vehicle" -> VehicleSettings()

@@ -27,6 +27,8 @@ android {
         buildConfigField("String", "LOCAL_BACKEND_URL", "\"\"")
         buildConfigField("String", "LOCAL_MAP_STYLE_URL", "\"\"")
         buildConfigField("String", "LOCAL_MAP_STYLE_DARK_URL", "\"\"")
+        // Music controls while driving need Android's "notification access" (see NowPlaying).
+        buildConfigField("boolean", "MUSIC_CONTROLS", "true")
     }
 
     signingConfigs {
@@ -59,6 +61,11 @@ android {
             initWith(getByName("release"))
             signingConfig = signingConfigs.getByName("tester")
             applicationIdSuffix = ".beta"
+            // No music controls in tester builds: Google Play Protect in Malaysia blocks the install of
+            // apps from outside the Play Store that ask for notification access when they are opened
+            // from a chat app, a browser or a file manager ("App not installed"). The service is
+            // taken out of this build's manifest (src/beta/AndroidManifest.xml).
+            buildConfigField("boolean", "MUSIC_CONTROLS", "false")
             versionNameSuffix = "-beta"
             matchingFallbacks += "release"
         }
